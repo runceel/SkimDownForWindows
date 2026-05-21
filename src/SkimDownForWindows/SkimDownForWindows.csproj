@@ -34,15 +34,6 @@
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
 
-  <!-- Exclude the unit-test project's sources from the main app build. -->
-  <ItemGroup>
-    <Compile Remove="tests\**" />
-    <None Remove="tests\**" />
-    <Content Remove="tests\**" />
-    <Page Remove="tests\**" />
-    <ApplicationDefinition Remove="tests\**" />
-  </ItemGroup>
-
   <!--
     Defining the "Msix" ProjectCapability here allows the Single-project MSIX Packaging
     Tools extension to be activated for this project even if the Windows App SDK Nuget

@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SkimDownForWindows.Tests/SkimDownForWindows.Tests.csproj" />
+    <Project Path="src/SkimDownForWindows/SkimDownForWindows.csproj" />
+  </Folder>
+</Solution>

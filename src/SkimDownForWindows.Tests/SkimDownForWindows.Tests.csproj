@@ -24,13 +24,13 @@
     depend on WinUI / WindowsAppSDK, so the test project can target plain net10.0.
   -->
   <ItemGroup>
-    <Compile Include="..\Utilities\PathHelpers.cs" Link="Source\PathHelpers.cs" />
-    <Compile Include="..\Models\MarkdownTreeItem.cs" Link="Source\MarkdownTreeItem.cs" />
-    <Compile Include="..\Models\LinkClass.cs" Link="Source\LinkClass.cs" />
-    <Compile Include="..\Markdown\MarkdownScanner.cs" Link="Source\MarkdownScanner.cs" />
-    <Compile Include="..\Markdown\MarkdownTreeBuilder.cs" Link="Source\MarkdownTreeBuilder.cs" />
-    <Compile Include="..\Markdown\LinkResolver.cs" Link="Source\LinkResolver.cs" />
-    <Compile Include="..\Markdown\InitialSelectionPicker.cs" Link="Source\InitialSelectionPicker.cs" />
+    <Compile Include="..\SkimDownForWindows\Utilities\PathHelpers.cs"            Link="Source\PathHelpers.cs" />
+    <Compile Include="..\SkimDownForWindows\Models\MarkdownTreeItem.cs"          Link="Source\MarkdownTreeItem.cs" />
+    <Compile Include="..\SkimDownForWindows\Models\LinkClass.cs"                 Link="Source\LinkClass.cs" />
+    <Compile Include="..\SkimDownForWindows\Markdown\MarkdownScanner.cs"         Link="Source\MarkdownScanner.cs" />
+    <Compile Include="..\SkimDownForWindows\Markdown\MarkdownTreeBuilder.cs"     Link="Source\MarkdownTreeBuilder.cs" />
+    <Compile Include="..\SkimDownForWindows\Markdown\LinkResolver.cs"            Link="Source\LinkResolver.cs" />
+    <Compile Include="..\SkimDownForWindows\Markdown\InitialSelectionPicker.cs"  Link="Source\InitialSelectionPicker.cs" />
   </ItemGroup>
 
 </Project>

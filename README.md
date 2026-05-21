@@ -55,21 +55,28 @@ Following the original SPEC, plus extra hardening for the Windows port:
 
 ```
 SkimDownForWindows/
-├── App/                       (App.xaml, MainWindow, MainPage shell)
-├── Core/
-│   ├── SettingsStore.cs       JSON settings persistence
-│   └── FolderWatcher.cs       FileSystemWatcher with debounce + UI marshal
-├── Markdown/
-│   ├── MarkdownScanner.cs     Recursive .md scan with SPEC exclusions
-│   ├── MarkdownTreeBuilder.cs Folder-first tree, case-insensitive
-│   ├── LinkResolver.cs        Anchor / relative-md / external / blocked
-│   └── InitialSelectionPicker.cs  Last-opened → README.md → first-file
-├── Models/                    AppSettings, MarkdownTreeItem, LinkClass
-├── Utilities/PathHelpers.cs   Canonicalization + folder-boundary checks
-├── ViewModels/MainPageViewModel.cs
-├── Viewer/MarkdownPreview.xaml(.cs)   WebView2 wrapper
-├── Assets/Web/                Bundled renderer.html / renderer.js / CSS / vendor
-└── tests/                     MSTest unit tests for the core logic
+├── SkimDownForWindows.slnx        Solution file (XML format) — references both projects
+└── src/
+    ├── SkimDownForWindows/        Main WinUI 3 app
+    │   ├── SkimDownForWindows.csproj
+    │   ├── App.xaml(.cs)
+    │   ├── MainWindow.xaml(.cs)
+    │   ├── MainPage.xaml(.cs)
+    │   ├── Package.appxmanifest
+    │   ├── Core/
+    │   │   ├── SettingsStore.cs       JSON settings persistence
+    │   │   └── FolderWatcher.cs       FileSystemWatcher with debounce + UI marshal
+    │   ├── Markdown/
+    │   │   ├── MarkdownScanner.cs     Recursive .md scan with SPEC exclusions
+    │   │   ├── MarkdownTreeBuilder.cs Folder-first tree, case-insensitive
+    │   │   ├── LinkResolver.cs        Anchor / relative-md / external / blocked
+    │   │   └── InitialSelectionPicker.cs  Last-opened → README.md → first-file
+    │   ├── Models/                    AppSettings, MarkdownTreeItem, LinkClass
+    │   ├── Utilities/PathHelpers.cs   Canonicalization + folder-boundary checks
+    │   ├── ViewModels/MainPageViewModel.cs
+    │   ├── Viewer/MarkdownPreview.xaml(.cs)   WebView2 wrapper
+    │   └── Assets/Web/                Bundled renderer.html / renderer.js / CSS / vendor
+    └── SkimDownForWindows.Tests/  MSTest unit tests (net10.0, no UI deps)
 ```
 
 ## Prerequisites
@@ -79,28 +86,32 @@ SkimDownForWindows/
 - .NET 10 SDK
 - WinUI 3 templates (`dotnet new install Microsoft.WindowsAppSDK.WinUI.CSharp.Templates`)
 - `winapp` CLI (`winget install Microsoft.WinAppCLI`)
+- (Optional, for one-step build+run) the `winui-dev-workflow` skill from the
+  [`awesome-copilot/winui`](https://github.com/microsoft/win-dev-skills)
+  plugin: `copilot plugin install winui@awesome-copilot`
 
 ## Build & run
 
 ```powershell
-# Build and launch (auto-detects platform):
-.\BuildAndRun.ps1                          # builds + runs with debug output
-.\BuildAndRun.ps1 -SkipRun                 # build only
+# Build everything via the solution file:
+dotnet build SkimDownForWindows.slnx
 
-# Or directly:
+# Build + launch the WinUI 3 app (requires winapp CLI):
+cd src\SkimDownForWindows
 dotnet build SkimDownForWindows.csproj
-winapp run .\bin\<Platform>\Debug\<TargetFramework>\win-<arch>
-```
+winapp run .\bin\<Platform>\Debug\<TargetFramework>\win-<arch>  --debug-output
 
-The included `BuildAndRun.ps1` (from the
-[`winui-dev-workflow`](https://github.com/microsoft/awesome-copilot) skill)
-handles platform detection and packaging.
+# Or, if the winui plugin is installed, one-shot build+launch with auto
+# platform / packaging detection:
+cd src\SkimDownForWindows
+~\.copilot\installed-plugins\awesome-copilot\winui\skills\winui-dev-workflow\BuildAndRun.ps1
+```
 
 ## Tests
 
 ```powershell
 # 30 always-on unit tests:
-cd tests
+cd src\SkimDownForWindows.Tests
 dotnet test
 
 # Add 9 integration tests against the upstream samples corpus
@@ -176,17 +187,6 @@ to plain text or unstyled code blocks as the original SPEC prescribes.
 - **Scroll-position persistence per file.**
 - **KaTeX / Mermaid rendering.** The renderer is wired with markdown-it,
   highlight.js, and DOMPurify; math/diagrams are easy follow-ups.
-
-## Bundled Copilot CLI plugin
-
-The repo ships a verbatim copy of the upstream **`winui`** plugin
-(from [microsoft/win-dev-skills](https://github.com/microsoft/win-dev-skills))
-under `.github/copilot/plugins/winui/`. Anyone cloning this repo gets the
-same skills that built it — `winui-dev-workflow`, `winui-design`,
-`winui-code-review`, `winui-packaging`, `winui-ui-testing`,
-`winui-wpf-migration`, `winui-setup`, `winui-session-report`, plus the
-`winui-dev` agent — without needing to install the marketplace plugin
-separately. See [`.github/copilot/plugins/README.md`](.github/copilot/plugins/README.md).
 
 ## License
 
