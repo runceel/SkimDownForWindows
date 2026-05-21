@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "SkimDownForWindows (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "SkimDownForWindows (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

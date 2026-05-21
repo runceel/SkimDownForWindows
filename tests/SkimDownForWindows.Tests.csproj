@@ -1,0 +1,36 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>SkimDownForWindows.Tests</RootNamespace>
+    <!-- Re-define just enough symbols so the main project's [ObservableProperty]
+         attribute usage in MarkdownTreeItem doesn't break compilation here. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" Version="4.0.2" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
+
+  <!--
+    Pull in only the UI-agnostic source files from the main app. These don't
+    depend on WinUI / WindowsAppSDK, so the test project can target plain net10.0.
+  -->
+  <ItemGroup>
+    <Compile Include="..\Utilities\PathHelpers.cs" Link="Source\PathHelpers.cs" />
+    <Compile Include="..\Models\MarkdownTreeItem.cs" Link="Source\MarkdownTreeItem.cs" />
+    <Compile Include="..\Models\LinkClass.cs" Link="Source\LinkClass.cs" />
+    <Compile Include="..\Markdown\MarkdownScanner.cs" Link="Source\MarkdownScanner.cs" />
+    <Compile Include="..\Markdown\MarkdownTreeBuilder.cs" Link="Source\MarkdownTreeBuilder.cs" />
+    <Compile Include="..\Markdown\LinkResolver.cs" Link="Source\LinkResolver.cs" />
+    <Compile Include="..\Markdown\InitialSelectionPicker.cs" Link="Source\InitialSelectionPicker.cs" />
+  </ItemGroup>
+
+</Project>

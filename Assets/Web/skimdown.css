@@ -1,0 +1,166 @@
+/* SkimDown — quiet reader styling.
+ * Light/Dark/System themes flip via the <body data-theme="..."> attribute. */
+
+:root {
+    color-scheme: light dark;
+    --skim-bg: #ffffff;
+    --skim-fg: #1f2328;
+    --skim-muted: #59636e;
+    --skim-border: #d0d7de;
+    --skim-soft: #f6f8fa;
+    --skim-soft-strong: #eaeef2;
+    --skim-link: #0969da;
+    --skim-mark-bg: #fff5b1;
+    --skim-mark-current-bg: #ffd33d;
+    --skim-blockquote: #59636e;
+    --skim-code-bg: #f6f8fa;
+    --skim-table-stripe: #f6f8fa;
+    --skim-content-max: 760px;
+    --skim-pad: clamp(16px, 4vw, 56px);
+}
+
+body[data-theme="dark"] {
+    color-scheme: dark;
+    --skim-bg: #0d1117;
+    --skim-fg: #e6edf3;
+    --skim-muted: #9198a1;
+    --skim-border: #30363d;
+    --skim-soft: #161b22;
+    --skim-soft-strong: #21262d;
+    --skim-link: #4493f8;
+    --skim-mark-bg: rgba(255, 212, 59, 0.4);
+    --skim-mark-current-bg: rgba(255, 212, 59, 0.8);
+    --skim-blockquote: #9198a1;
+    --skim-code-bg: #161b22;
+    --skim-table-stripe: #161b22;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--skim-bg);
+    color: var(--skim-fg);
+    font-family: -apple-system, "Segoe UI", "Segoe UI Variable", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+main.markdown-body {
+    box-sizing: border-box;
+    max-width: var(--skim-content-max);
+    margin: 0 auto;
+    padding: var(--skim-pad) var(--skim-pad) 96px;
+    text-align: left;
+    overflow-wrap: break-word;
+}
+
+main.markdown-body > *:first-child { margin-top: 0; }
+
+main.markdown-body h1, main.markdown-body h2 {
+    border-bottom: 1px solid var(--skim-border);
+    padding-bottom: 0.3em;
+    margin-top: 1.8em;
+    margin-bottom: 0.8em;
+}
+main.markdown-body h1 { font-size: 2em; }
+main.markdown-body h2 { font-size: 1.5em; }
+main.markdown-body h3 { font-size: 1.25em; margin-top: 1.6em; }
+main.markdown-body h4 { font-size: 1em; margin-top: 1.4em; }
+main.markdown-body h5 { font-size: 0.9em; }
+main.markdown-body h6 { font-size: 0.85em; color: var(--skim-muted); }
+
+main.markdown-body a { color: var(--skim-link); text-decoration: none; }
+main.markdown-body a:hover { text-decoration: underline; }
+
+main.markdown-body p, main.markdown-body ul, main.markdown-body ol, main.markdown-body blockquote {
+    margin: 0 0 1em;
+}
+
+main.markdown-body blockquote {
+    border-left: 4px solid var(--skim-border);
+    padding: 0 1em;
+    color: var(--skim-blockquote);
+}
+
+main.markdown-body hr {
+    border: 0;
+    border-top: 1px solid var(--skim-border);
+    margin: 2em 0;
+}
+
+main.markdown-body code {
+    background: var(--skim-code-bg);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+    font-family: "Cascadia Mono", Consolas, "SF Mono", Menlo, "DejaVu Sans Mono", monospace;
+    font-size: 0.9em;
+}
+
+main.markdown-body pre {
+    background: var(--skim-code-bg);
+    padding: 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    line-height: 1.5;
+}
+
+main.markdown-body pre code {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+main.markdown-body img {
+    max-width: 100%;
+    height: auto;
+}
+
+main.markdown-body table {
+    border-collapse: collapse;
+    display: block;
+    overflow-x: auto;
+    margin: 1em 0;
+}
+
+main.markdown-body table th, main.markdown-body table td {
+    border: 1px solid var(--skim-border);
+    padding: 6px 13px;
+}
+
+main.markdown-body table tr:nth-child(2n) {
+    background: var(--skim-table-stripe);
+}
+
+main.markdown-body ul.contains-task-list { padding-left: 1.5em; }
+
+mark.skim-search-hit {
+    background: var(--skim-mark-bg);
+    color: inherit;
+    border-radius: 2px;
+}
+
+mark.skim-search-hit.current {
+    background: var(--skim-mark-current-bg);
+    outline: 2px solid var(--skim-link);
+}
+
+.skim-empty {
+    color: var(--skim-muted);
+    font-style: italic;
+    text-align: center;
+    margin-top: 4em;
+}
+
+.skim-error {
+    color: #cf222e;
+    font-family: "Cascadia Mono", Consolas, monospace;
+    white-space: pre-wrap;
+    background: var(--skim-soft);
+    border: 1px solid var(--skim-border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 2em 0;
+}
