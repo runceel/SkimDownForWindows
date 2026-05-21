@@ -210,15 +210,19 @@ items that are deferred so there is no ambiguity about scope.
 
 ### ❌ SPEC MVP に明記されているが未対応 (Deferred from SPEC's MVP)
 
-| SPEC 項目 | 状態 | 備考 |
+すべての未対応項目は GitHub Issues 化されており、
+[Milestone: SPEC MVP completion](https://github.com/runceel/SkimDownForWindows/milestone/1)
+で進捗を追えます。各 Issue は SPEC 参照 / 受け入れ基準 / 実装ヒント付きです。
+
+| SPEC 項目 | 状態 | Issue |
 |---|---|---|
-| Markdown 数式 (KaTeX) | ❌ Deferred | 描画失敗時のフォールバック (元テキスト表示) のみ動作。renderer.html へ KaTeX を追加すれば有効化可能 |
-| Mermaid 図 (`mermaid` fenced code block) | ❌ Deferred | コードブロックとして表示。renderer.html へ Mermaid を追加すれば有効化可能 |
-| 複数ウィンドウ (`File > New Window`, `Cmd+N`) | ❌ Deferred | シングルウィンドウ。folder ドロップは現在のウィンドウで開く |
-| サイドバー左右切り替え (`View > Move Sidebar to Right/Left`) | ❌ Deferred | サイドバーは左固定。`SidebarPosition` 設定値の追加 + Grid 列入れ替えで実装可 |
-| コードブロック → 右上の言語名表示 | ❌ Not implemented | `highlight.js` の言語検出結果を活用すれば実装可 |
-| コードブロック → 右上のコピー ボタン | ❌ Not implemented | renderer.js に少量追加で実装可 |
-| `Edit > Find > Use Selection for Find` (`Cmd+E`) | ❌ Not implemented | macOS イディオム、Windows 既定では `Ctrl+E` を使う慣習がないため優先度低 |
+| Markdown 数式 (KaTeX) | ❌ Deferred | [#2](https://github.com/runceel/SkimDownForWindows/issues/2) |
+| Mermaid 図 (`mermaid` fenced code block) | ❌ Deferred | [#3](https://github.com/runceel/SkimDownForWindows/issues/3) |
+| 複数ウィンドウ (`File > New Window`, `Cmd+N`) | ❌ Deferred | [#4](https://github.com/runceel/SkimDownForWindows/issues/4) |
+| サイドバー左右切り替え (`View > Move Sidebar to ...`) | ❌ Deferred | [#5](https://github.com/runceel/SkimDownForWindows/issues/5) |
+| コードブロック → 右上の言語名表示 | ❌ Not implemented | [#6](https://github.com/runceel/SkimDownForWindows/issues/6) `good first issue` |
+| `Edit > Find > Use Selection for Find` (`Cmd+E`) | ❌ Not implemented | [#7](https://github.com/runceel/SkimDownForWindows/issues/7) `good first issue` |
+| コードブロック → 右上のコピー ボタン | ❌ Not implemented | [#8](https://github.com/runceel/SkimDownForWindows/issues/8) `good first issue` |
 
 ### ⚪ SPEC で明示的に MVP 外、または「省略してよい」とされている項目
 
