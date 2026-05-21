@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Navigation;
+using Microsoft.UI.Input;
 using SkimDownForWindows.Core;
 using SkimDownForWindows.Models;
 using SkimDownForWindows.ViewModels;
@@ -18,6 +20,10 @@ public sealed partial class MainPage : Page
 {
     private static SettingsStore? _sharedSettings;
     private FolderWatcher? _watcher;
+    private MainWindow? _window;
+    private string? _initialFolderPath;
+    private bool _restoreLastFolder = true;
+    private bool _windowsChangedSubscribed;
 
     public MainPageViewModel ViewModel { get; }
 
@@ -50,6 +56,7 @@ public sealed partial class MainPage : Page
 
             UpdateContentVisibility();
             UpdateThemeMenuChecks();
+            UpdateMoveSidebarLabel();
         }
         catch (Exception ex)
         {
@@ -64,37 +71,93 @@ public sealed partial class MainPage : Page
         }
     }
 
+    protected override void OnNavigatedTo(NavigationEventArgs e)
+    {
+        base.OnNavigatedTo(e);
+        if (e.Parameter is MainPageStartArgs args)
+        {
+            _window = args.Window;
+            _initialFolderPath = args.InitialFolderPath;
+            _restoreLastFolder = args.RestoreLastFolder;
+        }
+    }
+
+    /// <summary>
+    /// Allow <see cref="WindowManager"/> to flush the shared settings store on
+    /// last-window close so the most recent theme / sidebar / per-folder state
+    /// makes it to disk before the process exits.
+    /// </summary>
+    internal static void FlushSharedSettings() => _sharedSettings?.FlushSync();
+
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         // Initialize WebView2 with the bundled web folder.
         var appWeb = Path.Combine(AppContext.BaseDirectory, "Assets", "Web");
         await Preview.InitializeAsync(appWeb);
 
-        // Restore last folder (if any).
         var settings = ViewModel.Settings.Current;
-        if (!string.IsNullOrEmpty(settings.LastFolderPath) && Directory.Exists(settings.LastFolderPath))
-        {
-            await ViewModel.OpenFolderAsync(settings.LastFolderPath);
-        }
 
-        // Apply persisted sidebar width / visibility.
+        // Apply persisted sidebar width / visibility / position BEFORE deciding
+        // which folder to open (so the user never sees the wrong layout flash).
+        ApplySidebarPosition(settings.SidebarPosition);
         if (settings.SidebarVisible)
         {
-            SidebarColumn.Width = new GridLength(Math.Max(180, settings.SidebarWidth));
+            SetActiveSidebarWidth(new GridLength(Math.Max(180, settings.SidebarWidth)));
             Sidebar.Visibility = Visibility.Visible;
         }
         else
         {
-            SidebarColumn.Width = new GridLength(0);
+            SetActiveSidebarWidth(new GridLength(0));
             Sidebar.Visibility = Visibility.Collapsed;
         }
 
         Preview.SetZoom(settings.ZoomFactor);
 
+        // Apply persisted theme to the Page (MenuBar / TreeView) AND the
+        // window (TitleBar + system caption buttons). Without this on cold
+        // start, the TitleBar keeps Mica's auto theme and the caption buttons
+        // can flip to colors that don't read against the page background.
+        RequestedTheme = settings.Theme switch
+        {
+            AppTheme.Light => ElementTheme.Light,
+            AppTheme.Dark => ElementTheme.Dark,
+            _ => ElementTheme.Default,
+        };
+        _window?.ApplyTheme(settings.Theme);
+        Preview.SetTheme(ViewModel.EffectiveTheme());
+
+        // Decide which folder this window opens, exactly once:
+        //   1. Explicit initial folder (e.g. dropped onto a new window) wins.
+        //   2. Otherwise restore LastFolderPath when allowed.
+        //   3. Otherwise start in the empty state.
+        string? folderToOpen = null;
+        if (!string.IsNullOrEmpty(_initialFolderPath) && Directory.Exists(_initialFolderPath))
+        {
+            folderToOpen = _initialFolderPath;
+        }
+        else if (_restoreLastFolder &&
+                 !string.IsNullOrEmpty(settings.LastFolderPath) &&
+                 Directory.Exists(settings.LastFolderPath))
+        {
+            folderToOpen = settings.LastFolderPath;
+        }
+
+        if (folderToOpen is not null)
+        {
+            await ViewModel.OpenFolderAsync(folderToOpen);
+        }
+
         BuildRecentFoldersMenu();
         UpdateMarkdownCount();
         UpdateWindowTitle();
         UpdateContentVisibility();
+        RebuildWindowMenu();
+
+        if (!_windowsChangedSubscribed)
+        {
+            WindowManager.WindowsChanged += OnWindowsChanged;
+            _windowsChangedSubscribed = true;
+        }
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -105,6 +168,11 @@ public sealed partial class MainPage : Page
         Preview.RelativeMarkdownLinkClicked -= OnPreviewRelativeLink;
         Preview.ExternalLinkClicked -= OnPreviewExternalLink;
         Preview.SearchResult -= OnPreviewSearchResult;
+        if (_windowsChangedSubscribed)
+        {
+            WindowManager.WindowsChanged -= OnWindowsChanged;
+            _windowsChangedSubscribed = false;
+        }
         _watcher?.Dispose();
     }
 
@@ -146,10 +214,7 @@ public sealed partial class MainPage : Page
 
     private void UpdateWindowTitle()
     {
-        if (App.Window is MainWindow mw)
-        {
-            mw.SetTitle(ViewModel.WindowTitle);
-        }
+        _window?.SetTitle(ViewModel.WindowTitle);
     }
 
     private void BuildRecentFoldersMenu()
@@ -190,6 +255,7 @@ public sealed partial class MainPage : Page
 
     private async Task PromptForFolderAsync()
     {
+        if (_window is null) return;
         try
         {
             var picker = new Windows.Storage.Pickers.FolderPicker
@@ -198,7 +264,8 @@ public sealed partial class MainPage : Page
             };
             picker.FileTypeFilter.Add("*");
 
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, App.WindowHandle);
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_window);
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
             var folder = await picker.PickSingleFolderAsync();
             if (folder is null) return;
             await ViewModel.OpenFolderAsync(folder.Path);
@@ -212,7 +279,7 @@ public sealed partial class MainPage : Page
 
     private void OnCloseWindowClick(object? sender, RoutedEventArgs e)
     {
-        App.Window?.Close();
+        _window?.Close();
     }
 
     private void OnTreeItemInvoked(TreeView sender, TreeViewItemInvokedEventArgs args)
@@ -230,7 +297,14 @@ public sealed partial class MainPage : Page
         if (e.DataView.Contains(StandardDataFormats.StorageItems))
         {
             e.AcceptedOperation = DataPackageOperation.Link;
-            e.DragUIOverride.Caption = "Open in SkimDown";
+            if (ViewModel.HasFolder)
+            {
+                e.DragUIOverride.Caption = "Open in new SkimDown window";
+            }
+            else
+            {
+                e.DragUIOverride.Caption = "Open in SkimDown";
+            }
             e.DragUIOverride.IsCaptionVisible = true;
             e.DragUIOverride.IsContentVisible = true;
         }
@@ -243,24 +317,31 @@ public sealed partial class MainPage : Page
             if (!e.DataView.Contains(StandardDataFormats.StorageItems)) return;
             var items = await e.DataView.GetStorageItemsAsync();
             var folder = items.OfType<StorageFolder>().FirstOrDefault();
-            if (folder is null)
+
+            string? folderPath = folder?.Path;
+            if (folderPath is null)
             {
                 // If user dropped a file, open its parent.
                 var file = items.OfType<StorageFile>().FirstOrDefault();
                 if (file is not null)
                 {
                     var parent = Path.GetDirectoryName(file.Path);
-                    if (!string.IsNullOrEmpty(parent))
-                    {
-                        await ViewModel.OpenFolderAsync(parent);
-                        BuildRecentFoldersMenu();
-                    }
+                    if (!string.IsNullOrEmpty(parent)) folderPath = parent;
                 }
-                return;
             }
+            if (string.IsNullOrEmpty(folderPath)) return;
 
-            await ViewModel.OpenFolderAsync(folder.Path);
-            BuildRecentFoldersMenu();
+            // SPEC: dropping onto a window that already has a folder opens a
+            // new window. An empty window opens the folder in place.
+            if (ViewModel.HasFolder)
+            {
+                WindowManager.OpenFolderInNewWindow(folderPath);
+            }
+            else
+            {
+                await ViewModel.OpenFolderAsync(folderPath);
+                BuildRecentFoldersMenu();
+            }
         }
         catch (Exception ex)
         {
@@ -389,6 +470,32 @@ public sealed partial class MainPage : Page
         Preview.SearchPrev();
     }
 
+    // Edit > Use Selection for Find (Ctrl+E)
+    private async void OnUseSelectionForFindClick(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel.SelectedItem is null) return;
+
+        var selection = await Preview.GetSelectedTextAsync();
+
+        SearchBar.Visibility = Visibility.Visible;
+        SearchCaseSensitive.IsChecked = ViewModel.Settings.Current.SearchCaseSensitive;
+
+        if (!string.IsNullOrEmpty(selection))
+        {
+            // Trim multi-line selections to a single line — WebView2 includes
+            // hidden whitespace in some browsers and SPEC's behavior is to use
+            // the selection verbatim, so we only trim leading/trailing
+            // whitespace, not internal whitespace.
+            var trimmed = selection.Trim();
+            SearchBox.Text = trimmed;
+            // Setting Text triggers OnSearchTextChanged which runs the search,
+            // so no need to call Preview.Search explicitly here.
+        }
+
+        SearchBox.Focus(FocusState.Programmatic);
+        SearchBox.SelectAll();
+    }
+
     // ----- View: sidebar / zoom / theme -----
 
     private async void OnToggleSidebarClick(object? sender, RoutedEventArgs e)
@@ -396,18 +503,169 @@ public sealed partial class MainPage : Page
         var visible = Sidebar.Visibility == Visibility.Visible;
         if (visible)
         {
-            ViewModel.Settings.Current.SidebarWidth = Math.Max(180, SidebarColumn.ActualWidth);
+            ViewModel.Settings.Current.SidebarWidth = Math.Max(180, ActiveSidebarWidth);
             Sidebar.Visibility = Visibility.Collapsed;
-            SidebarColumn.Width = new GridLength(0);
+            SetActiveSidebarWidth(new GridLength(0));
             ViewModel.Settings.Current.SidebarVisible = false;
         }
         else
         {
             Sidebar.Visibility = Visibility.Visible;
-            SidebarColumn.Width = new GridLength(Math.Max(180, ViewModel.Settings.Current.SidebarWidth));
+            SetActiveSidebarWidth(new GridLength(Math.Max(180, ViewModel.Settings.Current.SidebarWidth)));
             ViewModel.Settings.Current.SidebarVisible = true;
         }
         await ViewModel.Settings.SaveAsync();
+    }
+
+    private async void OnMoveSidebarClick(object? sender, RoutedEventArgs e)
+    {
+        var current = ViewModel.Settings.Current.SidebarPosition;
+        var next = current == SidebarPosition.Left ? SidebarPosition.Right : SidebarPosition.Left;
+
+        // Capture the current sidebar width BEFORE we mutate Settings, because
+        // ActiveSidebarColumn/Width derive the active column from
+        // Settings.SidebarPosition.
+        var preservedWidth = Math.Max(180, ActiveSidebarWidth);
+        var wasVisible = Sidebar.Visibility == Visibility.Visible;
+
+        // Update the settings position FIRST so ActiveSidebarColumn now
+        // resolves to the destination column (otherwise SetActiveSidebarWidth
+        // below would re-set the source column, leaving the destination
+        // column at whatever ApplySidebarPosition gave it).
+        ViewModel.Settings.Current.SidebarPosition = next;
+
+        ApplySidebarPosition(next);
+        if (wasVisible)
+        {
+            SetActiveSidebarWidth(new GridLength(preservedWidth));
+        }
+
+        UpdateMoveSidebarLabel();
+        await ViewModel.Settings.SaveAsync();
+    }
+
+    /// <summary>
+    /// Snap the sidebar / splitter / content area into the columns implied by
+    /// <paramref name="position"/>. Column widths are also swapped so the
+    /// fixed-width side always owns the sidebar.
+    /// </summary>
+    private void ApplySidebarPosition(SidebarPosition position)
+    {
+        if (position == SidebarPosition.Left)
+        {
+            Grid.SetColumn(Sidebar, 0);
+            Grid.SetColumn(SidebarSplitter, 1);
+            Grid.SetColumn(ContentArea, 2);
+            LeftColumn.Width = new GridLength(Math.Max(180, ViewModel.Settings.Current.SidebarWidth));
+            RightColumn.Width = new GridLength(1, GridUnitType.Star);
+        }
+        else
+        {
+            Grid.SetColumn(ContentArea, 0);
+            Grid.SetColumn(SidebarSplitter, 1);
+            Grid.SetColumn(Sidebar, 2);
+            LeftColumn.Width = new GridLength(1, GridUnitType.Star);
+            RightColumn.Width = new GridLength(Math.Max(180, ViewModel.Settings.Current.SidebarWidth));
+        }
+
+        // If the sidebar was hidden, keep the corresponding column collapsed.
+        if (Sidebar.Visibility != Visibility.Visible)
+        {
+            SetActiveSidebarWidth(new GridLength(0));
+        }
+    }
+
+    /// <summary>
+    /// The column that currently owns the sidebar, regardless of which side
+    /// it lives on. Used by <see cref="OnToggleSidebarClick"/> so width
+    /// preservation works in both layouts.
+    /// </summary>
+    private ColumnDefinition ActiveSidebarColumn =>
+        ViewModel.Settings.Current.SidebarPosition == SidebarPosition.Left ? LeftColumn : RightColumn;
+
+    private double ActiveSidebarWidth =>
+        ActiveSidebarColumn.ActualWidth > 0 ? ActiveSidebarColumn.ActualWidth :
+        ActiveSidebarColumn.Width.IsAbsolute ? ActiveSidebarColumn.Width.Value :
+        ViewModel.Settings.Current.SidebarWidth;
+
+    private void SetActiveSidebarWidth(GridLength width)
+    {
+        ActiveSidebarColumn.Width = width;
+    }
+
+    private void UpdateMoveSidebarLabel()
+    {
+        var pos = ViewModel.Settings.Current.SidebarPosition;
+        MoveSidebarMenuItem.Text = pos == SidebarPosition.Left
+            ? "Move Sidebar to Right"
+            : "Move Sidebar to Left";
+    }
+
+    // ----- Sidebar splitter (drag to resize) -----
+    //
+    // The XAML splitter is a thin Border. We implement drag-to-resize via
+    // pointer capture so the active sidebar column tracks the pointer. Pixel
+    // values are clamped to [180, 800]. The width is persisted on release.
+
+    private bool _splitterDragging;
+    private double _splitterStartX;
+    private double _splitterStartWidth;
+    private uint _splitterPointerId;
+
+    private void OnSplitterPointerEntered(object? sender, PointerRoutedEventArgs e)
+    {
+        try { ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.SizeWestEast); }
+        catch { /* best-effort cursor change */ }
+    }
+
+    private void OnSplitterPointerExited(object? sender, PointerRoutedEventArgs e)
+    {
+        if (_splitterDragging) return;
+        try { ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.Arrow); }
+        catch { /* best-effort */ }
+    }
+
+    private void OnSplitterPointerPressed(object? sender, PointerRoutedEventArgs e)
+    {
+        if (sender is not UIElement el) return;
+        if (Sidebar.Visibility != Visibility.Visible) return;
+        var pp = e.GetCurrentPoint(this);
+        _splitterStartX = pp.Position.X;
+        _splitterStartWidth = ActiveSidebarWidth;
+        _splitterDragging = true;
+        _splitterPointerId = e.Pointer.PointerId;
+        el.CapturePointer(e.Pointer);
+        e.Handled = true;
+    }
+
+    private void OnSplitterPointerMoved(object? sender, PointerRoutedEventArgs e)
+    {
+        if (!_splitterDragging) return;
+        if (e.Pointer.PointerId != _splitterPointerId) return;
+        var pp = e.GetCurrentPoint(this);
+        var dx = pp.Position.X - _splitterStartX;
+        // Sidebar on the right side: dragging right shrinks it; flip the delta.
+        if (ViewModel.Settings.Current.SidebarPosition == SidebarPosition.Right)
+        {
+            dx = -dx;
+        }
+        var target = Math.Clamp(_splitterStartWidth + dx, 180, 800);
+        SetActiveSidebarWidth(new GridLength(target));
+        e.Handled = true;
+    }
+
+    private async void OnSplitterPointerReleased(object? sender, PointerRoutedEventArgs e)
+    {
+        if (!_splitterDragging) return;
+        if (sender is UIElement el) el.ReleasePointerCapture(e.Pointer);
+        _splitterDragging = false;
+        try { ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.Arrow); }
+        catch { /* best-effort */ }
+
+        var width = Math.Max(180, ActiveSidebarWidth);
+        ViewModel.Settings.Current.SidebarWidth = width;
+        await ViewModel.Settings.SaveAsync();
+        e.Handled = true;
     }
 
     private async void OnZoomInClick(object? sender, RoutedEventArgs e)
@@ -450,6 +708,10 @@ public sealed partial class MainPage : Page
             AppTheme.Dark => ElementTheme.Dark,
             _ => ElementTheme.Default,
         };
+        // Also propagate to the hosting Window so the custom TitleBar (which
+        // lives outside the Page in MainWindow.xaml) and the system caption
+        // buttons follow the chosen theme.
+        _window?.ApplyTheme(theme);
         await ViewModel.Settings.SaveAsync();
     }
 
@@ -460,4 +722,114 @@ public sealed partial class MainPage : Page
         ThemeLightMenu.IsChecked  = t == AppTheme.Light;
         ThemeDarkMenu.IsChecked   = t == AppTheme.Dark;
     }
+
+    // ----- Window menu -----
+
+    private void OnNewWindowClick(object? sender, RoutedEventArgs e)
+    {
+        // New empty window — do not auto-restore the last folder; the user
+        // explicitly asked for an empty surface.
+        var win = WindowManager.CreateWindow(initialFolderPath: null, restoreLastFolder: false);
+        win.Activate();
+    }
+
+    private void OnMinimizeClick(object? sender, RoutedEventArgs e)
+    {
+        if (_window?.AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter op)
+        {
+            op.Minimize();
+        }
+    }
+
+    // Window > Zoom: maximize or restore (matches macOS Window > Zoom semantics).
+    private void OnWindowZoomClick(object? sender, RoutedEventArgs e)
+    {
+        if (_window?.AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter op)
+        {
+            if (op.State == Microsoft.UI.Windowing.OverlappedPresenterState.Maximized)
+            {
+                op.Restore();
+            }
+            else
+            {
+                op.Maximize();
+            }
+        }
+    }
+
+    // ----- Edit > Copy / Select All (route through WebView2 selection) -----
+    private void OnCopyClick(object? sender, RoutedEventArgs e)
+    {
+        Preview.CopySelection();
+    }
+
+    private void OnSelectAllClick(object? sender, RoutedEventArgs e)
+    {
+        Preview.SelectAll();
+    }
+
+    private void OnBringAllToFrontClick(object? sender, RoutedEventArgs e)
+    {
+        foreach (var w in WindowManager.Windows)
+        {
+            try
+            {
+                w.AppWindow.MoveInZOrderAtTop();
+                w.Activate();
+            }
+            catch { /* best-effort */ }
+        }
+        // Re-activate the current window last so it remains focused.
+        _window?.Activate();
+    }
+
+    private void OnWindowsChanged() => RebuildWindowMenu();
+
+    /// <summary>
+    /// Refresh the dynamic window list at the bottom of the Window menu.
+    /// Items above the separator (New Window / Minimize / Bring All) stay put.
+    /// </summary>
+    private void RebuildWindowMenu()
+    {
+        if (WindowMenu is null) return;
+
+        var items = WindowMenu.Items;
+        var sepIndex = -1;
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (items[i] == WindowMenuListSeparator)
+            {
+                sepIndex = i;
+                break;
+            }
+        }
+        if (sepIndex < 0) return;
+
+        while (items.Count > sepIndex + 1)
+        {
+            items.RemoveAt(items.Count - 1);
+        }
+
+        foreach (var w in WindowManager.Windows)
+        {
+            var title = string.IsNullOrEmpty(w.Title) ? "SkimDown" : w.Title;
+            var item = new ToggleMenuFlyoutItem { Text = title };
+            if (w == _window)
+            {
+                item.IsChecked = true;
+            }
+            var target = w;
+            item.Click += (_, _) =>
+            {
+                try
+                {
+                    target.AppWindow.MoveInZOrderAtTop();
+                    target.Activate();
+                }
+                catch { /* best-effort */ }
+            };
+            items.Add(item);
+        }
+    }
 }
+

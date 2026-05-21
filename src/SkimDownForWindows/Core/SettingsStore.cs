@@ -79,6 +79,31 @@ public sealed class SettingsStore
         }
     }
 
+    /// <summary>
+    /// Synchronously persist the latest settings state. Used during app shutdown
+    /// so the last theme / sidebar / per-folder change isn't lost when the
+    /// process exits before an outstanding <see cref="SaveAsync"/> completes.
+    /// </summary>
+    public void FlushSync()
+    {
+        _saveGate.Wait();
+        try
+        {
+            var tmp = _filePath + ".tmp";
+            var json = JsonSerializer.Serialize(_current, Json);
+            File.WriteAllText(tmp, json);
+            File.Move(tmp, _filePath, overwrite: true);
+        }
+        catch
+        {
+            // Best-effort persistence.
+        }
+        finally
+        {
+            _saveGate.Release();
+        }
+    }
+
     public void UpdateRecentFolders(string folderPath)
     {
         if (string.IsNullOrWhiteSpace(folderPath))

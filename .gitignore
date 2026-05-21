@@ -52,3 +52,8 @@ _ReSharper*/
 # Generated files
 Generated\ Files/
 *_wpftmp.csproj
+
+# Node-based test harnesses (smoke-renderer.js uses jsdom).
+# The .js test files are part of the repo; their npm dependencies are not.
+node_modules/
+package-lock.json

@@ -9,6 +9,12 @@ public enum AppTheme
     Dark,
 }
 
+public enum SidebarPosition
+{
+    Left,
+    Right,
+}
+
 /// <summary>
 /// Global app settings persisted as JSON in <c>LocalFolder</c>.
 /// Per-folder state lives in <see cref="FolderState"/> objects.
@@ -25,6 +31,9 @@ public sealed class AppSettings
     public double SidebarWidth { get; set; } = 280;
 
     public bool SidebarVisible { get; set; } = true;
+
+    /// <summary>Which side of the window the sidebar lives on. Defaults to <see cref="SidebarPosition.Left"/>.</summary>
+    public SidebarPosition SidebarPosition { get; set; } = SidebarPosition.Left;
 
     /// <summary>Most-recently-opened folder paths, most recent first. Max 16 entries.</summary>
     public List<string> RecentFolders { get; set; } = new();

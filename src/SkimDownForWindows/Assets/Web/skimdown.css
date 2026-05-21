@@ -38,6 +38,10 @@ body[data-theme="dark"] {
 html, body {
     margin: 0;
     padding: 0;
+    /* Ensure the themed background covers the entire viewport even when the
+       content is shorter than the window (otherwise the WebView2 default
+       white background shows below the content in dark mode). */
+    min-height: 100vh;
     background: var(--skim-bg);
     color: var(--skim-fg);
     font-family: -apple-system, "Segoe UI", "Segoe UI Variable", "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -113,6 +117,187 @@ main.markdown-body pre code {
     word-break: break-word;
 }
 
+/* ----- Code-block wrapper (language label + copy button, upper-right) ----- */
+
+main.markdown-body .skim-code {
+    position: relative;
+    margin: 0 0 1em;
+}
+
+main.markdown-body .skim-code > pre {
+    margin: 0;
+    padding-right: 64px; /* leave room for the absolute-positioned controls */
+}
+
+main.markdown-body .skim-code-lang {
+    position: absolute;
+    top: 6px;
+    right: 56px;
+    font-size: 12px;
+    line-height: 1;
+    opacity: 0.6;
+    user-select: none;
+    pointer-events: none;
+    color: var(--skim-muted);
+    text-transform: lowercase;
+    letter-spacing: 0.02em;
+    font-family: "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
+}
+
+main.markdown-body .skim-code-copy {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--skim-muted);
+    font: inherit;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    opacity: 0;
+    user-select: none;
+    transition: opacity 120ms ease-in-out, background 120ms ease-in-out;
+}
+
+main.markdown-body .skim-code:hover .skim-code-copy,
+main.markdown-body .skim-code:focus-within .skim-code-copy {
+    opacity: 0.85;
+}
+
+main.markdown-body .skim-code-copy:hover {
+    background: var(--skim-soft-strong);
+    border-color: var(--skim-border);
+    opacity: 1;
+}
+
+main.markdown-body .skim-code-copy.copied {
+    opacity: 1;
+    background: var(--skim-soft-strong);
+    border-color: var(--skim-border);
+    color: var(--skim-link);
+}
+
+main.markdown-body .skim-code-copy .skim-code-copy-label {
+    pointer-events: none;
+}
+
+/* ----- Mermaid diagram container (block-level, scrollable) ----- */
+
+main.markdown-body .skim-mermaid-wrap {
+    margin: 1em 0;
+    padding: 16px;
+    background: var(--skim-soft);
+    border: 1px solid var(--skim-border);
+    border-radius: 8px;
+    overflow-x: auto;
+    text-align: center;
+}
+
+main.markdown-body .skim-mermaid-wrap pre.mermaid {
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    text-align: left;
+    font-family: "Cascadia Mono", Consolas, monospace;
+    color: var(--skim-fg);
+}
+
+main.markdown-body .skim-mermaid-wrap svg {
+    max-width: 100%;
+    height: auto;
+}
+
+/* ----- KaTeX math styling (light/dark inherits via currentColor) ----- */
+
+main.markdown-body .katex-display {
+    margin: 1em 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.25em 0;
+}
+
+main.markdown-body .katex { color: inherit; }
+
+main.markdown-body .skim-math-error {
+    font-family: "Cascadia Mono", Consolas, monospace;
+    color: var(--skim-muted);
+    background: var(--skim-soft);
+    padding: 0 4px;
+    border-radius: 4px;
+}
+
+/* ----- GitHub Alerts (> [!NOTE], > [!TIP], > [!IMPORTANT], > [!WARNING], > [!CAUTION]) ----- */
+
+main.markdown-body .skim-alert {
+    border-left-width: 4px;
+    border-left-style: solid;
+    padding: 12px 16px;
+    margin: 1em 0;
+    border-radius: 6px;
+    color: inherit;
+}
+
+/* The plain blockquote styling re-applies its own border which we override above. */
+main.markdown-body blockquote.skim-alert {
+    padding-left: 16px;
+}
+
+main.markdown-body .skim-alert > *:first-child { margin-top: 0; }
+main.markdown-body .skim-alert > *:last-child  { margin-bottom: 0; }
+
+main.markdown-body .skim-alert-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 0.95em;
+    user-select: none;
+}
+
+main.markdown-body .skim-alert-icon {
+    font-size: 1.1em;
+    line-height: 1;
+}
+
+main.markdown-body .skim-alert-note      { border-left-color: #1f6feb; background: rgba(31, 111, 235, 0.08); }
+main.markdown-body .skim-alert-note      .skim-alert-label { color: #1f6feb; }
+main.markdown-body .skim-alert-tip       { border-left-color: #1a7f37; background: rgba(26, 127, 55, 0.08); }
+main.markdown-body .skim-alert-tip       .skim-alert-label { color: #1a7f37; }
+main.markdown-body .skim-alert-important { border-left-color: #8250df; background: rgba(130, 80, 223, 0.08); }
+main.markdown-body .skim-alert-important .skim-alert-label { color: #8250df; }
+main.markdown-body .skim-alert-warning   { border-left-color: #bf8700; background: rgba(191, 135, 0, 0.10); }
+main.markdown-body .skim-alert-warning   .skim-alert-label { color: #bf8700; }
+main.markdown-body .skim-alert-caution   { border-left-color: #cf222e; background: rgba(207, 34, 46, 0.08); }
+main.markdown-body .skim-alert-caution   .skim-alert-label { color: #cf222e; }
+
+body[data-theme="dark"] main.markdown-body .skim-alert-note      { border-left-color: #4493f8; background: rgba(56, 139, 253, 0.12); }
+body[data-theme="dark"] main.markdown-body .skim-alert-note      .skim-alert-label { color: #4493f8; }
+body[data-theme="dark"] main.markdown-body .skim-alert-tip       { border-left-color: #3fb950; background: rgba(63, 185, 80, 0.12); }
+body[data-theme="dark"] main.markdown-body .skim-alert-tip       .skim-alert-label { color: #3fb950; }
+body[data-theme="dark"] main.markdown-body .skim-alert-important { border-left-color: #ab7df8; background: rgba(171, 125, 248, 0.12); }
+body[data-theme="dark"] main.markdown-body .skim-alert-important .skim-alert-label { color: #ab7df8; }
+body[data-theme="dark"] main.markdown-body .skim-alert-warning   { border-left-color: #d29922; background: rgba(210, 153, 34, 0.14); }
+body[data-theme="dark"] main.markdown-body .skim-alert-warning   .skim-alert-label { color: #d29922; }
+body[data-theme="dark"] main.markdown-body .skim-alert-caution   { border-left-color: #f85149; background: rgba(248, 81, 73, 0.12); }
+body[data-theme="dark"] main.markdown-body .skim-alert-caution   .skim-alert-label { color: #f85149; }
+
+/* ----- Inline color swatches after #rgb / #rrggbb / #rrggbbaa hex literals ----- */
+
+main.markdown-body .skim-color-swatch {
+    display: inline-block;
+    width: 0.85em;
+    height: 0.85em;
+    margin: 0 0.15em 0 0.3em;
+    border-radius: 3px;
+    border: 1px solid var(--skim-border);
+    vertical-align: -0.12em;
+    box-sizing: border-box;
+}
+
 main.markdown-body img {
     max-width: 100%;
     height: auto;
@@ -134,7 +319,25 @@ main.markdown-body table tr:nth-child(2n) {
     background: var(--skim-table-stripe);
 }
 
-main.markdown-body ul.contains-task-list { padding-left: 1.5em; }
+main.markdown-body ul.contains-task-list { padding-left: 1.5em; list-style: none; }
+main.markdown-body li.task-list-item { list-style: none; }
+main.markdown-body li.task-list-item > input[type="checkbox"] {
+    margin: 0 0.45em 0 -1.35em;
+    vertical-align: middle;
+    cursor: default;
+}
+main.markdown-body li.task-list-item > p:first-child {
+    display: inline;
+    margin: 0;
+}
+
+/* Display math from ```math fenced blocks; sits flush with body width. */
+main.markdown-body .skim-math-block {
+    margin: 1em 0;
+    text-align: center;
+    overflow-x: auto;
+}
+main.markdown-body .skim-math-block .katex-display { margin: 0; }
 
 mark.skim-search-hit {
     background: var(--skim-mark-bg);

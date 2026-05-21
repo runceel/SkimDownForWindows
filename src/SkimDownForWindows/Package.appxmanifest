@@ -16,7 +16,7 @@
   <mp:PhoneIdentity PhoneProductId="9189ECC8-13EB-4031-B20A-C5AF4747B911" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
-    <DisplayName>SkimDownForWindows</DisplayName>
+    <DisplayName>SkimDown</DisplayName>
     <PublisherDisplayName>AppPublisher</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -35,8 +35,8 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
-        DisplayName="SkimDownForWindows"
-        Description="SkimDownForWindows"
+        DisplayName="SkimDown"
+        Description="A quiet, read-only Markdown folder reader."
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">

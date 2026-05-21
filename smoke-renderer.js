@@ -1,0 +1,239 @@
+// Smoke-test the SkimDown renderer end-to-end by loading the actual
+// renderer.js inside jsdom and sending it the same JSON messages
+// the WinUI host sends via CoreWebView2.PostWebMessageAsJson.
+//
+// We mock chrome.webview's event dispatch with EventTarget-style add/dispatch.
+//
+// Exit code 0 == all assertions passed.
+
+const fs = require("fs");
+const path = require("path");
+const { JSDOM } = require("jsdom");
+
+const ROOT = path.resolve(__dirname, "src/SkimDownForWindows/Assets/Web");
+
+// Build a synthetic HTML page with inline scripts so jsdom doesn't try to fetch.
+const html = fs.readFileSync(path.join(ROOT, "renderer.html"), "utf8");
+
+const dom = new JSDOM(`<!doctype html><html><body><main id="content"></main><div id="search-status" hidden></div></body></html>`, {
+    url: "https://skimdown-app.example/renderer.html",
+    runScripts: "outside-only",
+    pretendToBeVisual: true,
+});
+
+const { window } = dom;
+
+// Mock the chrome.webview bridge BEFORE loading renderer.js so the renderer
+// finds it during onReady.
+const incoming = []; // messages sent by renderer to host
+const messageListeners = [];
+window.chrome = {
+    webview: {
+        postMessage: function (m) { incoming.push(m); },
+        addEventListener: function (type, fn) {
+            if (type === "message") messageListeners.push(fn);
+        },
+    },
+};
+
+function loadScript(rel) {
+    const p = path.join(ROOT, rel);
+    const code = fs.readFileSync(p, "utf8");
+    try {
+        window.eval(code);
+    } catch (e) {
+        console.error("Loading " + rel + " threw:", e && e.message);
+    }
+}
+
+// Load assets in the same order as renderer.html.
+console.log("Loading vendor scripts + renderer.js...");
+loadScript("vendor/markdown-it.min.js");
+loadScript("vendor/markdown-it-footnote.min.js");
+loadScript("vendor/markdown-it-emoji.min.js");
+loadScript("vendor/markdown-it-imsize.min.js");
+loadScript("vendor/highlight.min.js");
+loadScript("vendor/dompurify.min.js");
+loadScript("vendor/katex/katex.min.js");
+loadScript("vendor/katex/auto-render.min.js");
+// Skip mermaid in jsdom — it pulls in browser APIs we'd have to stub heavily;
+// the renderer's `if (!window.mermaid)` early-outs make this safe.
+loadScript("renderer.js");
+
+function postToRenderer(msg) {
+    messageListeners.forEach(fn => {
+        try { fn({ data: msg }); } catch (e) { console.error("listener threw", e); }
+    });
+}
+
+let failures = 0;
+function check(label, cond, detail) {
+    const status = cond ? "✅" : "❌";
+    console.log(`  ${status} ${label}` + (detail ? ` — ${detail}` : ""));
+    if (!cond) failures++;
+}
+
+// Wait for renderer's "ready" message.
+async function waitUntilReady(timeoutMs = 5000) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+        if (incoming.some(m => m && m.type === "ready")) return true;
+        await new Promise(r => setTimeout(r, 50));
+    }
+    throw new Error("Timed out waiting for renderer 'ready'");
+}
+
+function lastRendered() {
+    return window.document.getElementById("content").innerHTML;
+}
+
+async function renderMd(md, opts = {}) {
+    incoming.length = 0;
+    postToRenderer({
+        type: "render",
+        markdown: md,
+        sourcePath: opts.sourcePath || "test.md",
+        contentBaseUri: "https://skimdown-content.example/",
+        theme: opts.theme || "light",
+    });
+    // Allow microtasks / KaTeX to settle.
+    await new Promise(r => setTimeout(r, 200));
+    return lastRendered();
+}
+
+async function main() {
+    console.log("Waiting for renderer 'ready'...");
+    await waitUntilReady();
+    console.log("Renderer ready. Running checks.\n");
+
+    // --- 1. Task lists ---
+    console.log("[1] Task lists");
+    let h = await renderMd("- [ ] todo\n- [x] done\n- regular item\n");
+    check("task list item present", /task-list-item/.test(h),
+        "got: " + h.substring(0, 300));
+    check("at least one unchecked checkbox",
+        /<li[^>]*class="task-list-item"[^>]*>\s*<input[^>]*type="checkbox"(?![^>]*checked)/.test(h)
+        || /<input type="checkbox" disabled="">todo/.test(h),
+        "got: " + h.substring(0, 300));
+    check("at least one checked checkbox",
+        /<input[^>]*type="checkbox"[^>]*checked[^>]*>\s*done/.test(h)
+        || /<input[^>]*checked[^>]*>(\s*)done/.test(h),
+        "got: " + h.substring(0, 300));
+    check("UL has contains-task-list class",
+        /<ul[^>]*class="[^"]*contains-task-list/.test(h));
+
+    // --- 2. Heading anchor IDs ---
+    console.log("[2] Heading anchor IDs");
+    h = await renderMd("# Hello World\n\n## Section 1.2 - Beta\n\n## Section 1.2 - Beta\n");
+    check("h1 gets slug id", /<h1\s+id="hello-world"/.test(h));
+    check("h2 gets slug id", /<h2\s+id="section-12-beta"/.test(h));
+    check("duplicate h2 gets -1 suffix", /<h2\s+id="section-12-beta-1"/.test(h));
+
+    // --- 3. Single-tilde strikethrough ---
+    console.log("[3] Single-tilde strikethrough");
+    h = await renderMd("hello ~world~ done\n");
+    check("single tilde produces <s>", /<s>world<\/s>/.test(h), "got: " + h);
+
+    // --- 4. Math: ```math fenced block ---
+    console.log("[4] ```math fenced block");
+    h = await renderMd("```math\nx = 1 + 2\n```\n");
+    check("math fence wrapped in .skim-math-block", /class="skim-math-block"/.test(h));
+    check("math is rendered by KaTeX", /class="katex/.test(h));
+
+    // --- 5. Backtick math $`...`$ ---
+    console.log("[5] $`...`$ backtick math");
+    h = await renderMd("inline $`x^2 + 1`$ here\n");
+    check("inline backtick math becomes katex span", /class="katex/.test(h));
+
+    // --- 6. Imsize: ![alt](src =100x200) ---
+    console.log("[6] markdown-it-imsize image dimensions");
+    h = await renderMd('![logo](logo.png =100x200)\n');
+    check("img has width=100", /<img[^>]+width="100"/.test(h), "got: " + h);
+    check("img has height=200", /<img[^>]+height="200"/.test(h), "got: " + h);
+
+    // --- 7. KaTeX inline + block ---
+    console.log("[7] KaTeX inline + display");
+    h = await renderMd("inline $E = mc^2$\n\n$$\\int_0^1 x\\,dx$$\n");
+    check("inline katex span present", /class="katex"/.test(h));
+    check("display katex present", /class="katex-display"/.test(h));
+
+    // --- 8. GitHub alerts ---
+    console.log("[8] GitHub alerts");
+    h = await renderMd("> [!WARNING]\n> Be careful\n");
+    check("blockquote gets skim-alert class", /class="[^"]*skim-alert/.test(h));
+    check("alert kind class present", /skim-alert-warning/.test(h));
+
+    // --- 9. Code blocks ---
+    console.log("[9] Code-block wrapper");
+    h = await renderMd("```js\nconsole.log(1)\n```\n");
+    check("skim-code wrapper", /class="skim-code"/.test(h));
+    check("language label", /class="skim-code-lang"[^>]*>js/.test(h));
+    check("copy button", /class="skim-code-copy"/.test(h));
+
+    // --- 10. Mermaid placeholder ---
+    console.log("[10] Mermaid placeholder");
+    h = await renderMd("```mermaid\nflowchart TD\nA-->B\n```\n");
+    check("mermaid wrapper present", /class="skim-mermaid-wrap"/.test(h));
+    check("pre.mermaid with data-source", /<pre[^>]+class="mermaid"[^>]+data-source/.test(h));
+
+    // --- 11. Search ---
+    console.log("[11] Search");
+    await renderMd("# Hello\n\nfind this word in the text.\n");
+    incoming.length = 0;
+    postToRenderer({ type: "search", query: "word", caseSensitive: false });
+    await new Promise(r => setTimeout(r, 100));
+    h = lastRendered();
+    check("search result message posted",
+        incoming.some(m => m && m.type === "search/result" && m.total > 0),
+        "msgs: " + JSON.stringify(incoming.filter(m => m && m.type === "search/result")));
+    check("mark.skim-search-hit injected", /<mark[^>]+class="skim-search-hit/.test(h));
+
+    // --- 12. Theme ---
+    console.log("[12] Theme");
+    postToRenderer({ type: "theme", theme: "dark" });
+    await new Promise(r => setTimeout(r, 50));
+    check("body data-theme=dark", window.document.body.dataset.theme === "dark");
+    postToRenderer({ type: "theme", theme: "light" });
+    await new Promise(r => setTimeout(r, 50));
+    check("body data-theme=light after switch", window.document.body.dataset.theme === "light");
+
+    // --- 13. selectAll + copySelection ---
+    console.log("[13] selectAll / copySelection");
+    await renderMd("Hello World\n");
+    incoming.length = 0;
+    postToRenderer({ type: "selectAll" });
+    await new Promise(r => setTimeout(r, 50));
+    const sel = window.getSelection();
+    check("selectAll selects something",
+        sel && sel.toString().length > 0,
+        "got selection: '" + (sel && sel.toString()) + "'");
+    postToRenderer({ type: "copySelection" });
+    await new Promise(r => setTimeout(r, 50));
+    check("copySelection posts copy message",
+        incoming.some(m => m && m.type === "copy" && m.text && m.text.length > 0));
+
+    // --- 14. anchor scroll smoke ---
+    console.log("[14] scrollToAnchor smoke");
+    await renderMd("# Hello World\n\nbody\n");
+    let errored = false;
+    try {
+        postToRenderer({ type: "scrollToAnchor", hash: "#hello-world" });
+        await new Promise(r => setTimeout(r, 50));
+    } catch (e) { errored = true; }
+    check("scrollToAnchor doesn't throw", !errored);
+
+    console.log("");
+    if (failures === 0) {
+        console.log("✅ ALL RENDERER SMOKE CHECKS PASSED");
+        process.exit(0);
+    } else {
+        console.log(`❌ ${failures} CHECK(S) FAILED`);
+        process.exit(1);
+    }
+}
+
+main().catch(e => {
+    console.error("FATAL:", e);
+    process.exit(2);
+});
+

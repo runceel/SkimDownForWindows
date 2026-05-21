@@ -44,6 +44,17 @@
             </MenuBarItem>
 
             <MenuBarItem Title="Edit">
+                <MenuFlyoutItem Text="Copy" Click="OnCopyClick">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control" Key="C" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Select All" Click="OnSelectAllClick">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control" Key="A" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="Find…" Click="OnFindClick">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="F" />
@@ -59,6 +70,11 @@
                         <KeyboardAccelerator Modifiers="Control,Shift" Key="G" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Use Selection for Find" Click="OnUseSelectionForFindClick">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control" Key="E" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
             </MenuBarItem>
 
             <MenuBarItem Title="View">
@@ -67,6 +83,9 @@
                         <KeyboardAccelerator Modifiers="Control" Key="B" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
+                <MenuFlyoutItem x:Name="MoveSidebarMenuItem"
+                                Text="Move Sidebar to Right"
+                                Click="OnMoveSidebarClick" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutSubItem Text="Zoom">
                     <MenuFlyoutItem Text="Zoom In" Click="OnZoomInClick">
@@ -91,6 +110,23 @@
                     <ToggleMenuFlyoutItem x:Name="ThemeLightMenu"  Text="Light"  Click="OnThemeLightClick" />
                     <ToggleMenuFlyoutItem x:Name="ThemeDarkMenu"   Text="Dark"   Click="OnThemeDarkClick" />
                 </MenuFlyoutSubItem>
+            </MenuBarItem>
+
+            <MenuBarItem x:Name="WindowMenu" Title="Window">
+                <MenuFlyoutItem Text="New Window" Click="OnNewWindowClick">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control" Key="N" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Minimize" Click="OnMinimizeClick">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control" Key="M" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Zoom" Click="OnWindowZoomClick" />
+                <MenuFlyoutItem Text="Bring All to Front" Click="OnBringAllToFrontClick" />
+                <MenuFlyoutSeparator x:Name="WindowMenuListSeparator" />
+                <!-- Dynamic list of open windows is appended below the separator at runtime. -->
             </MenuBarItem>
         </MenuBar>
 
@@ -121,12 +157,13 @@
             </StackPanel>
         </Border>
 
-        <!-- Body -->
+        <!-- Body. Left/right columns are populated dynamically by the
+             OnLoaded handler based on the persisted SidebarPosition. -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="SidebarColumn" Width="280" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="LeftColumn" Width="280" />
+                <ColumnDefinition x:Name="SplitterColumn" Width="Auto" />
+                <ColumnDefinition x:Name="RightColumn" Width="*" />
             </Grid.ColumnDefinitions>
 
             <!-- Sidebar -->
@@ -171,21 +208,39 @@
                 </ScrollViewer>
             </Grid>
 
-            <!-- Splitter -->
-            <Border Grid.Column="1" Width="4" Background="Transparent" />
+            <!-- Splitter: drag to resize the active sidebar column. -->
+            <Border x:Name="SidebarSplitter"
+                    Grid.Column="1"
+                    Width="6"
+                    Background="Transparent"
+                    ManipulationMode="TranslateX"
+                    PointerEntered="OnSplitterPointerEntered"
+                    PointerExited="OnSplitterPointerExited"
+                    PointerPressed="OnSplitterPointerPressed"
+                    PointerMoved="OnSplitterPointerMoved"
+                    PointerReleased="OnSplitterPointerReleased"
+                    PointerCanceled="OnSplitterPointerReleased"
+                    PointerCaptureLost="OnSplitterPointerReleased" />
 
             <!-- Content area -->
-            <Grid Grid.Column="2">
+            <Grid x:Name="ContentArea" Grid.Column="2">
                 <!-- Markdown preview (always present so WebView2 can initialize) -->
                 <viewer:MarkdownPreview x:Name="Preview" />
 
-                <!-- Empty state: no folder. Overlays preview with solid background. -->
+                <!-- Empty state: no folder. Overlays preview with a SOLID
+                     opaque background so the WebView2's default surface
+                     doesn't bleed through (LayerFillColorDefaultBrush is
+                     semi-transparent in dark mode). -->
                 <Border x:Name="EmptyState"
-                        Background="{ThemeResource LayerFillColorDefaultBrush}">
+                        Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
                     <StackPanel HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
-                                Spacing="16">
-                        <TextBlock Text="SkimDown" Style="{ThemeResource TitleLargeTextBlockStyle}" HorizontalAlignment="Center" Opacity="0.55" />
+                                Spacing="20">
+                        <Image Source="ms-appx:///Assets/AppIcon.svg"
+                               Width="120" Height="120"
+                               HorizontalAlignment="Center"
+                               Opacity="0.95" />
+                        <TextBlock Text="SkimDown" Style="{ThemeResource TitleLargeTextBlockStyle}" HorizontalAlignment="Center" Opacity="0.8" />
                         <TextBlock Text="Open a folder to start reading."
                                    HorizontalAlignment="Center"
                                    Opacity="0.7" />
@@ -198,7 +253,7 @@
 
                 <!-- No markdown state: folder has no .md. Overlays preview with solid background. -->
                 <Border x:Name="NoMarkdownState"
-                        Background="{ThemeResource LayerFillColorDefaultBrush}">
+                        Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
                     <StackPanel HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 Spacing="12">
@@ -215,3 +270,4 @@
         </Grid>
     </Grid>
 </Page>
+

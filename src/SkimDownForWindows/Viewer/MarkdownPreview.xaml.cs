@@ -81,10 +81,33 @@ public sealed partial class MarkdownPreview : UserControl
         core.Settings.AreDevToolsEnabled = false;
         core.Settings.IsZoomControlEnabled = false;
 
+        // Make the WebView2's surface transparent so when the renderer hasn't
+        // pushed body styles yet, the parent (themed) Border shows through —
+        // no white flash on first paint, no white margin where the body is
+        // shorter than the viewport.
+        try
+        {
+            Web.DefaultBackgroundColor = Windows.UI.Color.FromArgb(0, 0, 0, 0);
+        }
+        catch { /* not all WebView2 builds expose this */ }
+
         _initialized = true;
 
         var indexUri = $"https://{AppHost}/renderer.html";
         Web.Source = new Uri(indexUri);
+    }
+
+    /// <summary>
+    /// Set the WebView2 host-surface background color used before the
+    /// rendered document paints its own background. Transparent stays in
+    /// effect except during initial load; the renderer's own body background
+    /// covers everything once <see cref="LoadAsync"/> has run.
+    /// </summary>
+    public void SetHostBackground(Windows.UI.Color color)
+    {
+        if (!_initialized) return;
+        try { Web.DefaultBackgroundColor = color; }
+        catch { /* best-effort */ }
     }
 
     private static void LogToFile(string msg)
@@ -166,6 +189,51 @@ public sealed partial class MarkdownPreview : UserControl
     public void SearchPrev() { if (_webReady) Post(new { type = "search/prev" }); }
     public void SearchClear() { if (_webReady) Post(new { type = "search/clear" }); }
 
+    /// <summary>Ask the renderer to select all body text inside the preview.</summary>
+    public void SelectAll()
+    {
+        if (_webReady) Post(new { type = "selectAll" });
+    }
+
+    /// <summary>Ask the renderer to post the current selection back as a "copy" message.</summary>
+    public void CopySelection()
+    {
+        if (_webReady) Post(new { type = "copySelection" });
+    }
+
+    /// <summary>Ask the renderer to smooth-scroll to a #hash anchor (slug-aware).</summary>
+    public void ScrollToAnchor(string hash)
+    {
+        if (_webReady) Post(new { type = "scrollToAnchor", hash = hash ?? "" });
+    }
+
+    /// <summary>
+    /// Return the current text selection inside the WebView2, or <c>null</c> if
+    /// nothing is selected / the WebView isn't ready. Used by the
+    /// <c>Edit &gt; Use Selection for Find</c> menu (Ctrl+E).
+    /// </summary>
+    public async Task<string?> GetSelectedTextAsync()
+    {
+        if (!_initialized || Web.CoreWebView2 is null) return null;
+        try
+        {
+            // ExecuteScriptAsync returns a JSON-encoded value (so a JS string
+            // comes back as a JSON-quoted string). Parse it through JsonDocument.
+            var raw = await Web.CoreWebView2.ExecuteScriptAsync(
+                "(function(){try{return (window.getSelection()||'').toString();}catch(e){return '';}})()");
+            if (string.IsNullOrEmpty(raw) || raw == "null") return null;
+            using var doc = JsonDocument.Parse(raw);
+            if (doc.RootElement.ValueKind != JsonValueKind.String) return null;
+            var text = doc.RootElement.GetString();
+            return string.IsNullOrEmpty(text) ? null : text;
+        }
+        catch (Exception ex)
+        {
+            LogToFile($"GetSelectedTextAsync failed: {ex.Message}");
+            return null;
+        }
+    }
+
     private async Task FlushPendingAsync()
     {
         if (!_webReady || _pendingMarkdown is null)
@@ -239,6 +307,22 @@ public sealed partial class MarkdownPreview : UserControl
                     var total = doc.RootElement.TryGetProperty("total", out var tEl) ? tEl.GetInt32() : 0;
                     var current = doc.RootElement.TryGetProperty("current", out var cEl) ? cEl.GetInt32() : 0;
                     SearchResult?.Invoke(total, current);
+                    break;
+                case "copy":
+                    var copyText = doc.RootElement.TryGetProperty("text", out var ctEl) ? ctEl.GetString() : null;
+                    if (!string.IsNullOrEmpty(copyText))
+                    {
+                        try
+                        {
+                            var pkg = new Windows.ApplicationModel.DataTransfer.DataPackage();
+                            pkg.SetText(copyText);
+                            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(pkg);
+                        }
+                        catch (Exception ex)
+                        {
+                            LogToFile($"clipboard fallback failed: {ex.Message}");
+                        }
+                    }
                     break;
             }
         }
