@@ -99,12 +99,18 @@ handles platform detection and packaging.
 ## Tests
 
 ```powershell
+# 30 always-on unit tests:
 cd tests
 dotnet test
+
+# Add 9 integration tests against the upstream samples corpus
+# (point SKIM_SAMPLES_PATH at a cloned copy of github.com/07JP27/SkimDown/samples):
+$env:SKIM_SAMPLES_PATH = "C:\path\to\SkimDown\samples"
+dotnet test          # -> 39 / 39 passing
 ```
 
 The test project targets plain `net10.0` and re-includes the UI-agnostic
-source files from the main project. It covers:
+source files from the main project. Coverage:
 
 | Suite | Covers |
 |---|---|
@@ -113,8 +119,37 @@ source files from the main project. It covers:
 | `MarkdownTreeBuilderTests` | Folder-first order, alpha sort, omits empty folders, counts, forward-slash relative paths, out-of-root rejection |
 | `InitialSelectionPickerTests` | Last-opened > README > first-file fallbacks |
 | `LinkResolverTests` | Anchor / relative-md / relative-non-md / external / out-of-folder / `javascript:` / URL-encoded |
+| `UpstreamSamplesIntegrationTests` | Scans + builds the actual upstream `samples/` corpus (38 files across `en/ja` × `basics/blocks/deep/extended/misc`), asserts `.markdown` extension support, deep recursion, omission of non-Markdown `images/` folder, alphabetized branches, and the picker's README fallback |
 
 UI automation is intentionally out of scope (matches the original SPEC).
+
+### Verified against the upstream samples
+
+The Windows port has been smoke-tested against every file in the original
+SkimDown `samples/` directory. The 15 English samples were navigated via
+Windows UI Automation and screenshot-verified. Behavior summary:
+
+| Sample | Result |
+|---|---|
+| `basics/headings.md` | ✅ h1–h6 hierarchy + underlines |
+| `basics/text-formatting.md` | ✅ bold / italic / strikethrough / inline code |
+| `basics/links-and-images.md` | ✅ links + relative images via content virtual host |
+| `basics/lists.md` | ✅ ordered / unordered / task lists |
+| `blocks/blockquotes.md` | ✅ blockquote styling |
+| `blocks/code-blocks.md` | ✅ multi-language syntax highlighting via highlight.js |
+| `blocks/tables.md` | ✅ GFM tables with column alignment + emoji + inline formatting |
+| `blocks/horizontal-rules.md` | ✅ `<hr>` rendering |
+| `extended/footnotes.md` | ✅ `markdown-it-footnote` references and back-refs |
+| `extended/github-alerts.md` | ⚠️ Renders as plain blockquote (GitHub alert plugin not bundled in MVP) |
+| `extended/emoji.md` | ⚠️ Shortcodes shown as text (emoji plugin not bundled in MVP) |
+| `extended/html-elements.md` | ✅ `<kbd>`, `<details>/<summary>`, `<mark>`, sanitized via DOMPurify |
+| `extended/math.md` | ⚠️ LaTeX shown as text (KaTeX deferred — graceful fallback per SPEC) |
+| `extended/mermaid.md` | ⚠️ Diagrams shown as syntax-highlighted code blocks (Mermaid deferred — graceful fallback per SPEC) |
+| `misc/all-in-one.md` | ✅ Combined-syntax stress test |
+| `misc/sample.markdown` | ✅ Full `.markdown` extension recognised + rendered |
+
+The ⚠️ cases all match documented MVP deferrals; the renderer falls back
+to plain text or unstyled code blocks as the original SPEC prescribes.
 
 ## Manual smoke check
 
