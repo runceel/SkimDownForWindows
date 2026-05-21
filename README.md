@@ -180,13 +180,65 @@ to plain text or unstyled code blocks as the original SPEC prescribes.
 12. Click an external `https://...` link — the default browser opens it.
 13. Restart the app — it reopens the last folder and selects the last file.
 
-## What's deferred from the SPEC's MVP
+## SPEC compliance — what is and isn't covered
 
-- **Multiple windows** (`Cmd+N`). Single window in this initial port.
-- **Sidebar left / right swap.** Sidebar is on the left.
-- **Scroll-position persistence per file.**
-- **KaTeX / Mermaid rendering.** The renderer is wired with markdown-it,
-  highlight.js, and DOMPurify; math/diagrams are easy follow-ups.
+This port targets the [original macOS `SPEC.md`](https://github.com/07JP27/SkimDown/blob/main/design/SPEC.md).
+The table below cross-references every requirement and explicitly marks
+items that are deferred so there is no ambiguity about scope.
+
+### ✅ SPEC MVP — implemented
+
+- フォルダを開く (menu / `Ctrl+O` / empty-state button / drag-drop), `Cmd+O` mapped to `Ctrl+O`
+- 起動時の前回フォルダ復元、`Open Recent`、空ウィンドウへのドロップ
+- ファイル検出: `.md` / `.markdown`、再帰、`.git`/`node_modules`/`.build`/`DerivedData`/隠しファイル除外、Markdown を含まない空フォルダ除外
+- ツリー: VS Code 風、フォルダ先 → ファイル、名前順 (大文字小文字非区別)、選択中ハイライト、開閉状態の保存、Markdown ファイル数表示
+- 初期選択: 前回ファイル → `README.md` → 先頭ファイル → 空状態
+- プレビュー: `WebView2` 描画、本文左揃え、読みやすい幅 + 余白、Light/Dark/System、`View > Zoom` でフォントサイズ
+- Markdown: 見出し / 段落 / 強調・打ち消し / リスト・タスクリスト / インラインコード・コードブロック / 表 / 引用 / 水平線 / リンク / ローカル & 外部画像 / 自動リンク / 脚注 / 安全な HTML 埋め込み (DOMPurify)
+- コードブロック: シンタックスハイライト (highlight.js)、長行は折り返し (`white-space: pre-wrap`)、等幅フォント、横スクロール抑止
+- 表: 罫線・控えめな背景、表内のみ横スクロール
+- HTML 埋め込み: `details`/`summary`/`kbd`/`mark`/`sup`/`sub`/`br`/`span`/`div` 許可、`script`/`iframe`/`object`/`embed`/`style` と `onclick` 等イベント属性 / `javascript:` 等危険スキームを除去
+- リンク: ページ内アンカー、相対 Markdown はアプリ内遷移、外部は既定ブラウザ、フォルダ外ローカルは拒否
+- 画像: 開いたフォルダ内ローカル画像を本文表示、外部画像も許可、画像単体はツリーに出さない
+- 本文検索: `Ctrl+F` で検索バー、入力に応じてハイライト、`Enter` / `Shift+Enter` で次 / 前、`Esc` で閉じる、一致件数と現在位置表示、大文字小文字切り替え (JS 側実装)
+- 変更検知: 追加 / 削除 / リネームでツリー更新、外部更新で自動再読み込み、削除で空状態
+- 空状態: 中央の `Open Folder…` ボタン、フォルダのドロップ受付、Markdown が無いフォルダで `No Markdown files found` + `Open Another Folder…`
+- ウィンドウタイトル: 未選択 = `SkimDown`、選択時 = `FolderName — SkimDown`
+- メニュー: `File > Open Folder…/Open Recent/Close Window/Reveal in File Explorer/Copy File Path`、`Edit > Find…/Find Next/Find Previous`、`View > Toggle Sidebar/Zoom/Theme`
+- 保存する状態: 前回フォルダ / 最近開いた / フォルダごとの最後の Markdown / 開閉状態 / サイドバー表示 / サイドバー幅 / テーマ / フォントサイズ / 検索の大文字小文字
+- セキュリティ: フォルダピッカーで選んだフォルダのみアクセス、読み取り専用、Markdown 内の任意 JS 実行禁止、HTML サニタイズ、外部リンクは既定ブラウザ、外部 API 通信なし
+
+### ❌ SPEC MVP に明記されているが未対応 (Deferred from SPEC's MVP)
+
+| SPEC 項目 | 状態 | 備考 |
+|---|---|---|
+| Markdown 数式 (KaTeX) | ❌ Deferred | 描画失敗時のフォールバック (元テキスト表示) のみ動作。renderer.html へ KaTeX を追加すれば有効化可能 |
+| Mermaid 図 (`mermaid` fenced code block) | ❌ Deferred | コードブロックとして表示。renderer.html へ Mermaid を追加すれば有効化可能 |
+| 複数ウィンドウ (`File > New Window`, `Cmd+N`) | ❌ Deferred | シングルウィンドウ。folder ドロップは現在のウィンドウで開く |
+| サイドバー左右切り替え (`View > Move Sidebar to Right/Left`) | ❌ Deferred | サイドバーは左固定。`SidebarPosition` 設定値の追加 + Grid 列入れ替えで実装可 |
+| コードブロック → 右上の言語名表示 | ❌ Not implemented | `highlight.js` の言語検出結果を活用すれば実装可 |
+| コードブロック → 右上のコピー ボタン | ❌ Not implemented | renderer.js に少量追加で実装可 |
+| `Edit > Find > Use Selection for Find` (`Cmd+E`) | ❌ Not implemented | macOS イディオム、Windows 既定では `Ctrl+E` を使う慣習がないため優先度低 |
+
+### ⚪ SPEC で明示的に MVP 外、または「省略してよい」とされている項目
+
+これらは元 SPEC が "MVP 外" / "将来拡張" / "省略してよい" と明記しているため、本実装でも未対応です。
+
+- スクロール位置のファイル毎保存 ("重くなる場合はMVPでは省略してよい")
+- 手動 Reload メニュー ("MVPでは不要")
+- ファイル名検索 / 複数ファイル横断検索 ("将来拡張")
+- 文字コード自動判定 / Shift_JIS 対応 ("MVP外")
+- Mermaid 図のズーム・パン操作 ("MVP外")
+- 専用 Settings 画面 ("MVPでは作らない")
+- `File > Save/Export/Print` ("MVP外")
+- UI 自動テスト ("MVP外")
+
+### 🆕 SPEC に存在しないため非対応 (オリジナルでも MVP 範囲外と推測される項目)
+
+upstream の `samples/extended/` で言及されているが SPEC には記載がない構文。本実装でも未対応で、標準的な Markdown 表現 (通常の引用 / 文字列) として描画されます。
+
+- GitHub Alerts (`> [!NOTE]`, `> [!TIP]`, etc.)
+- 絵文字ショートコード (`:smile:`)
 
 ## License
 
