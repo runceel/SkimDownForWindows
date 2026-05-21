@@ -177,6 +177,17 @@ to plain text or unstyled code blocks as the original SPEC prescribes.
 - **KaTeX / Mermaid rendering.** The renderer is wired with markdown-it,
   highlight.js, and DOMPurify; math/diagrams are easy follow-ups.
 
+## Bundled Copilot CLI plugin
+
+The repo ships a verbatim copy of the upstream **`winui`** plugin
+(from [microsoft/win-dev-skills](https://github.com/microsoft/win-dev-skills))
+under `.github/copilot/plugins/winui/`. Anyone cloning this repo gets the
+same skills that built it — `winui-dev-workflow`, `winui-design`,
+`winui-code-review`, `winui-packaging`, `winui-ui-testing`,
+`winui-wpf-migration`, `winui-setup`, `winui-session-report`, plus the
+`winui-dev` agent — without needing to install the marketplace plugin
+separately. See [`.github/copilot/plugins/README.md`](.github/copilot/plugins/README.md).
+
 ## License
 
 Mirrors the upstream SkimDown project licensing intent.
