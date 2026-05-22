@@ -31,6 +31,7 @@
     <Compile Include="..\SkimDownForWindows\Markdown\MarkdownTreeBuilder.cs"     Link="Source\MarkdownTreeBuilder.cs" />
     <Compile Include="..\SkimDownForWindows\Markdown\LinkResolver.cs"            Link="Source\LinkResolver.cs" />
     <Compile Include="..\SkimDownForWindows\Markdown\InitialSelectionPicker.cs"  Link="Source\InitialSelectionPicker.cs" />
+    <Compile Include="..\SkimDownForWindows\Core\CommandLineLauncher.cs"         Link="Source\CommandLineLauncher.cs" />
   </ItemGroup>
 
 </Project>

@@ -55,8 +55,19 @@ public partial class App : Application
     protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
         DispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
-        // The first window restores the persisted LastFolderPath if any.
-        var first = WindowManager.CreateWindow(initialFolderPath: null, restoreLastFolder: true);
+
+        // Honor a "skimdown <folder>" / "skimdown <file.md>" CLI invocation.
+        // When a usable path is provided, open it instead of restoring the
+        // previously-opened folder.
+        var cliFolder = CommandLineLauncher.TryGetInitialFolderPath(
+            Environment.GetCommandLineArgs(),
+            Environment.CurrentDirectory);
+
+        // The first window restores the persisted LastFolderPath if no CLI
+        // folder was supplied; an explicit CLI path always wins.
+        var first = cliFolder is null
+            ? WindowManager.CreateWindow(initialFolderPath: null, restoreLastFolder: true)
+            : WindowManager.CreateWindow(initialFolderPath: cliFolder, restoreLastFolder: false);
         first.Activate();
     }
 }
