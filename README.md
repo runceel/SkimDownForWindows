@@ -10,7 +10,7 @@ Open a folder, and SkimDown shows only the Markdown files in a sidebar tree and 
 
 ## Highlights
 
-- Open a folder with **File → Open Folder…**, **Ctrl+O**, **Window → New Window** (Ctrl+N), or by dragging a folder onto the window
+- Open a folder with **File → Open Folder…**, **Ctrl+O**, **Window → New Window** (Ctrl+N), by dragging a folder onto the window, or by passing a folder path on the command line — once the app is installed, a `skimdown` execution alias is registered automatically, so `skimdown D:\notes` (or `skimdown .` in any folder) works from any terminal; a Markdown file path opens its containing folder
 - Multiple windows for multiple folders (dropping a folder onto a window that already has one opens a new window)
 - Sidebar position is swappable left / right (**View → Move Sidebar to Right / Left**)
 - Folder-first, case-insensitive Markdown tree (recursive `.md` / `.markdown` discovery)
