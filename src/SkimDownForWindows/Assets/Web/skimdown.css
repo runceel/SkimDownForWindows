@@ -321,10 +321,45 @@ main.markdown-body table tr:nth-child(2n) {
 
 main.markdown-body ul.contains-task-list { padding-left: 1.5em; list-style: none; }
 main.markdown-body li.task-list-item { list-style: none; }
+/* Custom-render the task-list checkbox instead of relying on the browser's
+   native disabled-checkbox look. Chromium / WebView2 draws disabled native
+   checkboxes as a heavy dark-filled square whenever the OS color-scheme is
+   dark — which made checked/unchecked items look like indistinguishable
+   black blocks on the light (Mica-tinted) background. The custom appearance
+   below is theme-aware (uses --skim-bg / --skim-border / --skim-link) so it
+   stays legible in both light and dark themes regardless of OS theme. */
 main.markdown-body li.task-list-item > input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
     margin: 0 0.45em 0 -1.35em;
-    vertical-align: middle;
+    padding: 0;
+    vertical-align: -2px;
     cursor: default;
+    box-sizing: border-box;
+    background-color: var(--skim-bg);
+    border: 1px solid var(--skim-border);
+    border-radius: 3px;
+    position: relative;
+    opacity: 1;
+    flex-shrink: 0;
+}
+main.markdown-body li.task-list-item > input[type="checkbox"]:checked {
+    background-color: var(--skim-link);
+    border-color: var(--skim-link);
+}
+main.markdown-body li.task-list-item > input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    left: 3.5px;
+    top: 0.5px;
+    width: 3px;
+    height: 7px;
+    border: solid #ffffff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+    box-sizing: content-box;
 }
 main.markdown-body li.task-list-item > p:first-child {
     display: inline;
