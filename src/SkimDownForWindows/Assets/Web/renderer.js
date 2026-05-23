@@ -16,6 +16,9 @@
  *   { type: "search/result", total, current }
  *   { type: "ready" }
  *   { type: "copy",   text }   // fallback when navigator.clipboard fails
+ *   { type: "shortcut", id }   // keyboard accelerator forwarded from WebView2
+ *                              // because WebView2's child HWND swallows keys
+ *                              // before WinUI's KeyboardAccelerator sees them.
  */
 
 (function () {
@@ -1027,10 +1030,84 @@
         postToHost({ type: "search/result", total: 0, current: 0 });
     }
 
+    // ----- Keyboard accelerator forwarding -----
+    //
+    // When the WebView2's child HWND has focus, WinUI's KeyboardAccelerator
+    // on the menu items never fires — the keys are consumed by the browser
+    // before they reach the WinUI input pipeline. To make the menu shortcuts
+    // (Ctrl+F, Ctrl+B, Ctrl+O, Ctrl++ / - / 0, etc.) work uniformly, we
+    // detect the relevant combos here and post `{type:"shortcut", id}` back
+    // to the host so it can invoke the same handler the menu would.
+    //
+    // We intentionally do NOT forward Ctrl+C: native browser copy is faster
+    // and writes the user's actual selection to the clipboard directly. The
+    // menu's Ctrl+C is the fallback for when focus is in WinUI.
+    function shortcutIdFromEvent(ev) {
+        // Skip Alt / Meta combos — none of our shortcuts use them, and Alt+
+        // is widely used for menu mnemonics / system shortcuts.
+        if (!ev.ctrlKey || ev.altKey || ev.metaKey) return null;
+
+        var key = ev.key || "";
+
+        // Symbol keys are layout-stable across letter/digit cases, so match
+        // them BEFORE the lowercase fold (Shift+= produces "+", not "=").
+        if (key === "+" || key === "=") return "zoom-in";
+        if (key === "-") return "zoom-out";
+        if (key === "0" && !ev.shiftKey) return "zoom-reset";
+
+        var lk = key.toLowerCase();
+
+        if (ev.shiftKey) {
+            // Ctrl+Shift+G is Find Previous; no other Ctrl+Shift+letter
+            // combos are mapped today.
+            if (lk === "g") return "find-prev";
+            return null;
+        }
+
+        switch (lk) {
+            case "o": return "open-folder";
+            case "w": return "close-window";
+            case "n": return "new-window";
+            case "f": return "find";
+            case "g": return "find-next";
+            case "e": return "use-selection-for-find";
+            case "b": return "toggle-sidebar";
+            case "a": return "select-all";
+            case "m": return "minimize";
+            default:  return null;
+        }
+    }
+
+    function isEditableTarget(t) {
+        if (!t) return false;
+        try {
+            if (t.isContentEditable) return true;
+            var tag = (t.tagName || "").toUpperCase();
+            if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+        } catch (e) { /* defensive */ }
+        return false;
+    }
+
+    function handleAcceleratorKey(ev) {
+        // Don't hijack keystrokes the user is typing into a real input.
+        if (isEditableTarget(ev.target)) return;
+
+        var id = shortcutIdFromEvent(ev);
+        if (!id) return;
+
+        ev.preventDefault();
+        ev.stopPropagation();
+        postToHost({ type: "shortcut", id: id });
+    }
+
     // ----- Bootstrap -----
     function onReady() {
         contentEl = document.getElementById("content");
         contentEl.addEventListener("click", handleClick, true);
+
+        // Capture-phase so we see the key before any child handler can
+        // swallow it (e.g. KaTeX-rendered widgets).
+        window.addEventListener("keydown", handleAcceleratorKey, true);
 
         installPurifyHooks();
         initMermaid(currentTheme);

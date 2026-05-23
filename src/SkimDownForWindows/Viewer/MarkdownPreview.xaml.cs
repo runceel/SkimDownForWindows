@@ -26,6 +26,15 @@ public sealed partial class MarkdownPreview : UserControl
     public event Action<string>? RelativeMarkdownLinkClicked;
     public event Action<string>? ExternalLinkClicked;
     public event Action<int, int>? SearchResult; // (total, currentOneBased)
+    /// <summary>
+    /// Raised when the WebView2's child HWND has focus and the user presses a
+    /// keyboard accelerator that WinUI's <see cref="Microsoft.UI.Xaml.Input.KeyboardAccelerator"/>
+    /// would normally handle. The renderer detects the combo, calls
+    /// <c>preventDefault()</c>, and posts the shortcut id back so the host can
+    /// invoke the same action the menu would. See <c>renderer.js</c> for the
+    /// list of ids.
+    /// </summary>
+    public event Action<string>? ShortcutInvoked;
 
     private bool _initialized;
     private bool _webReady;
@@ -80,6 +89,14 @@ public sealed partial class MarkdownPreview : UserControl
         core.Settings.IsStatusBarEnabled = false;
         core.Settings.AreDevToolsEnabled = false;
         core.Settings.IsZoomControlEnabled = false;
+
+        // Stop the browser from acting on its own accelerators (Ctrl+F find
+        // bar, Ctrl+P print, Ctrl+plus/minus zoom, Ctrl+R reload, F12 dev
+        // tools, etc.). The renderer's keydown listener forwards every
+        // shortcut we actually care about back to the host instead, so these
+        // are pure no-ops from the user's perspective once disabled.
+        try { core.Settings.AreBrowserAcceleratorKeysEnabled = false; }
+        catch { /* older WebView2 runtime lacks this knob; ignore */ }
 
         // Make the WebView2's surface transparent so when the renderer hasn't
         // pushed body styles yet, the parent (themed) Border shows through —
@@ -322,6 +339,13 @@ public sealed partial class MarkdownPreview : UserControl
                         {
                             LogToFile($"clipboard fallback failed: {ex.Message}");
                         }
+                    }
+                    break;
+                case "shortcut":
+                    var id = doc.RootElement.TryGetProperty("id", out var idEl) ? idEl.GetString() : null;
+                    if (!string.IsNullOrEmpty(id))
+                    {
+                        ShortcutInvoked?.Invoke(id);
                     }
                     break;
             }
