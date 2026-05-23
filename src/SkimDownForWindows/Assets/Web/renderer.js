@@ -1051,7 +1051,10 @@
 
         // Symbol keys are layout-stable across letter/digit cases, so match
         // them BEFORE the lowercase fold (Shift+= produces "+", not "=").
-        if (key === "+" || key === "=") return "zoom-in";
+        // ";" is included as a zoom-in alias for Japanese (JIS) keyboards,
+        // where the "+" character lives on Shift+";" — so Ctrl+; (no Shift)
+        // gives JIS users the same one-handed feel US users get from Ctrl+=.
+        if (key === "+" || key === "=" || key === ";") return "zoom-in";
         if (key === "-") return "zoom-out";
         if (key === "0" && !ev.shiftKey) return "zoom-reset";
 

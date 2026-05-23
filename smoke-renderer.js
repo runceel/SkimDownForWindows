@@ -259,6 +259,7 @@ async function main() {
         { combo: { key: "=" },                        id: "zoom-in" },
         { combo: { key: "+", shiftKey: true },        id: "zoom-in" },       // Shift+= → "+"
         { combo: { key: "+" },                        id: "zoom-in" },       // numpad add
+        { combo: { key: ";" },                        id: "zoom-in" },       // JIS keyboard: ';' is the '+' key position, so Ctrl+; (no Shift) zooms in
         { combo: { key: "-" },                        id: "zoom-out" },
     ];
 
