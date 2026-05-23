@@ -4,17 +4,16 @@
   xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  xmlns:systemai="http://schemas.microsoft.com/appx/manifest/systemai/windows10"
-  IgnorableNamespaces="uap rescap systemai uap5"
+  IgnorableNamespaces="uap rescap uap5"
   xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5">
   <Identity
-    Name="9189ECC8-13EB-4031-B20A-C5AF4747B911"
-    Publisher="CN=AppPublisher"
+    Name="45014okazuki.SkimDown"
+    Publisher="CN=57A8C5FA-395A-4109-91A0-CF1B93556B5D"
     Version="1.0.0.0" />
-  <mp:PhoneIdentity PhoneProductId="9189ECC8-13EB-4031-B20A-C5AF4747B911" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
+  <mp:PhoneIdentity PhoneProductId="9BB7808E-1D64-4BD5-B28D-768C39DF32A1" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
   <Properties>
     <DisplayName>SkimDown</DisplayName>
-    <PublisherDisplayName>AppPublisher</PublisherDisplayName>
+    <PublisherDisplayName>okazuki</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
   <Dependencies>
@@ -55,6 +54,5 @@
   </Applications>
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
-    <systemai:Capability Name="systemAIModels" />
   </Capabilities>
 </Package>
