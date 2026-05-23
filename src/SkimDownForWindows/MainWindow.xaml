@@ -20,7 +20,7 @@
 
         <TitleBar x:Name="AppTitleBar" Title="SkimDown">
             <TitleBar.IconSource>
-                <ImageIconSource ImageSource="ms-appx:///Assets/AppIcon.svg" />
+                <ImageIconSource ImageSource="ms-appx:///Assets/AppIcon.png" />
             </TitleBar.IconSource>
         </TitleBar>
 

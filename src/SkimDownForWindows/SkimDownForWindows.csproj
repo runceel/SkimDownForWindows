@@ -24,10 +24,11 @@
     <Content Include="Assets\Square44x44Logo.targetsize-48_altform-lightunplated.png" />
     <Content Include="Assets\StoreLogo.png" />
     <Content Include="Assets\AppIcon.ico" />
-    <Content Include="Assets\AppIcon.svg" />
-    <!-- AppIcon-small.svg is build-time only (used by scripts/generate-icons.js).
-         Tracked here so it shows in Solution Explorer but not packaged. -->
-    <None Include="Assets\AppIcon-small.svg" />
+    <Content Include="Assets\AppIcon.png" />
+    <!-- AppIcon-source.png is the master logo (from upstream 07JP27/SkimDown,
+         used with permission). It's the build-time input for scripts/generate-icons.js;
+         tracked here so it shows in Solution Explorer but not packaged in the MSIX. -->
+    <None Include="Assets\AppIcon-source.png" />
     <Content Include="Assets\Wide310x150Logo.scale-200.png" />
     <Content Include="Assets\Web\**\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

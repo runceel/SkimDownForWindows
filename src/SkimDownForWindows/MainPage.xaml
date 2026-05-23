@@ -236,7 +236,7 @@
                     <StackPanel HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 Spacing="20">
-                        <Image Source="ms-appx:///Assets/AppIcon.svg"
+                        <Image Source="ms-appx:///Assets/AppIcon.png"
                                Width="120" Height="120"
                                HorizontalAlignment="Center"
                                Opacity="0.95" />
