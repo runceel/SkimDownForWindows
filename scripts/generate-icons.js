@@ -1,8 +1,10 @@
-// Generate Windows shell icons from AppIcon.svg (+ small variant for tiny sizes).
+// Generate Windows shell icons from AppIcon-source.png (the upstream SkimDown
+// master icon, used with permission from @07JP27).
 //
 // Outputs (overwriting existing files in src/SkimDownForWindows/Assets/):
 //
-//   PNG (transparent background):
+//   PNG (centered on transparent background where the asset has spare area):
+//     AppIcon.png                                              128x128   (in-app TitleBar icon)
 //     Square44x44Logo.scale-200.png                            88x88
 //     Square44x44Logo.targetsize-24_altform-unplated.png       24x24
 //     Square44x44Logo.targetsize-48_altform-lightunplated.png  48x48
@@ -10,15 +12,17 @@
 //     LockScreenLogo.scale-200.png                             48x48
 //     StoreLogo.png                                            50x50
 //
-//   PNG with transparent background (wide / splash) — OS supplies tile color:
+//   PNG with transparent background (wide / splash) — icon centered at 75% of
+//   the tile height; OS supplies the tile colour:
 //     Wide310x150Logo.scale-200.png                            620x300
 //     SplashScreen.scale-200.png                               1240x600
 //
-//   ICO (multi-resolution):
-//     AppIcon.ico                                              16,24,32,48,64,128,256
+//   ICO (multi-resolution): 16, 24, 32, 48, 64, 128, 256
+//     AppIcon.ico
 //
-// Sizes <= 32 use AppIcon-small.svg (simpler shape that survives downscaling);
-// everything else uses AppIcon.svg.
+// All sizes downscale from the same square master (1254x1254). Sharp uses
+// lanczos3 by default which produces clean results down to 16x16 because the
+// upstream icon is gradient-dominated.
 
 const fs = require("fs");
 const path = require("path");
@@ -26,15 +30,16 @@ const sharp = require("sharp");
 const pngToIco = require("png-to-ico").default;
 
 const ASSETS = path.resolve(__dirname, "..", "src/SkimDownForWindows/Assets");
-const SVG_FULL = fs.readFileSync(path.join(ASSETS, "AppIcon.svg"));
-const SVG_SMALL = fs.readFileSync(path.join(ASSETS, "AppIcon-small.svg"));
+const SOURCE = path.join(ASSETS, "AppIcon-source.png");
 
-function pickSvg(size) {
-    return size <= 32 ? SVG_SMALL : SVG_FULL;
+if (!fs.existsSync(SOURCE)) {
+    console.error("FATAL: missing source icon at", SOURCE);
+    console.error("Copy the upstream icon.png from https://github.com/07JP27/SkimDown to that path.");
+    process.exit(1);
 }
 
 async function rasterSquare(size, outPath) {
-    const buf = await sharp(pickSvg(size), { density: 300 })
+    const buf = await sharp(SOURCE)
         .resize(size, size, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
         .png()
         .toBuffer();
@@ -43,9 +48,10 @@ async function rasterSquare(size, outPath) {
 }
 
 async function rasterWide(width, height, outPath) {
-    // Center the icon (a square equal to ~75% of height) on transparency.
+    // Center the square icon at ~75% of the tile height on a transparent
+    // canvas. Keeps proportions consistent across wide / splash variants.
     const iconSize = Math.round(height * 0.75);
-    const iconBuf = await sharp(pickSvg(iconSize), { density: 300 })
+    const iconBuf = await sharp(SOURCE)
         .resize(iconSize, iconSize, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
         .png()
         .toBuffer();
@@ -65,16 +71,17 @@ async function rasterWide(width, height, outPath) {
 }
 
 async function rasterIcoFrame(size) {
-    return sharp(pickSvg(size), { density: 300 })
+    return sharp(SOURCE)
         .resize(size, size, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
         .png()
         .toBuffer();
 }
 
 async function main() {
-    console.log("Generating Windows shell icons from", ASSETS);
+    console.log("Generating Windows shell icons from", SOURCE);
 
     console.log("\n[Square PNG]");
+    await rasterSquare(128, path.join(ASSETS, "AppIcon.png"));
     await rasterSquare(88,  path.join(ASSETS, "Square44x44Logo.scale-200.png"));
     await rasterSquare(24,  path.join(ASSETS, "Square44x44Logo.targetsize-24_altform-unplated.png"));
     await rasterSquare(48,  path.join(ASSETS, "Square44x44Logo.targetsize-48_altform-lightunplated.png"));
