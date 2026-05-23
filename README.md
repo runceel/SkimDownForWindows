@@ -79,6 +79,54 @@ $env:SKIM_SAMPLES_PATH = "C:\path\to\SkimDown\samples"
 dotnet test src\SkimDownForWindows.Tests
 ```
 
+## Microsoft Store submission
+
+SkimDown is published under the reserved app name **SkimDown** in [Microsoft Partner Center](https://partner.microsoft.com/dashboard/products/9NHTZMM0XMMF/overview). The `Package.appxmanifest` is pre-wired to that product:
+
+| Field | Value |
+|---|---|
+| `Identity/Name` | `45014okazuki.SkimDown` |
+| `Identity/Publisher` | `CN=57A8C5FA-395A-4109-91A0-CF1B93556B5D` |
+| `Properties/PublisherDisplayName` | `okazuki` |
+
+### Build the `.msixupload`
+
+```powershell
+.\scripts\Build-StorePackage.ps1
+```
+
+This produces `bin\StorePackage\45014okazuki.SkimDown_<version>.msixupload` containing a multi-architecture `.msixbundle` (x64 + ARM64 by default). Add `-IncludeX86` (or `-Architectures x64,arm64,x86`) for a tri-arch bundle. The output is **unsigned by design** — the Microsoft Store re-signs every package during ingestion.
+
+Internally the script:
+
+1. Runs `dotnet publish -c Release -p:PublishTrimmed=false` per architecture (trimming is disabled for Store builds because WinUI 3 / `CommunityToolkit.Mvvm` reflection code is not fully trim-safe; `ReadyToRun` stays on)
+2. Calls `winapp package` on each published layout to produce per-arch `.msix`
+3. Calls `MakeAppx.exe bundle` (via `winapp tool`) to combine them into a `.msixbundle`
+4. Wraps the bundle into a `.msixupload` zip with the bundle at the archive root
+
+### Upload to Partner Center
+
+1. Sign in to [Partner Center → SkimDown](https://partner.microsoft.com/dashboard/products/9NHTZMM0XMMF/overview)
+2. Start a new submission and open **Packages**
+3. Drag-drop `bin\StorePackage\*.msixupload`
+4. Fill in store listing, age rating, screenshots, and submit
+
+### Bumping the version
+
+Edit `Identity/@Version` in `src/SkimDownForWindows/Package.appxmanifest`. The last segment **must remain `0`** for Store submissions (the Store reserves the revision component for its own re-signing pipeline).
+
+### Local install validation (optional)
+
+For sideload testing before submission, generate and trust a dev cert that matches the manifest Publisher:
+
+```powershell
+.\scripts\Build-StorePackage.ps1 -Sign            # creates bin\StorePackage\devcert.pfx
+winapp cert install .\bin\StorePackage\devcert.pfx   # run as admin, one-time trust
+Add-AppxPackage .\bin\StorePackage\45014okazuki.SkimDown_1.0.0.0.msixbundle
+```
+
+The unsigned `.msixupload` and the signed `.msixbundle` are produced side-by-side — only the `.msixupload` should be uploaded to the Store.
+
 ## License
 
 Mirrors the upstream SkimDown project licensing — see [`07JP27/SkimDown`](https://github.com/07JP27/SkimDown) ([GNU General Public License v3.0](https://github.com/07JP27/SkimDown/blob/main/LICENSE)) for the source SPEC, design notes, and macOS reference implementation.
