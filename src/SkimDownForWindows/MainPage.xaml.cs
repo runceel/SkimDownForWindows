@@ -47,12 +47,20 @@ public sealed partial class MainPage : Page
             Preview.RelativeMarkdownLinkClicked += OnPreviewRelativeLink;
             Preview.ExternalLinkClicked += OnPreviewExternalLink;
             Preview.SearchResult += OnPreviewSearchResult;
+            Preview.ShortcutInvoked += OnPreviewShortcut;
 
             Loaded += OnLoaded;
             Unloaded += OnUnloaded;
 
             DragOver += OnDragOver;
             Drop += OnDrop;
+
+            // Use AddHandler with handledEventsToo:true so KeyDown reaches us
+            // even after a child control marked the routed event handled. We
+            // rely on this for main-row Ctrl+= / Ctrl+- zoom because those
+            // OEM key VirtualKeys aren't named in Windows.System.VirtualKey,
+            // which makes them awkward to bind as XAML KeyboardAccelerators.
+            AddHandler(KeyDownEvent, new KeyEventHandler(OnPageKeyDown), handledEventsToo: true);
 
             UpdateContentVisibility();
             UpdateThemeMenuChecks();
@@ -168,6 +176,7 @@ public sealed partial class MainPage : Page
         Preview.RelativeMarkdownLinkClicked -= OnPreviewRelativeLink;
         Preview.ExternalLinkClicked -= OnPreviewExternalLink;
         Preview.SearchResult -= OnPreviewSearchResult;
+        Preview.ShortcutInvoked -= OnPreviewShortcut;
         if (_windowsChangedSubscribed)
         {
             WindowManager.WindowsChanged -= OnWindowsChanged;
@@ -401,6 +410,81 @@ public sealed partial class MainPage : Page
         else
         {
             SearchStatus.Text = $"{currentOneBased} / {total}";
+        }
+    }
+
+    // ----- WebView2-forwarded keyboard shortcuts -----
+    //
+    // When the WebView2's child HWND has focus, WinUI's KeyboardAccelerator
+    // never sees the keystroke. The renderer (renderer.js) detects the combo,
+    // preventDefaults the browser action, and posts the id back to the host
+    // via the "shortcut" web message. We dispatch to the same handlers the
+    // menu items invoke so the user-visible behavior is identical regardless
+    // of which surface currently has focus.
+    private void OnPreviewShortcut(string id)
+    {
+        // Whitelist + dispatch. Unknown ids are silently dropped — never
+        // invoke arbitrary actions from web messages.
+        var args = new RoutedEventArgs();
+        switch (id)
+        {
+            case "open-folder":             OnOpenFolderClick(this, args);            break;
+            case "close-window":            OnCloseWindowClick(this, args);           break;
+            case "new-window":              OnNewWindowClick(this, args);             break;
+            case "minimize":                OnMinimizeClick(this, args);              break;
+            case "toggle-sidebar":          OnToggleSidebarClick(this, args);         break;
+            case "find":                    OnFindClick(this, args);                  break;
+            case "find-next":               OnFindNextClick(this, args);              break;
+            case "find-prev":               OnFindPrevClick(this, args);              break;
+            case "use-selection-for-find":  OnUseSelectionForFindClick(this, args);   break;
+            case "zoom-in":                 OnZoomInClick(this, args);                break;
+            case "zoom-out":                OnZoomOutClick(this, args);               break;
+            case "zoom-reset":              OnZoomResetClick(this, args);             break;
+            case "select-all":              OnSelectAllClick(this, args);             break;
+            case "copy":                    OnCopyClick(this, args);                  break;
+            // Anything else: ignore.
+        }
+    }
+
+    // Main-row Ctrl+=, Ctrl++, Ctrl+- support for WinUI focus (sidebar /
+    // empty state). The XAML accelerators only cover the numpad's Add /
+    // Subtract VirtualKeys, which leaves laptop / TKL users without a way
+    // to zoom unless they switch focus into the WebView2 first (where the
+    // renderer.js handler picks them up).
+    //
+    // OemPlus / OemMinus aren't named in Windows.System.VirtualKey, so we
+    // compare against the raw VK codes (0xBB / 0xBD).
+    private const int VK_OEM_PLUS  = 0xBB;
+    private const int VK_OEM_MINUS = 0xBD;
+
+    private async void OnPageKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Handled) return;
+
+        var ctrl = (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control)
+                    & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
+        if (!ctrl) return;
+
+        var menu = (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu)
+                    & Windows.UI.Core.CoreVirtualKeyStates.Down) == Windows.UI.Core.CoreVirtualKeyStates.Down;
+        if (menu) return; // Alt held — leave for menu mnemonics.
+
+        // Skip if the user is typing in a real text input (SearchBox, etc.).
+        // FocusManager is more reliable than e.OriginalSource because routed
+        // events surface inner template parts (e.g. RootGrid TextBox child).
+        var focused = FocusManager.GetFocusedElement(XamlRoot);
+        if (focused is TextBox or PasswordBox or RichEditBox) return;
+
+        var key = (int)e.Key;
+        if (key == VK_OEM_PLUS)
+        {
+            await SetZoomAsync(Math.Min(3.0, ViewModel.Settings.Current.ZoomFactor + 0.1));
+            e.Handled = true;
+        }
+        else if (key == VK_OEM_MINUS)
+        {
+            await SetZoomAsync(Math.Max(0.5, ViewModel.Settings.Current.ZoomFactor - 0.1));
+            e.Handled = true;
         }
     }
 

@@ -222,6 +222,87 @@ async function main() {
     } catch (e) { errored = true; }
     check("scrollToAnchor doesn't throw", !errored);
 
+    // --- 15. Keyboard shortcut forwarding ---
+    //
+    // WebView2's child HWND swallows keystrokes before WinUI's
+    // KeyboardAccelerator sees them, so the renderer forwards them as
+    // { type: "shortcut", id } messages. Make sure the JS keydown
+    // listener turns the canonical combos into the ids the host expects.
+    console.log("[15] Keyboard shortcut forwarding");
+
+    function fireKey(opts) {
+        var ev = new window.KeyboardEvent("keydown", Object.assign({
+            bubbles: true,
+            cancelable: true,
+            ctrlKey: true,
+        }, opts));
+        // jsdom's defaultPrevented surfaces preventDefault() calls inside
+        // the renderer handler — we verify the handler claimed the key.
+        var target = (opts && opts._target) ? opts._target : window.document.body;
+        target.dispatchEvent(ev);
+        return ev;
+    }
+
+    var shortcutCases = [
+        { combo: { key: "f" },                        id: "find" },
+        { combo: { key: "F" },                        id: "find" },          // caps-lock / shift normalization
+        { combo: { key: "g" },                        id: "find-next" },
+        { combo: { key: "G", shiftKey: true },        id: "find-prev" },
+        { combo: { key: "e" },                        id: "use-selection-for-find" },
+        { combo: { key: "b" },                        id: "toggle-sidebar" },
+        { combo: { key: "o" },                        id: "open-folder" },
+        { combo: { key: "w" },                        id: "close-window" },
+        { combo: { key: "n" },                        id: "new-window" },
+        { combo: { key: "m" },                        id: "minimize" },
+        { combo: { key: "a" },                        id: "select-all" },
+        { combo: { key: "0" },                        id: "zoom-reset" },
+        { combo: { key: "=" },                        id: "zoom-in" },
+        { combo: { key: "+", shiftKey: true },        id: "zoom-in" },       // Shift+= → "+"
+        { combo: { key: "+" },                        id: "zoom-in" },       // numpad add
+        { combo: { key: "-" },                        id: "zoom-out" },
+    ];
+
+    for (var i = 0; i < shortcutCases.length; i++) {
+        var c = shortcutCases[i];
+        incoming.length = 0;
+        var ev = fireKey(c.combo);
+        var msg = incoming.find(m => m && m.type === "shortcut");
+        check(
+            "Ctrl+" + (c.combo.shiftKey ? "Shift+" : "") + c.combo.key + " → " + c.id,
+            !!msg && msg.id === c.id && ev.defaultPrevented,
+            "got: " + JSON.stringify(msg) + " prevented=" + ev.defaultPrevented);
+    }
+
+    // Ctrl+C is intentionally NOT forwarded (native browser copy is faster).
+    incoming.length = 0;
+    var copyEv = fireKey({ key: "c" });
+    check("Ctrl+C is not forwarded (native browser copy wins)",
+        !incoming.some(m => m && m.type === "shortcut") && !copyEv.defaultPrevented);
+
+    // Plain letters without Ctrl must NOT be forwarded.
+    incoming.length = 0;
+    var plainEv = new window.KeyboardEvent("keydown", { key: "f", bubbles: true, cancelable: true });
+    window.document.body.dispatchEvent(plainEv);
+    check("Plain 'f' (no Ctrl) is ignored",
+        !incoming.some(m => m && m.type === "shortcut") && !plainEv.defaultPrevented);
+
+    // Alt+Ctrl combos must NOT be forwarded (Alt+ is reserved for menu mnemonics).
+    incoming.length = 0;
+    var altEv = fireKey({ key: "f", altKey: true });
+    check("Ctrl+Alt+F is ignored",
+        !incoming.some(m => m && m.type === "shortcut") && !altEv.defaultPrevented);
+
+    // Keystrokes inside an editable element must be left alone so the user
+    // can still type. Renderer has no inputs today but the guard is real.
+    var input = window.document.createElement("input");
+    input.type = "text";
+    window.document.body.appendChild(input);
+    incoming.length = 0;
+    var inInputEv = fireKey({ key: "f", _target: input });
+    check("Ctrl+F inside <input> is not hijacked",
+        !incoming.some(m => m && m.type === "shortcut") && !inInputEv.defaultPrevented);
+    window.document.body.removeChild(input);
+
     console.log("");
     if (failures === 0) {
         console.log("✅ ALL RENDERER SMOKE CHECKS PASSED");
