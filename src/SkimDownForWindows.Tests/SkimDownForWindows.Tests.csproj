@@ -6,32 +6,22 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>SkimDownForWindows.Tests</RootNamespace>
-    <!-- Re-define just enough symbols so the main project's [ObservableProperty]
-         attribute usage in MarkdownTreeItem doesn't break compilation here. -->
+    <!-- テストは Domain / Application を ProjectReference する。Infrastructure は
+         windows TFM のためテストでは参照せず、必要なら TestHelpers/ 配下に最小限の
+         IFileSystem 実装を置く。 -->
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="MSTest" Version="4.0.2" />
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
   </ItemGroup>
 
-  <!--
-    Pull in only the UI-agnostic source files from the main app. These don't
-    depend on WinUI / WindowsAppSDK, so the test project can target plain net10.0.
-  -->
   <ItemGroup>
-    <Compile Include="..\SkimDownForWindows\Utilities\PathHelpers.cs"            Link="Source\PathHelpers.cs" />
-    <Compile Include="..\SkimDownForWindows\Models\MarkdownTreeItem.cs"          Link="Source\MarkdownTreeItem.cs" />
-    <Compile Include="..\SkimDownForWindows\Models\LinkClass.cs"                 Link="Source\LinkClass.cs" />
-    <Compile Include="..\SkimDownForWindows\Markdown\MarkdownScanner.cs"         Link="Source\MarkdownScanner.cs" />
-    <Compile Include="..\SkimDownForWindows\Markdown\MarkdownTreeBuilder.cs"     Link="Source\MarkdownTreeBuilder.cs" />
-    <Compile Include="..\SkimDownForWindows\Markdown\LinkResolver.cs"            Link="Source\LinkResolver.cs" />
-    <Compile Include="..\SkimDownForWindows\Markdown\InitialSelectionPicker.cs"  Link="Source\InitialSelectionPicker.cs" />
-    <Compile Include="..\SkimDownForWindows\Core\CommandLineLauncher.cs"         Link="Source\CommandLineLauncher.cs" />
+    <ProjectReference Include="..\SkimDownForWindows.Domain\SkimDownForWindows.Domain.csproj" />
+    <ProjectReference Include="..\SkimDownForWindows.Application\SkimDownForWindows.Application.csproj" />
   </ItemGroup>
 
 </Project>

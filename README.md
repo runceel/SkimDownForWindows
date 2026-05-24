@@ -24,20 +24,23 @@ Open a folder, and SkimDown shows only the Markdown files in a sidebar tree and 
 
 ## Architecture
 
-Pure **WinUI 3 + Windows App SDK 2.0.1** with WebView2 for Markdown rendering, on **.NET 10**. CommunityToolkit.Mvvm provides the MVVM scaffolding. WebView2 serves bundled renderer assets from one virtual host (`https://skimdown-app.example/`) while the opened folder is mapped to a separate origin (`https://skimdown-content.example/`), so a renderer bug cannot reach the user's content from the asset origin. Markdown is delivered to the renderer through `CoreWebView2.PostWebMessageAsJson` — never `NavigateToString`.
+**WinUI 3 + Windows App SDK 2.0.1** + WebView2 + CommunityToolkit.Mvvm on **.NET 10**, with **Microsoft.Extensions.DependencyInjection** for composition. WebView2 serves bundled renderer assets from one virtual host (`https://skimdown-app.example/`) while the opened folder is mapped to a separate origin (`https://skimdown-content.example/`), so a renderer bug cannot reach the user's content from the asset origin. Markdown is delivered to the renderer through `CoreWebView2.PostWebMessageAsJson` — never `NavigateToString`.
 
-| Layer | Directory | Purpose |
+The solution is split into 4 + 1 projects following clean-architecture-style layering. Dependencies flow inward only.
+
+| Project | TFM | Role |
 |---|---|---|
-| **App** | `src/SkimDownForWindows/` | App startup, `MainWindow` / `MainPage`, menus, sidebar tree UI |
-| **Core** | `src/SkimDownForWindows/Core/` | Settings store, folder watcher, multi-window registry |
-| **Markdown** | `src/SkimDownForWindows/Markdown/` | Discovery, link resolution, tree building, initial selection |
-| **Viewer** | `src/SkimDownForWindows/Viewer/` | WebView2 host, JS bridge, in-document search, link routing |
-| **Models** | `src/SkimDownForWindows/Models/` | Folder session, tree items, settings models |
-| **ViewModels** | `src/SkimDownForWindows/ViewModels/` | MVVM coordinator for the main page |
-| **Utilities** | `src/SkimDownForWindows/Utilities/` | Path canonicalization, folder-boundary checks |
-| **Assets/Web** | `src/SkimDownForWindows/Assets/Web/` | Bundled `renderer.html` / `renderer.js` / CSS / vendor libraries |
+| **`SkimDownForWindows.Domain`** | `net10.0` | Pure value objects / enums (`AppTheme`, `SidebarPosition`, `LinkKind`, `LinkClassification`). No external dependencies. |
+| **`SkimDownForWindows.Application`** | `net10.0` | Use case layer: abstractions (`IFileSystem`, `IFolderWatcher`, `ISettingsRepository`, `IClipboardService`, `IShellService`, `ISystemThemeProvider`, `IUiDispatcher`, `IExternalUriLauncher`, `IWindowService`, `IAppLogger`, `IMarkdownFileReader`), pure services (`MarkdownScanner`, `MarkdownTreeBuilder`, `InitialSelectionPicker`, `LinkResolver`, `CommandLineLauncher`), ViewModels (`MainPageViewModel`), persistence DTOs (`AppSettings`, `FolderState`), UI-bound models (`MarkdownTreeItem`, `LoadRequest`, `RecentFolderEntry`), and path utilities. |
+| **`SkimDownForWindows.Infrastructure`** | `net10.0-windows10.0.26100.0` | Platform implementations of the abstractions — `LocalFileSystem`, `FileSystemFolderWatcher`, `JsonSettingsRepository`, `WindowsClipboardService`, `ExplorerShellService`, `UiSettingsThemeProvider`, `LauncherExternalUriService`, `FileAppLogger`. References WinRT only — **does not depend on `Microsoft.WindowsAppSDK`**. |
+| **`SkimDownForWindows`** (App / Presentation) | `net10.0-windows10.0.26100.0` | XAML pages / windows / `MarkdownPreview` UserControl, the DI composition root (`App.Services`), and WindowsAppSDK-specific service implementations (`DispatcherQueueUiDispatcher`, `WindowService`). |
+| **`SkimDownForWindows.Tests`** | `net10.0` | Unit + opt-in integration tests against Domain + Application. Stays cross-platform-neutral (no Infrastructure reference). |
 
-Detailed design documents are in the upstream project: [`07JP27/SkimDown/design/`](https://github.com/07JP27/SkimDown/tree/main/design).
+Each `MainWindow` owns its own `IServiceScope`, so window-scoped services (`IFolderWatcher`, `MainPageViewModel`, Markdown pure services, `CommandLineLauncher`) are deterministically disposed when the window is closed.
+
+Design decisions are recorded as ADRs under [`.github/adr/`](.github/adr/). The repository-specific coding guide for humans and Copilot lives at [`.github/copilot-instructions.md`](.github/copilot-instructions.md).
+
+Detailed design documents for SkimDown itself are in the upstream project: [`07JP27/SkimDown/design/`](https://github.com/07JP27/SkimDown/tree/main/design).
 
 ## Development
 

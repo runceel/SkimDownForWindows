@@ -1,58 +1,69 @@
+using System;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
+using SkimDownForWindows.Application.Abstractions;
+using SkimDownForWindows.Domain;
 using Windows.UI;
-using SkimDownForWindows.Core;
-using SkimDownForWindows.Models;
-
-// To learn more about WinUI, the WinUI project structure,
-// and more about our project templates, see: http://aka.ms/winui-project-info.
 
 namespace SkimDownForWindows;
 
 /// <summary>
-/// The application window. This hosts a Frame that displays pages. Add your
-/// UI and logic to MainPage.xaml / MainPage.xaml.cs instead of here so you
-/// can use Page features such as navigation events and the Loaded lifecycle.
+/// アプリケーションのメインウィンドウ。<see cref="MainPage"/> を表示するフレームをホストする。
+///
+/// 各ウィンドウは自前の <see cref="IServiceScope"/> を所有し、閉じられた時に dispose する。
+/// スコープ内では <see cref="ViewModels.MainPageViewModel"/> や <see cref="IFolderWatcher"/>
+/// などのウィンドウ寿命に紐づく Scoped サービスがライフサイクル管理される。
 /// </summary>
 public sealed partial class MainWindow : Window
 {
+    private readonly IServiceScope _scope;
+
     public MainWindow() : this(null, restoreLastFolder: true) { }
 
     public MainWindow(string? initialFolderPath, bool restoreLastFolder)
     {
         InitializeComponent();
 
+        // App.Services はこのコンストラクタが呼ばれる時点で確実に初期化済み (App.OnLaunched 内で
+        // ServiceProviderFactory.Build → WindowService.CreateWindow → このコンストラクタ の順)。
+        _scope = App.Services.CreateScope();
+
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
 
         AppWindow.SetIcon("Assets/AppIcon.ico");
 
-        // Pass the window reference + initial-folder intent to the page so it
-        // doesn't have to reach for any static "current window" singleton.
-        var startArgs = new MainPageStartArgs(this, initialFolderPath, restoreLastFolder);
+        Closed += OnClosed;
+
+        // ウィンドウ固有のランタイム引数とスコープを Page に渡す
+        var startArgs = new MainPageStartArgs(this, _scope.ServiceProvider, initialFolderPath, restoreLastFolder);
         RootFrame.Navigate(typeof(MainPage), startArgs);
     }
 
+    private void OnClosed(object sender, WindowEventArgs args)
+    {
+        try { _scope.Dispose(); }
+        catch { /* best-effort: scope dispose may fail if VM dispose throws */ }
+    }
+
     /// <summary>
-    /// Update the visible window/title-bar title. Called by the page when the
-    /// open folder changes (per SPEC: <c>"FolderName — SkimDown"</c>).
+    /// ウィンドウタイトルを更新する。ページがフォルダーを変えた時に呼ばれる
+    /// (SPEC: <c>"FolderName — SkimDown"</c>)。
     /// </summary>
     public void SetTitle(string title)
     {
         Title = title;
         AppTitleBar.Title = title;
-        WindowManager.NotifyTitleChanged();
+        try { App.Services.GetRequiredService<IWindowService>().NotifyTitleChanged(); }
+        catch { /* best-effort */ }
     }
 
     /// <summary>
-    /// Apply the user-chosen theme to the entire window — including the
-    /// custom <c>TitleBar</c> control that lives outside the hosted Page —
-    /// and update the system caption buttons (min/max/close glyphs) so they
-    /// remain visible against the new background.
+    /// ユーザー選択テーマをウィンドウ全体 (TitleBar + 系統 caption ボタン) に反映する。
     /// </summary>
     public void ApplyTheme(AppTheme theme)
     {
-        // 1. Root grid -> cascades to TitleBar and any non-Page chrome.
         RootGrid.RequestedTheme = theme switch
         {
             AppTheme.Light => ElementTheme.Light,
@@ -60,28 +71,14 @@ public sealed partial class MainWindow : Window
             _ => ElementTheme.Default,
         };
 
-        // 2. Caption (min/max/close) button colors. These are drawn by the OS
-        //    via AppWindowTitleBar — they don't inherit our XAML theme — so
-        //    we have to pick foreground colors explicitly for the active
-        //    effective theme.
-        var effective = theme;
-        if (effective == AppTheme.System)
-        {
-            // Sample current OS theme so we pick matching caption colors.
-            try
-            {
-                var ui = new Windows.UI.ViewManagement.UISettings();
-                var bg = ui.GetColorValue(Windows.UI.ViewManagement.UIColorType.Background);
-                effective = (bg.R + bg.G + bg.B) < 384 ? AppTheme.Dark : AppTheme.Light;
-            }
-            catch { effective = AppTheme.Light; }
-        }
+        // OS が描画する Caption (min/max/close) ボタンは XAML テーマを継承しないため、
+        // 実効テーマを ISystemThemeProvider で解決して明示色を設定する。
+        var themeProvider = App.Services.GetRequiredService<ISystemThemeProvider>();
+        var effective = theme == AppTheme.System ? themeProvider.ResolveSystem() : theme;
 
         var captionBar = AppWindow?.TitleBar;
         if (captionBar is null) return;
 
-        // Make the caption area itself transparent so MicaBackdrop +
-        // RootGrid.Background show through and follow the XAML theme.
         captionBar.BackgroundColor = Colors.Transparent;
         captionBar.ButtonBackgroundColor = Colors.Transparent;
         captionBar.InactiveBackgroundColor = Colors.Transparent;
@@ -111,8 +108,15 @@ public sealed partial class MainWindow : Window
 }
 
 /// <summary>
-/// Bundle of values handed to the new <see cref="MainPage"/> via
-/// <see cref="Microsoft.UI.Xaml.Controls.Frame.Navigate(System.Type, object)"/>.
+/// <see cref="Microsoft.UI.Xaml.Controls.Frame.Navigate(System.Type, object)"/> で
+/// <see cref="MainPage"/> に渡される起動引数。
 /// </summary>
-public sealed record MainPageStartArgs(MainWindow Window, string? InitialFolderPath, bool RestoreLastFolder);
-
+/// <param name="Window">ホストウィンドウ。</param>
+/// <param name="ScopeProvider">このウィンドウ専用の DI スコープ。Page は ここから VM を解決する。</param>
+/// <param name="InitialFolderPath">起動時に開くフォルダー (CLI / drop 等で指定された場合)。</param>
+/// <param name="RestoreLastFolder"><see cref="InitialFolderPath"/> が <c>null</c> の時に persisted LastFolderPath を復元するか。</param>
+public sealed record MainPageStartArgs(
+    MainWindow Window,
+    IServiceProvider ScopeProvider,
+    string? InitialFolderPath,
+    bool RestoreLastFolder);

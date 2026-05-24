@@ -1,6 +1,6 @@
 using System;
 using System.IO;
-using SkimDownForWindows.Utilities;
+using SkimDownForWindows.Application.Utilities;
 
 namespace SkimDownForWindows.Tests;
 

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>SkimDownForWindows.Application</RootNamespace>
+    <!-- Application はユースケース層: 抽象 I/F・純粋ロジック・ViewModel。
+         プラットフォーム実装 (Windows, System.IO, Process 等) を直接呼ばない。
+         参照可能: Domain + CommunityToolkit.Mvvm + Microsoft.Extensions.DependencyInjection.Abstractions -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SkimDownForWindows.Domain\SkimDownForWindows.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

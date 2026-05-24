@@ -5,6 +5,21 @@
     <Platform Name="ARM64" />
   </Configurations>
   <Folder Name="/src/">
+    <Project Path="src/SkimDownForWindows.Domain/SkimDownForWindows.Domain.csproj">
+      <Platform Solution="*|x86" Project="AnyCPU" />
+      <Platform Solution="*|x64" Project="AnyCPU" />
+      <Platform Solution="*|ARM64" Project="AnyCPU" />
+    </Project>
+    <Project Path="src/SkimDownForWindows.Application/SkimDownForWindows.Application.csproj">
+      <Platform Solution="*|x86" Project="AnyCPU" />
+      <Platform Solution="*|x64" Project="AnyCPU" />
+      <Platform Solution="*|ARM64" Project="AnyCPU" />
+    </Project>
+    <Project Path="src/SkimDownForWindows.Infrastructure/SkimDownForWindows.Infrastructure.csproj">
+      <Platform Solution="*|x86" Project="AnyCPU" />
+      <Platform Solution="*|x64" Project="AnyCPU" />
+      <Platform Solution="*|ARM64" Project="AnyCPU" />
+    </Project>
     <Project Path="src/SkimDownForWindows.Tests/SkimDownForWindows.Tests.csproj">
       <Platform Solution="*|x86" Project="AnyCPU" />
       <Platform Solution="*|x64" Project="AnyCPU" />
