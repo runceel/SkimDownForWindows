@@ -78,6 +78,47 @@ public sealed class MarkdownScannerTests
     public void Scan_NonExistentFolder_ReturnsEmpty()
     {
         var results = _scanner.Scan(Path.Combine(_root, "nope"));
-        Assert.AreEqual(0, results.Count);
+        Assert.IsEmpty(results);
+    }
+
+    [TestMethod]
+    public void Scan_NullOrEmptyRoot_ReturnsEmpty()
+    {
+        Assert.IsEmpty(_scanner.Scan(""));
+        Assert.IsEmpty(_scanner.Scan(null!));
+    }
+
+    [TestMethod]
+    public void Scan_EmptyExistingFolder_ReturnsEmpty()
+    {
+        // ルート自体は存在するが Markdown はゼロ。
+        var empty = Path.Combine(_root, "empty");
+        Directory.CreateDirectory(empty);
+        Assert.IsEmpty(_scanner.Scan(empty));
+    }
+
+    [TestMethod]
+    public void Scan_NestedExcludedFolder_IsAlsoExcluded()
+    {
+        // どの深さでも除外名 (.git, node_modules, .build, DerivedData) に該当すれば除外。
+        Touch("README.md");
+        Touch("projects/library/node_modules/internal/x.md");
+        Touch("projects/library/src/keep.md");
+        Touch("vendor/.git/refs/y.md");
+
+        var results = _scanner.Scan(_root);
+        Assert.HasCount(2, results);
+        CollectionAssert.AreEquivalent(
+            new[] { "README.md", "keep.md" },
+            results.Select(Path.GetFileName).ToArray());
+    }
+
+    [TestMethod]
+    public void Scan_DotMarkdownExtension_IsRecognized()
+    {
+        Touch("a.markdown");
+        Touch("b.MARKDOWN");
+        var results = _scanner.Scan(_root);
+        Assert.HasCount(2, results);
     }
 }

@@ -60,4 +60,43 @@ public sealed class InitialSelectionPickerTests
         var picked = new InitialSelectionPicker().Pick(root, null);
         Assert.IsNull(picked);
     }
+
+    [TestMethod]
+    public void Pick_NullTree_ReturnsNull()
+    {
+        var picked = new InitialSelectionPicker().Pick(null!, "anything");
+        Assert.IsNull(picked);
+    }
+
+    [TestMethod]
+    public void Pick_ReadmeMarkdownVariant_IsAcceptedAsFallback()
+    {
+        // SPEC: ".markdown" 拡張子 README もフォールバック対象。
+        var files = new[]
+        {
+            Path.Combine(TestRoot, "alpha", "deep.md"),
+            Path.Combine(TestRoot, "README.markdown"),
+            Path.Combine(TestRoot, "zeta.md"),
+        };
+        var root = new MarkdownTreeBuilder().Build(TestRoot, files);
+        var picked = new InitialSelectionPicker().Pick(root, null);
+        Assert.IsNotNull(picked);
+        StringAssert.EndsWith(picked!, "README.markdown");
+    }
+
+    [TestMethod]
+    public void Pick_ReadmeCaseVariant_IsAcceptedAsFallback()
+    {
+        // 大文字小文字を区別しない: "readme.md" でもフォールバック対象。
+        var files = new[]
+        {
+            Path.Combine(TestRoot, "alpha", "deep.md"),
+            Path.Combine(TestRoot, "readme.MD"),
+            Path.Combine(TestRoot, "zeta.md"),
+        };
+        var root = new MarkdownTreeBuilder().Build(TestRoot, files);
+        var picked = new InitialSelectionPicker().Pick(root, null);
+        Assert.IsNotNull(picked);
+        StringAssert.EndsWith(picked!, "readme.MD");
+    }
 }

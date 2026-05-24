@@ -69,4 +69,31 @@ public sealed class PathHelpersTests
         var outside = Path.Combine(Path.GetTempPath(), "other", "x.md");
         Assert.ThrowsExactly<InvalidOperationException>(() => PathHelpers.RelativeFromRoot(root, outside));
     }
+
+    [TestMethod]
+    public void Canonicalize_TrimsTrailingSeparator()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "skim-canon") + Path.DirectorySeparatorChar;
+        var canonical = PathHelpers.Canonicalize(root);
+
+        Assert.DoesNotEndWith(Path.DirectorySeparatorChar.ToString(), canonical,
+            $"Canonicalize should strip trailing separator: '{canonical}'");
+        Assert.IsTrue(Path.IsPathFullyQualified(canonical),
+            $"Canonicalize should produce a fully-qualified path: '{canonical}'");
+    }
+
+    [TestMethod]
+    public void Canonicalize_EmptyOrNull_ReturnsEmpty()
+    {
+        Assert.AreEqual(string.Empty, PathHelpers.Canonicalize(""));
+        Assert.AreEqual(string.Empty, PathHelpers.Canonicalize(null!));
+    }
+
+    [TestMethod]
+    public void IsInsideFolder_NullOrEmpty_ReturnsFalse()
+    {
+        Assert.IsFalse(PathHelpers.IsInsideFolder("", @"C:\Temp\x"));
+        Assert.IsFalse(PathHelpers.IsInsideFolder(@"C:\Temp", ""));
+        Assert.IsFalse(PathHelpers.IsInsideFolder(null!, null!));
+    }
 }
