@@ -144,6 +144,7 @@ winapp run .\bin\<Platform>\Debug\<TargetFramework>\win-<arch> --debug-output
 
 ## さらに知るには
 
+- コーディング時のチェックリスト / 具体例: [`.github/skills/`](.github/skills/) (Clean Architecture / 単体テストの実装パターン)
 - 設計判断の歴史: [`.github/adr/`](.github/adr/)
 - リポジトリ概要 / ビルド手順: [`README.md`](README.md)
 - 上流 macOS アプリ: <https://github.com/07JP27/SkimDown>
