@@ -5,11 +5,16 @@
  * copy fallbacks) back the same way.
  *
  * Message in:
- *   { type: "render", markdown, sourcePath, contentBaseUri, theme }
- *   { type: "theme",  theme }            // "light" | "dark"
+ *   { type: "render", markdown, sourcePath, contentBaseUri,
+ *                     theme, themeType, themeIsDark, themeVars }
+ *   { type: "theme",  theme, themeType, themeIsDark, themeVars } // theme: "system"|"light"|"dark"|"custom"
  *   { type: "zoom",   factor }           // 0.5..3.0
  *   { type: "search", query, caseSensitive }
  *   { type: "search/next" } / { type: "search/prev" } / { type: "search/clear" }
+ *
+ *   themeVars (optional): { "--skim-bg": "#...", ... } for custom user themes.
+ *                         Only keys starting with "--skim-" are honored.
+ *   themeIsDark (optional bool): selects dark code-highlight CSS + Mermaid dark theme.
  *
  * Message out:
  *   { type: "link",   href, kind }
@@ -30,7 +35,10 @@
     var currentContentBaseUri = "";
     var lastRenderedMarkdown = "";
     var lastRenderedHtml = "";
-    var currentTheme = "light";
+    var currentTheme = "light";       // "light" | "dark" | "custom"
+    var currentThemeType = "light";   // "light" | "dark" — drives hljs + Mermaid choice
+    var currentThemeIsDark = false;
+    var appliedCustomVars = [];       // CSS variable names currently set on documentElement
     var mermaidReady = false;
 
     // ----- Search state -----
@@ -328,17 +336,55 @@
         return md;
     }
 
-    function initMermaid(theme) {
+    function initMermaid(themeType) {
         if (!window.mermaid) return;
+        // Read the active --skim-* values so Mermaid label/edge colors match
+        // the current page (including any custom theme overrides).
+        // We sample document.body because that's where the dark/light selectors
+        // resolve and where custom theme overrides are now applied (see
+        // applyThemeVars). Using documentElement here would miss body-level
+        // overrides and feed Mermaid the wrong palette.
+        var bodyStyle = window.getComputedStyle(document.body);
+        function cssVar(name) {
+            var v = bodyStyle.getPropertyValue(name);
+            return v ? v.trim() : "";
+        }
+        var bg = cssVar("--skim-bg");
+        var fg = cssVar("--skim-fg");
+        var soft = cssVar("--skim-soft-strong");
+        var accent = cssVar("--skim-link");
+        var border = cssVar("--skim-border");
+        var themeVariables = { fontFamily: "inherit" };
+        if (bg) { themeVariables.background = bg; }
+        if (soft) { themeVariables.primaryColor = soft; }
+        if (fg) {
+            themeVariables.primaryTextColor = fg;
+            themeVariables.secondaryTextColor = fg;
+            themeVariables.tertiaryTextColor = fg;
+        }
+        if (border) { themeVariables.primaryBorderColor = border; }
+        if (accent) { themeVariables.lineColor = accent; }
+
+        // For built-in light/dark we keep Mermaid's "default" / "dark" presets so
+        // diagrams look familiar. For custom themes we switch to "base" so
+        // themeVariables actually drive the palette.
+        var mermaidTheme;
+        if (currentTheme === "custom") {
+            mermaidTheme = "base";
+        } else {
+            mermaidTheme = themeType === "dark" ? "dark" : "default";
+        }
+
         try {
             window.mermaid.initialize({
                 startOnLoad: false,
                 securityLevel: "strict",
-                theme: theme === "dark" ? "dark" : "default",
+                theme: mermaidTheme,
                 suppressErrorRendering: true,
                 maxTextSize: 50000,
                 maxEdges: 500,
                 fontFamily: "inherit",
+                themeVariables: themeVariables,
             });
             mermaidReady = true;
         } catch (e) {
@@ -609,19 +655,69 @@
         renderMermaidBlocks();
     }
 
-    function setTheme(theme) {
-        var t = (theme || "light").toLowerCase();
-        if (t !== "dark") t = "light";
+    // Apply CSS variables for a custom theme via inline style on document.body.
+    // We set them on <body> (not <html>) because the dark/light fallback CSS rules
+    // also target body[data-theme=...]; setting custom vars on <html> loses the
+    // cascade race because body's selector-defined values would override the
+    // html-level inline for any descendant element.
+    function applyThemeVars(themeVars) {
+        // Strip any previously applied custom vars so stale values don't leak
+        // into the next theme.
+        var bodyEl = document.body;
+        for (var i = 0; i < appliedCustomVars.length; i++) {
+            try { bodyEl.style.removeProperty(appliedCustomVars[i]); } catch (e) { /* best-effort */ }
+        }
+        appliedCustomVars = [];
+
+        if (!themeVars || typeof themeVars !== "object") return;
+        for (var name in themeVars) {
+            if (!Object.prototype.hasOwnProperty.call(themeVars, name)) continue;
+            if (typeof name !== "string" || name.indexOf("--skim-") !== 0) continue;
+            var value = themeVars[name];
+            if (typeof value !== "string" || value.length === 0) continue;
+            try {
+                bodyEl.style.setProperty(name, value);
+                appliedCustomVars.push(name);
+            } catch (e) {
+                // ignore unsupported values
+            }
+        }
+    }
+
+    function setTheme(theme, themeType, themeIsDark, themeVars) {
+        var t = (theme || "light").toString().toLowerCase();
+        // Map "system" to its effective light/dark; for "custom" keep the literal
+        // so CSS selectors body[data-theme="custom"][data-theme-type="..."] match.
+        if (t !== "dark" && t !== "light" && t !== "custom") {
+            t = "light";
+        }
         currentTheme = t;
+
+        // Resolve a concrete light/dark flag for code highlight + Mermaid.
+        var resolvedType;
+        if (typeof themeIsDark === "boolean") {
+            resolvedType = themeIsDark ? "dark" : "light";
+        } else if (themeType === "dark" || themeType === "light") {
+            resolvedType = themeType;
+        } else {
+            resolvedType = (t === "dark") ? "dark" : "light";
+        }
+        currentThemeType = resolvedType;
+        currentThemeIsDark = (resolvedType === "dark");
+
         document.body.dataset.theme = t;
+        document.body.dataset.themeType = resolvedType;
+
+        applyThemeVars(themeVars);
+
         var lightLink = document.getElementById("hljs-light");
         var darkLink  = document.getElementById("hljs-dark");
         if (lightLink && darkLink) {
-            lightLink.disabled = (t === "dark");
-            darkLink.disabled  = (t !== "dark");
+            lightLink.disabled = (resolvedType === "dark");
+            darkLink.disabled  = (resolvedType !== "dark");
         }
         if (window.mermaid) {
-            initMermaid(t);
+            initMermaid(resolvedType);
             refreshMermaidForTheme();
         }
     }
@@ -709,7 +805,7 @@
         });
     }
 
-    function render(markdown, sourcePath, contentBaseUri, theme) {
+    function render(markdown, sourcePath, contentBaseUri, theme, themeType, themeIsDark, themeVars) {
         if (typeof markdown !== "string") markdown = "";
         currentContentBaseUri = contentBaseUri || "";
         // sourceDir is the relative folder portion of sourcePath, forward-slash form.
@@ -718,7 +814,9 @@
             var idx = sourcePath.lastIndexOf("/");
             if (idx >= 0) currentSourceDir = sourcePath.substring(0, idx);
         }
-        if (theme) setTheme(theme);
+        if (theme || themeType || typeof themeIsDark === "boolean" || themeVars) {
+            setTheme(theme || currentTheme, themeType, themeIsDark, themeVars);
+        }
 
         var rendererInstance = ensureMarkdown();
         var raw;
@@ -1113,7 +1211,7 @@
         window.addEventListener("keydown", handleAcceleratorKey, true);
 
         installPurifyHooks();
-        initMermaid(currentTheme);
+        initMermaid(currentThemeType);
 
         if (window.chrome && window.chrome.webview) {
             window.chrome.webview.addEventListener("message", function (ev) {
@@ -1121,10 +1219,17 @@
                 if (!msg || typeof msg !== "object") return;
                 switch (msg.type) {
                     case "render":
-                        render(msg.markdown, msg.sourcePath, msg.contentBaseUri, msg.theme);
+                        render(
+                            msg.markdown,
+                            msg.sourcePath,
+                            msg.contentBaseUri,
+                            msg.theme,
+                            msg.themeType,
+                            msg.themeIsDark,
+                            msg.themeVars);
                         break;
                     case "theme":
-                        setTheme(msg.theme);
+                        setTheme(msg.theme, msg.themeType, msg.themeIsDark, msg.themeVars);
                         break;
                     case "zoom":
                         setZoom(msg.factor);

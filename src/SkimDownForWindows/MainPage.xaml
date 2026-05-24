@@ -105,10 +105,16 @@
                         </MenuFlyoutItem.KeyboardAccelerators>
                     </MenuFlyoutItem>
                 </MenuFlyoutSubItem>
-                <MenuFlyoutSubItem Text="Theme">
+                <MenuFlyoutSubItem x:Name="ThemeSubmenu"
+                                  Text="Theme">
                     <ToggleMenuFlyoutItem x:Name="ThemeSystemMenu" Text="System" Click="OnThemeSystemClick" />
                     <ToggleMenuFlyoutItem x:Name="ThemeLightMenu"  Text="Light"  Click="OnThemeLightClick" />
                     <ToggleMenuFlyoutItem x:Name="ThemeDarkMenu"   Text="Dark"   Click="OnThemeDarkClick" />
+                    <MenuFlyoutSeparator x:Name="ThemeBuiltInSeparator" />
+                    <!-- Custom themes are inserted between ThemeBuiltInSeparator and ThemeActionSeparator at runtime. -->
+                    <MenuFlyoutSeparator x:Name="ThemeActionSeparator" />
+                    <MenuFlyoutItem x:Name="OpenThemesFolderMenu" Text="Open Themes Folder" Click="OnOpenThemesFolderClick" />
+                    <MenuFlyoutItem x:Name="ReloadThemesMenu"     Text="Reload Themes"      Click="OnReloadThemesClick" />
                 </MenuFlyoutSubItem>
             </MenuBarItem>
 

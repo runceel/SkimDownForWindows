@@ -73,3 +73,4 @@ PR で他のレビュワーから合意を得たら `ステータス` を `Accep
 | [0001](0001-record-architecture-decisions.md) | アーキテクチャー判断を ADR として記録する | Accepted |
 | [0002](0002-clean-architecture-layered-projects.md) | クリーンアーキテクチャー風のプロジェクト分割と DI 導入 | Accepted |
 | [0003](0003-test-strategy-and-testhelpers-pattern.md) | Application / Domain 単体テストの戦略と TestHelpers パターン | Proposed |
+| [0004](0004-custom-color-schemes.md) | VS Code 互換のカスタムカラースキーマ対応 | Accepted |

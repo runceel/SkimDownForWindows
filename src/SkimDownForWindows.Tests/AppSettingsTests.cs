@@ -189,6 +189,7 @@ public sealed class AppSettingsTests
         var s = new AppSettings();
 
         Assert.AreEqual(AppTheme.System, s.Theme);
+        Assert.IsNull(s.CustomThemeId);
         Assert.AreEqual(1.0, s.ZoomFactor);
         Assert.IsFalse(s.SearchCaseSensitive);
         Assert.AreEqual(280d, s.SidebarWidth);
@@ -197,5 +198,36 @@ public sealed class AppSettingsTests
         Assert.IsEmpty(s.RecentFolders);
         Assert.IsNull(s.LastFolderPath);
         Assert.IsEmpty(s.FolderStates);
+    }
+
+    [TestMethod]
+    public void NormalizeAfterLoad_KeepsBuiltInThemes()
+    {
+        var s = new AppSettings { Theme = AppTheme.Dark, CustomThemeId = "ignored" };
+        s.NormalizeAfterLoad();
+        Assert.AreEqual(AppTheme.Dark, s.Theme);
+        Assert.IsNull(s.CustomThemeId);
+    }
+
+    [TestMethod]
+    public void NormalizeAfterLoad_DropsInvalidCustomTheme()
+    {
+        var s = new AppSettings { Theme = AppTheme.Custom, CustomThemeId = null };
+        s.NormalizeAfterLoad();
+        Assert.AreEqual(AppTheme.System, s.Theme);
+        Assert.IsNull(s.CustomThemeId);
+
+        s = new AppSettings { Theme = AppTheme.Custom, CustomThemeId = string.Empty };
+        s.NormalizeAfterLoad();
+        Assert.AreEqual(AppTheme.System, s.Theme);
+    }
+
+    [TestMethod]
+    public void NormalizeAfterLoad_PreservesValidCustomTheme()
+    {
+        var s = new AppSettings { Theme = AppTheme.Custom, CustomThemeId = "monokai" };
+        s.NormalizeAfterLoad();
+        Assert.AreEqual(AppTheme.Custom, s.Theme);
+        Assert.AreEqual("monokai", s.CustomThemeId);
     }
 }

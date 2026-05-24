@@ -16,9 +16,11 @@ public static class InfrastructureServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddSkimDownInfrastructure(this IServiceCollection services)
     {
+        services.AddSingleton<SettingsFolderProvider>();
         services.AddSingleton<IFileSystem, LocalFileSystem>();
         services.AddSingleton<IMarkdownFileReader, LocalMarkdownFileReader>();
         services.AddSingleton<ISettingsRepository, JsonSettingsRepository>();
+        services.AddSingleton<IColorSchemeSource, LocalColorSchemeSource>();
         services.AddSingleton<IClipboardService, WindowsClipboardService>();
         services.AddSingleton<IShellService, ExplorerShellService>();
         services.AddSingleton<ISystemThemeProvider, UiSettingsThemeProvider>();

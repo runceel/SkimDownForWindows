@@ -1,5 +1,7 @@
 /* SkimDown — quiet reader styling.
- * Light/Dark/System themes flip via the <body data-theme="..."> attribute. */
+ * Light/Dark/System themes flip via the <body data-theme="..."> attribute.
+ * Custom user themes set both data-theme="custom" and data-theme-type="light|dark";
+ * custom CSS variables are then layered on top via inline style on documentElement. */
 
 :root {
     color-scheme: light dark;
@@ -19,7 +21,8 @@
     --skim-pad: clamp(16px, 4vw, 56px);
 }
 
-body[data-theme="dark"] {
+body[data-theme="dark"],
+body[data-theme="custom"][data-theme-type="dark"] {
     color-scheme: dark;
     --skim-bg: #0d1117;
     --skim-fg: #e6edf3;
@@ -274,16 +277,26 @@ main.markdown-body .skim-alert-warning   .skim-alert-label { color: #bf8700; }
 main.markdown-body .skim-alert-caution   { border-left-color: #cf222e; background: rgba(207, 34, 46, 0.08); }
 main.markdown-body .skim-alert-caution   .skim-alert-label { color: #cf222e; }
 
-body[data-theme="dark"] main.markdown-body .skim-alert-note      { border-left-color: #4493f8; background: rgba(56, 139, 253, 0.12); }
-body[data-theme="dark"] main.markdown-body .skim-alert-note      .skim-alert-label { color: #4493f8; }
-body[data-theme="dark"] main.markdown-body .skim-alert-tip       { border-left-color: #3fb950; background: rgba(63, 185, 80, 0.12); }
-body[data-theme="dark"] main.markdown-body .skim-alert-tip       .skim-alert-label { color: #3fb950; }
-body[data-theme="dark"] main.markdown-body .skim-alert-important { border-left-color: #ab7df8; background: rgba(171, 125, 248, 0.12); }
-body[data-theme="dark"] main.markdown-body .skim-alert-important .skim-alert-label { color: #ab7df8; }
-body[data-theme="dark"] main.markdown-body .skim-alert-warning   { border-left-color: #d29922; background: rgba(210, 153, 34, 0.14); }
-body[data-theme="dark"] main.markdown-body .skim-alert-warning   .skim-alert-label { color: #d29922; }
-body[data-theme="dark"] main.markdown-body .skim-alert-caution   { border-left-color: #f85149; background: rgba(248, 81, 73, 0.12); }
-body[data-theme="dark"] main.markdown-body .skim-alert-caution   .skim-alert-label { color: #f85149; }
+body[data-theme="dark"] main.markdown-body .skim-alert-note,
+body[data-theme="custom"][data-theme-type="dark"] main.markdown-body .skim-alert-note      { border-left-color: #4493f8; background: rgba(56, 139, 253, 0.12); }
+body[data-theme="dark"] main.markdown-body .skim-alert-note      .skim-alert-label,
+body[data-theme="custom"][data-theme-type="dark"] main.markdown-body .skim-alert-note      .skim-alert-label { color: #4493f8; }
+body[data-theme="dark"] main.markdown-body .skim-alert-tip,
+body[data-theme="custom"][data-theme-type="dark"] main.markdown-body .skim-alert-tip       { border-left-color: #3fb950; background: rgba(63, 185, 80, 0.12); }
+body[data-theme="dark"] main.markdown-body .skim-alert-tip       .skim-alert-label,
+body[data-theme="custom"][data-theme-type="dark"] main.markdown-body .skim-alert-tip       .skim-alert-label { color: #3fb950; }
+body[data-theme="dark"] main.markdown-body .skim-alert-important,
+body[data-theme="custom"][data-theme-type="dark"] main.markdown-body .skim-alert-important { border-left-color: #ab7df8; background: rgba(171, 125, 248, 0.12); }
+body[data-theme="dark"] main.markdown-body .skim-alert-important .skim-alert-label,
+body[data-theme="custom"][data-theme-type="dark"] main.markdown-body .skim-alert-important .skim-alert-label { color: #ab7df8; }
+body[data-theme="dark"] main.markdown-body .skim-alert-warning,
+body[data-theme="custom"][data-theme-type="dark"] main.markdown-body .skim-alert-warning   { border-left-color: #d29922; background: rgba(210, 153, 34, 0.14); }
+body[data-theme="dark"] main.markdown-body .skim-alert-warning   .skim-alert-label,
+body[data-theme="custom"][data-theme-type="dark"] main.markdown-body .skim-alert-warning   .skim-alert-label { color: #d29922; }
+body[data-theme="dark"] main.markdown-body .skim-alert-caution,
+body[data-theme="custom"][data-theme-type="dark"] main.markdown-body .skim-alert-caution   { border-left-color: #f85149; background: rgba(248, 81, 73, 0.12); }
+body[data-theme="dark"] main.markdown-body .skim-alert-caution   .skim-alert-label,
+body[data-theme="custom"][data-theme-type="dark"] main.markdown-body .skim-alert-caution   .skim-alert-label { color: #f85149; }
 
 /* ----- Inline color swatches after #rgb / #rrggbb / #rrggbbaa hex literals ----- */
 
