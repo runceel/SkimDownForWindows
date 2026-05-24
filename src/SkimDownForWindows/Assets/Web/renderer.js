@@ -340,9 +340,13 @@
         if (!window.mermaid) return;
         // Read the active --skim-* values so Mermaid label/edge colors match
         // the current page (including any custom theme overrides).
-        var rootStyle = window.getComputedStyle(document.documentElement);
+        // We sample document.body because that's where the dark/light selectors
+        // resolve and where custom theme overrides are now applied (see
+        // applyThemeVars). Using documentElement here would miss body-level
+        // overrides and feed Mermaid the wrong palette.
+        var bodyStyle = window.getComputedStyle(document.body);
         function cssVar(name) {
-            var v = rootStyle.getPropertyValue(name);
+            var v = bodyStyle.getPropertyValue(name);
             return v ? v.trim() : "";
         }
         var bg = cssVar("--skim-bg");
@@ -651,16 +655,17 @@
         renderMermaidBlocks();
     }
 
-    // Apply CSS variables for a custom theme via inline style on documentElement.
-    // Only keys with the "--skim-" prefix are honored to prevent CSS injection
-    // through arbitrary property names. Values are inserted as-is — the host
-    // is responsible for validating them on the C# side.
+    // Apply CSS variables for a custom theme via inline style on document.body.
+    // We set them on <body> (not <html>) because the dark/light fallback CSS rules
+    // also target body[data-theme=...]; setting custom vars on <html> loses the
+    // cascade race because body's selector-defined values would override the
+    // html-level inline for any descendant element.
     function applyThemeVars(themeVars) {
         // Strip any previously applied custom vars so stale values don't leak
         // into the next theme.
-        var docEl = document.documentElement;
+        var bodyEl = document.body;
         for (var i = 0; i < appliedCustomVars.length; i++) {
-            try { docEl.style.removeProperty(appliedCustomVars[i]); } catch (e) { /* best-effort */ }
+            try { bodyEl.style.removeProperty(appliedCustomVars[i]); } catch (e) { /* best-effort */ }
         }
         appliedCustomVars = [];
 
@@ -671,7 +676,7 @@
             var value = themeVars[name];
             if (typeof value !== "string" || value.length === 0) continue;
             try {
-                docEl.style.setProperty(name, value);
+                bodyEl.style.setProperty(name, value);
                 appliedCustomVars.push(name);
             } catch (e) {
                 // ignore unsupported values
