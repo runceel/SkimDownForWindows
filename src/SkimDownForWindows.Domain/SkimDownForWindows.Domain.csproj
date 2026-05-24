@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>SkimDownForWindows.Domain</RootNamespace>
+    <!-- Domain は副作用ゼロの値オブジェクト・列挙のみを置く。
+         他プロジェクトへの参照は禁止。 -->
+  </PropertyGroup>
+
+</Project>

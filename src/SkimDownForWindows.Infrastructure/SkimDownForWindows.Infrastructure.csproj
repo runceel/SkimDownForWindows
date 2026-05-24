@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>SkimDownForWindows.Infrastructure</RootNamespace>
+    <UseWindowsForms>false</UseWindowsForms>
+    <UseWPF>false</UseWPF>
+    <!-- Infrastructure は Application 層の抽象を WinRT / System.IO で実装する層。
+         Microsoft.WindowsAppSDK は不参照 (WinUI 依存を Presentation に閉じる)。
+         WinRT 型 (Windows.Storage, Windows.UI.ViewManagement, Windows.ApplicationModel.DataTransfer,
+         Windows.System.Launcher 等) は Windows TFM の暗黙投影経由でアクセス。 -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SkimDownForWindows.Application\SkimDownForWindows.Application.csproj" />
+  </ItemGroup>
+
+</Project>

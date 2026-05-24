@@ -2,9 +2,11 @@ using System;
 using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
-using SkimDownForWindows.Models;
+using SkimDownForWindows.Application.Abstractions;
+using SkimDownForWindows.Application.Models;
 namespace SkimDownForWindows.Viewer;
 
 /// <summary>
@@ -129,9 +131,16 @@ public sealed partial class MarkdownPreview : UserControl
 
     private static void LogToFile(string msg)
     {
-        // Logs only errors / unusual events. Quiet during normal operation.
+        // 通常運用ではエラーや異常イベントのみ記録する。
+        // DI が初期化済みなら IAppLogger 経由でファイルに書き、未初期化ならフォールバックで直接書き込む。
         try
         {
+            var logger = App.Services?.GetService<IAppLogger>();
+            if (logger is not null)
+            {
+                logger.LogWarning($"[MarkdownPreview] {msg}");
+                return;
+            }
             var logDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             var logPath = Path.Combine(logDir, "SkimDownForWindows-web.log");
             File.AppendAllText(logPath, $"[{DateTimeOffset.Now:O}] {msg}{Environment.NewLine}");

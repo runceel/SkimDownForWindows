@@ -1,6 +1,6 @@
 using System.IO;
-using SkimDownForWindows.Markdown;
-using SkimDownForWindows.Models;
+using SkimDownForWindows.Application.Markdown;
+using SkimDownForWindows.Domain;
 
 namespace SkimDownForWindows.Tests;
 

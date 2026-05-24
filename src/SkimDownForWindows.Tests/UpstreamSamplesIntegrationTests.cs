@@ -1,7 +1,8 @@
 using System;
 using System.IO;
 using System.Linq;
-using SkimDownForWindows.Markdown;
+using SkimDownForWindows.Application.Markdown;
+using SkimDownForWindows.Tests.TestHelpers;
 
 namespace SkimDownForWindows.Tests;
 
@@ -18,6 +19,8 @@ namespace SkimDownForWindows.Tests;
 public sealed class UpstreamSamplesIntegrationTests
 {
     private const string EnvVar = "SKIM_SAMPLES_PATH";
+
+    private static MarkdownScanner CreateScanner() => new(new RealFileSystem());
 
     private static string ResolveSamplesPath()
     {
@@ -41,7 +44,7 @@ public sealed class UpstreamSamplesIntegrationTests
     public void Scanner_FindsAllUpstreamMarkdownFiles()
     {
         RequireSamples(out var samples);
-        var scanner = new MarkdownScanner();
+        var scanner = CreateScanner();
         var hits = scanner.Scan(samples);
 
         // 38 files in the upstream samples directory at the version we ported
@@ -67,7 +70,7 @@ public sealed class UpstreamSamplesIntegrationTests
         // SPEC requires .markdown support; upstream samples/en/misc/sample.markdown
         // and samples/ja/misc/sample.markdown exercise it.
         RequireSamples(out var samples);
-        var hits = new MarkdownScanner().Scan(samples);
+        var hits = CreateScanner().Scan(samples);
         Assert.IsTrue(
             hits.Any(p => p.EndsWith("sample.markdown", StringComparison.OrdinalIgnoreCase)),
             "Expected at least one .markdown (full-extension) file in the samples set.");
@@ -78,7 +81,7 @@ public sealed class UpstreamSamplesIntegrationTests
     {
         // samples/en/deep/nested/folder/deep-file.md tests recursion depth.
         RequireSamples(out var samples);
-        var hits = new MarkdownScanner().Scan(samples);
+        var hits = CreateScanner().Scan(samples);
         Assert.IsTrue(
             hits.Any(p => p.Replace('\\', '/').EndsWith("/deep/nested/folder/deep-file.md", StringComparison.OrdinalIgnoreCase)),
             "Expected to find a deep-nested .md file via recursive scan.");
@@ -88,7 +91,7 @@ public sealed class UpstreamSamplesIntegrationTests
     public void TreeBuilder_TopLevelFoldersBeforeReadmeFiles()
     {
         RequireSamples(out var samples);
-        var files = new MarkdownScanner().Scan(samples);
+        var files = CreateScanner().Scan(samples);
         var root = new MarkdownTreeBuilder().Build(samples, files);
 
         // First sort: folders, then files. SPEC ordering, VS Code style.
@@ -108,7 +111,7 @@ public sealed class UpstreamSamplesIntegrationTests
     public void TreeBuilder_CategoryFoldersAreAlphabetized()
     {
         RequireSamples(out var samples);
-        var files = new MarkdownScanner().Scan(samples);
+        var files = CreateScanner().Scan(samples);
         var root = new MarkdownTreeBuilder().Build(samples, files);
 
         // Top level should expose en, ja, (images is non-markdown so should be omitted).
@@ -131,7 +134,7 @@ public sealed class UpstreamSamplesIntegrationTests
     {
         // Check that the en branch contains the documented subfolders.
         RequireSamples(out var samples);
-        var files = new MarkdownScanner().Scan(samples);
+        var files = CreateScanner().Scan(samples);
         var root = new MarkdownTreeBuilder().Build(samples, files);
 
         var en = root.Children.FirstOrDefault(c => c.IsFolder && c.Name == "en");
@@ -154,7 +157,7 @@ public sealed class UpstreamSamplesIntegrationTests
     public void TreeBuilder_MarkdownCount_MatchesScannerCount()
     {
         RequireSamples(out var samples);
-        var files = new MarkdownScanner().Scan(samples);
+        var files = CreateScanner().Scan(samples);
         var root = new MarkdownTreeBuilder().Build(samples, files);
         Assert.AreEqual(files.Count, root.MarkdownCount,
             "Tree root MarkdownCount should equal the number of files the scanner found.");
@@ -166,7 +169,7 @@ public sealed class UpstreamSamplesIntegrationTests
         // From a cold open of samples/, the initial selection should land on
         // the top-level README.md per SPEC fallback chain.
         RequireSamples(out var samples);
-        var files = new MarkdownScanner().Scan(samples);
+        var files = CreateScanner().Scan(samples);
         var root = new MarkdownTreeBuilder().Build(samples, files);
 
         var picked = new InitialSelectionPicker().Pick(root, lastSelectedRelativePath: null);
@@ -178,7 +181,7 @@ public sealed class UpstreamSamplesIntegrationTests
     public void Picker_HonorsLastSelectionWhenPresent()
     {
         RequireSamples(out var samples);
-        var files = new MarkdownScanner().Scan(samples);
+        var files = CreateScanner().Scan(samples);
         var root = new MarkdownTreeBuilder().Build(samples, files);
 
         var picked = new InitialSelectionPicker().Pick(root, "en/extended/footnotes.md");

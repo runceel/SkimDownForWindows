@@ -1,7 +1,7 @@
 using System.IO;
 using System.Linq;
-using SkimDownForWindows.Markdown;
-using SkimDownForWindows.Models;
+using SkimDownForWindows.Application.Markdown;
+using SkimDownForWindows.Application.Models;
 
 namespace SkimDownForWindows.Tests;
 

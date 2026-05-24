@@ -1,6 +1,7 @@
 using System;
 using System.IO;
-using SkimDownForWindows.Core;
+using SkimDownForWindows.Application.CommandLine;
+using SkimDownForWindows.Tests.TestHelpers;
 
 namespace SkimDownForWindows.Tests;
 
@@ -8,12 +9,14 @@ namespace SkimDownForWindows.Tests;
 public sealed class CommandLineLauncherTests
 {
     private string _tempRoot = null!;
+    private CommandLineLauncher _launcher = null!;
 
     [TestInitialize]
     public void Setup()
     {
         _tempRoot = Path.Combine(Path.GetTempPath(), "SkimDownCLI_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_tempRoot);
+        _launcher = new CommandLineLauncher(new RealFileSystem());
     }
 
     [TestCleanup]
@@ -25,14 +28,14 @@ public sealed class CommandLineLauncherTests
     [TestMethod]
     public void Returns_Null_When_No_Args()
     {
-        Assert.IsNull(CommandLineLauncher.TryGetInitialFolderPath(Array.Empty<string>(), _tempRoot));
-        Assert.IsNull(CommandLineLauncher.TryGetInitialFolderPath(new[] { "skimdown.exe" }, _tempRoot));
+        Assert.IsNull(_launcher.TryGetInitialFolderPath(Array.Empty<string>(), _tempRoot));
+        Assert.IsNull(_launcher.TryGetInitialFolderPath(new[] { "skimdown.exe" }, _tempRoot));
     }
 
     [TestMethod]
     public void Returns_Null_When_Args_Is_Null()
     {
-        Assert.IsNull(CommandLineLauncher.TryGetInitialFolderPath(null!, _tempRoot));
+        Assert.IsNull(_launcher.TryGetInitialFolderPath(null!, _tempRoot));
     }
 
     [TestMethod]
@@ -41,7 +44,7 @@ public sealed class CommandLineLauncherTests
         var folder = Path.Combine(_tempRoot, "docs");
         Directory.CreateDirectory(folder);
 
-        var result = CommandLineLauncher.TryGetInitialFolderPath(
+        var result = _launcher.TryGetInitialFolderPath(
             new[] { "skimdown.exe", folder },
             currentDirectory: _tempRoot);
 
@@ -58,7 +61,7 @@ public sealed class CommandLineLauncherTests
         var folder = Path.Combine(_tempRoot, "notes");
         Directory.CreateDirectory(folder);
 
-        var result = CommandLineLauncher.TryGetInitialFolderPath(
+        var result = _launcher.TryGetInitialFolderPath(
             new[] { "skimdown.exe", "notes" },
             currentDirectory: _tempRoot);
 
@@ -71,7 +74,7 @@ public sealed class CommandLineLauncherTests
     [TestMethod]
     public void Returns_Dot_As_Current_Directory()
     {
-        var result = CommandLineLauncher.TryGetInitialFolderPath(
+        var result = _launcher.TryGetInitialFolderPath(
             new[] { "skimdown.exe", "." },
             currentDirectory: _tempRoot);
 
@@ -85,7 +88,7 @@ public sealed class CommandLineLauncherTests
     public void Returns_Null_When_Path_Does_Not_Exist()
     {
         var missing = Path.Combine(_tempRoot, "does-not-exist");
-        var result = CommandLineLauncher.TryGetInitialFolderPath(
+        var result = _launcher.TryGetInitialFolderPath(
             new[] { "skimdown.exe", missing },
             currentDirectory: _tempRoot);
 
@@ -97,7 +100,7 @@ public sealed class CommandLineLauncherTests
     {
         // A path that GetFullPath rejects on Windows (control chars in name).
         var bad = "\0bad-path";
-        var result = CommandLineLauncher.TryGetInitialFolderPath(
+        var result = _launcher.TryGetInitialFolderPath(
             new[] { "skimdown.exe", bad },
             currentDirectory: _tempRoot);
 
@@ -112,7 +115,7 @@ public sealed class CommandLineLauncherTests
         var file = Path.Combine(folder, "README.md");
         File.WriteAllText(file, "# hi");
 
-        var result = CommandLineLauncher.TryGetInitialFolderPath(
+        var result = _launcher.TryGetInitialFolderPath(
             new[] { "skimdown.exe", file },
             currentDirectory: _tempRoot);
 
@@ -130,7 +133,7 @@ public sealed class CommandLineLauncherTests
         var file = Path.Combine(folder, "note.markdown");
         File.WriteAllText(file, "# hi");
 
-        var result = CommandLineLauncher.TryGetInitialFolderPath(
+        var result = _launcher.TryGetInitialFolderPath(
             new[] { "skimdown.exe", file },
             currentDirectory: _tempRoot);
 
@@ -147,7 +150,7 @@ public sealed class CommandLineLauncherTests
         var file = Path.Combine(folder, "notes.txt");
         File.WriteAllText(file, "hi");
 
-        var result = CommandLineLauncher.TryGetInitialFolderPath(
+        var result = _launcher.TryGetInitialFolderPath(
             new[] { "skimdown.exe", file },
             currentDirectory: _tempRoot);
 
@@ -161,7 +164,7 @@ public sealed class CommandLineLauncherTests
         var folder = Path.Combine(_tempRoot, "after-switch");
         Directory.CreateDirectory(folder);
 
-        var result = CommandLineLauncher.TryGetInitialFolderPath(
+        var result = _launcher.TryGetInitialFolderPath(
             new[] { "skimdown.exe", "--verbose", "-x", folder },
             currentDirectory: _tempRoot);
 
@@ -176,7 +179,7 @@ public sealed class CommandLineLauncherTests
         var folder = Path.Combine(_tempRoot, "post-blanks");
         Directory.CreateDirectory(folder);
 
-        var result = CommandLineLauncher.TryGetInitialFolderPath(
+        var result = _launcher.TryGetInitialFolderPath(
             new[] { "skimdown.exe", "", "   ", folder },
             currentDirectory: _tempRoot);
 
@@ -193,7 +196,7 @@ public sealed class CommandLineLauncherTests
         Directory.CreateDirectory(first);
         Directory.CreateDirectory(second);
 
-        var result = CommandLineLauncher.TryGetInitialFolderPath(
+        var result = _launcher.TryGetInitialFolderPath(
             new[] { "skimdown.exe", first, second },
             currentDirectory: _tempRoot);
 
@@ -207,13 +210,11 @@ public sealed class CommandLineLauncherTests
     {
         // First positional arg is non-existent, second is a real folder. The
         // parser should advance past the bad one (per current behavior:
-        // "first usable" wins). NOTE: this test documents the current
-        // forgiving behavior; if we ever decide a missing-but-positional
-        // arg should *fail closed*, update this test together with the impl.
+        // "first usable" wins).
         var good = Path.Combine(_tempRoot, "good");
         Directory.CreateDirectory(good);
 
-        var result = CommandLineLauncher.TryGetInitialFolderPath(
+        var result = _launcher.TryGetInitialFolderPath(
             new[] { "skimdown.exe", Path.Combine(_tempRoot, "ghost"), good },
             currentDirectory: _tempRoot);
 
@@ -228,7 +229,7 @@ public sealed class CommandLineLauncherTests
         var folder = Path.Combine(_tempRoot, "trailing");
         Directory.CreateDirectory(folder);
 
-        var result = CommandLineLauncher.TryGetInitialFolderPath(
+        var result = _launcher.TryGetInitialFolderPath(
             new[] { "skimdown.exe", folder + Path.DirectorySeparatorChar },
             currentDirectory: _tempRoot);
 
