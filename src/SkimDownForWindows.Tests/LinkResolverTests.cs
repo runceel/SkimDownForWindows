@@ -86,4 +86,73 @@ public sealed class LinkResolverTests
         Assert.AreEqual(LinkKind.RelativeMarkdown, c.Kind);
         StringAssert.EndsWith(c.ResolvedFullPath!, "my notes.md");
     }
+
+    [TestMethod]
+    public void HashOnly_IsAnchor_WithEmptyAnchorString()
+    {
+        // 現コード: href が "#" 始まりなら Anchor。空アンカーは空文字として残る。
+        var c = _r.Classify(Root, Origin, "#");
+        Assert.AreEqual(LinkKind.Anchor, c.Kind);
+        Assert.AreEqual(string.Empty, c.Anchor);
+    }
+
+    [TestMethod]
+    public void FileScheme_InsideFolder_Markdown_IsClassified()
+    {
+        var localPath = Path.Combine(Root, "docs", "spec.md").Replace('\\', '/');
+        var fileUri = new Uri("file:///" + localPath.TrimStart('/'));
+
+        var c = _r.Classify(Root, Origin, fileUri.ToString());
+
+        Assert.AreEqual(LinkKind.RelativeMarkdown, c.Kind);
+        StringAssert.EndsWith(c.ResolvedFullPath!, "spec.md");
+    }
+
+    [TestMethod]
+    public void FileScheme_OutsideFolder_IsOutOfFolder()
+    {
+        var outside = Path.Combine(Path.GetTempPath(), "elsewhere", "x.md").Replace('\\', '/');
+        var fileUri = new Uri("file:///" + outside.TrimStart('/'));
+
+        var c = _r.Classify(Root, Origin, fileUri.ToString());
+
+        Assert.AreEqual(LinkKind.OutOfFolder, c.Kind);
+    }
+
+    /// <summary>
+    /// 現挙動の golden test: <c>file://...</c> URI の fragment は <see cref="Uri.LocalPath"/>
+    /// に含まれず、anchor として伝播しない。テスト名で「現挙動」を明示する。
+    /// </summary>
+    [TestMethod]
+    public void FileScheme_MarkdownWithFragment_DropsAnchor_CurrentBehavior()
+    {
+        var localPath = Path.Combine(Root, "docs", "spec.md").Replace('\\', '/');
+        var fileUri = new Uri("file:///" + localPath.TrimStart('/') + "#section");
+
+        var c = _r.Classify(Root, Origin, fileUri.ToString());
+
+        Assert.AreEqual(LinkKind.RelativeMarkdown, c.Kind);
+        Assert.IsNull(c.Anchor, "現挙動: file:// scheme では fragment が落ちる。");
+    }
+
+    [TestMethod]
+    public void RelativeNonMarkdown_DoesNotCarryAnchor()
+    {
+        // パス側がアンカー付きでも、Markdown 以外なら ResolvedFullPath だけ返り Anchor は null。
+        var c = _r.Classify(Root, Origin, "../img/cover.png#top");
+        Assert.AreEqual(LinkKind.RelativeNonMarkdown, c.Kind);
+        Assert.IsNull(c.Anchor);
+    }
+
+    [TestMethod]
+    public void Whitespace_IsBlocked()
+    {
+        Assert.AreEqual(LinkKind.Blocked, _r.Classify(Root, Origin, "   ").Kind);
+    }
+
+    [TestMethod]
+    public void UnknownScheme_IsBlocked()
+    {
+        Assert.AreEqual(LinkKind.Blocked, _r.Classify(Root, Origin, "ftp://example.com/x").Kind);
+    }
 }
