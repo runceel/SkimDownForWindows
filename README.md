@@ -19,6 +19,7 @@ Open a folder, and SkimDown shows only the Markdown files in a sidebar tree and 
 - Markdown rendering bundled: markdown-it + highlight.js + DOMPurify + KaTeX + Mermaid + emoji; GitHub-style alerts and inline color swatches included
 - In-document search for the current file (**Ctrl+F**), plus **Edit → Use Selection for Find** (Ctrl+E)
 - Live reload — Markdown add / delete / rename / update events refresh the tree and preview
+- **VS Code-compatible custom color schemes** — drop a `*.json` theme into the Themes folder and pick it from **View → Theme** (see [Custom color schemes](#custom-color-schemes))
 - Persists sidebar position, visibility, width, theme, font size, recent folders, last selected file, and tree expansion state
 - Local-only — no telemetry, no Markdown text leaves your machine
 
@@ -81,6 +82,66 @@ The unit test project is plain `net10.0` (no UI dependencies) and re-includes th
 $env:SKIM_SAMPLES_PATH = "C:\path\to\SkimDown\samples"
 dotnet test src\SkimDownForWindows.Tests
 ```
+
+## Custom color schemes
+
+SkimDown for Windows can load user-defined themes for the preview area. Themes are written as JSON files in the [VS Code color theme format](https://code.visualstudio.com/api/references/theme-color), so existing VS Code theme assets can be reused.
+
+### Where themes live
+
+Drop `*.json` files into the Themes folder under your local app data:
+
+- **Packaged build**: `%LOCALAPPDATA%\Packages\<package-family>\LocalState\Themes\`
+- **Unpackaged build**: `%LOCALAPPDATA%\SkimDownForWindows\Themes\`
+
+The fastest way to open it: **View → Theme → Open Themes Folder**. After editing or adding a file choose **View → Theme → Reload Themes** to refresh the menu — the folder is **not** watched automatically.
+
+### JSON format
+
+Each file is a stand-alone VS Code color theme:
+
+```json
+{
+  "$schema": "vscode://schemas/color-theme",
+  "name": "My Theme",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#1e1e1e",
+    "editor.foreground": "#d4d4d4",
+    "textLink.foreground": "#3794ff"
+  }
+}
+```
+
+- `name` — label shown in **View → Theme**. Falls back to the file name when omitted.
+- `type` — `"light"` or `"dark"`. Picks the light/dark code-highlight CSS, decides whether to use the dark CSS fallback block, and chooses the Mermaid theme.
+- `colors` — VS Code color keys. Only the subset listed below is consumed by SkimDown; the rest are ignored.
+- `tokenColors` (syntax highlighting) is **not yet supported**. Code blocks use GitHub's light or dark palette based on `type`.
+
+### Supported color key mapping
+
+SkimDown reads each row top-down and uses the first VS Code key found. Missing keys fall back to the built-in `--skim-*` palette appropriate for the theme `type`.
+
+| SkimDown CSS variable     | VS Code keys (in priority order)                                              |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| `--skim-bg`               | `editor.background`                                                           |
+| `--skim-fg`               | `editor.foreground`, `foreground`                                             |
+| `--skim-muted`            | `descriptionForeground`, `disabledForeground`                                 |
+| `--skim-border`           | `panel.border`, `editorGroup.border`, `editorWidget.border`, `contrastBorder` |
+| `--skim-soft`             | `editorGroupHeader.tabsBackground`, `editor.lineHighlightBackground`, `sideBar.background` |
+| `--skim-soft-strong`      | `editorWidget.background`, `editor.background`                                |
+| `--skim-code-bg`          | `editor.lineHighlightBackground`, `editorGroupHeader.tabsBackground`          |
+| `--skim-table-stripe`     | `editorGroupHeader.tabsBackground`, `editor.lineHighlightBackground`          |
+| `--skim-link`             | `textLink.foreground`, `editorLink.activeForeground`, `focusBorder`           |
+| `--skim-blockquote`       | `descriptionForeground`, `editor.foreground`                                  |
+| `--skim-mark-bg`          | `editor.findMatchHighlightBackground`                                         |
+| `--skim-mark-current-bg`  | `editor.findMatchBackground`                                                  |
+
+Accepted color value formats are restricted to safe CSS forms: `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `rgb(...)`, `rgba(...)`, `hsl(...)`, `hsla(...)`, and `transparent`. Anything containing `var()`, `calc()`, `url()`, `;`, `{`, or `}` is rejected and falls back to the built-in palette.
+
+### Selecting & switching
+
+Open **View → Theme** to see the built-ins (**System / Light / Dark**), registered custom themes, and the **Open Themes Folder** / **Reload Themes** actions. The currently active theme is checked. If the JSON file backing the selected custom theme is deleted, SkimDown silently falls back to **System** the next time the app starts or **Reload Themes** is invoked.
 
 ## Microsoft Store submission
 

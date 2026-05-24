@@ -17,23 +17,23 @@ public sealed class JsonSettingsRepository : ISettingsRepository
 {
     private const string FileName = "settings.json";
 
-    private static readonly JsonSerializerOptions Json = new()
-    {
-        WriteIndented = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    };
+    private static readonly JsonSerializerOptions Json = CreateJsonOptions();
 
     private readonly string _filePath;
     private readonly SemaphoreSlim _saveGate = new(1, 1);
     private AppSettings _current = new();
 
     /// <summary>テスト用に保存先フォルダーを差し替えられる。</summary>
-    public JsonSettingsRepository(string? settingsFolderOverride = null)
+    public JsonSettingsRepository(SettingsFolderProvider? folderProvider = null)
     {
-        var folder = settingsFolderOverride ?? GetDefaultFolder();
+        var folder = (folderProvider ?? new SettingsFolderProvider()).GetSettingsFolder();
         Directory.CreateDirectory(folder);
         _filePath = Path.Combine(folder, FileName);
     }
+
+    /// <summary>後方互換: 旧 API (フォルダーパスを直接渡す形) も継続サポート。</summary>
+    public JsonSettingsRepository(string settingsFolderOverride)
+        : this(new SettingsFolderProvider(settingsFolderOverride)) { }
 
     public AppSettings Current => _current;
 
@@ -47,6 +47,7 @@ public sealed class JsonSettingsRepository : ISettingsRepository
                 var parsed = JsonSerializer.Deserialize<AppSettings>(json, Json);
                 if (parsed is not null)
                 {
+                    parsed.NormalizeAfterLoad();
                     _current = parsed;
                 }
             }
@@ -98,18 +99,19 @@ public sealed class JsonSettingsRepository : ISettingsRepository
         }
     }
 
-    private static string GetDefaultFolder()
+    /// <summary>
+    /// <see cref="AppTheme"/> 用カスタムコンバーターを含む <see cref="JsonSerializerOptions"/> を構築する。
+    /// 旧フォーマット (整数) との互換性は <see cref="AppThemeJsonConverter"/> 側で吸収する。
+    /// </summary>
+    internal static JsonSerializerOptions CreateJsonOptions()
     {
-        // パッケージ実行時は LocalFolder、それ以外は %LOCALAPPDATA% にフォールバック。
-        try
+        var options = new JsonSerializerOptions
         {
-            var local = global::Windows.Storage.ApplicationData.Current.LocalFolder.Path;
-            return local;
-        }
-        catch
-        {
-            var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            return Path.Combine(localAppData, "SkimDownForWindows");
-        }
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        };
+        options.Converters.Add(new AppThemeJsonConverter());
+        return options;
     }
 }
+

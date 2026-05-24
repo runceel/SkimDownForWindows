@@ -61,20 +61,37 @@ public sealed partial class MainWindow : Window
 
     /// <summary>
     /// ユーザー選択テーマをウィンドウ全体 (TitleBar + 系統 caption ボタン) に反映する。
+    ///
+    /// <see cref="AppTheme.Custom"/> のときは <paramref name="customIsDark"/> で
+    /// 「カスタムテーマが暗色か」を渡して caption ボタンの前景色を決定する。
     /// </summary>
-    public void ApplyTheme(AppTheme theme)
+    public void ApplyTheme(AppTheme theme, bool? customIsDark = null)
     {
-        RootGrid.RequestedTheme = theme switch
+        ElementTheme requested = theme switch
         {
             AppTheme.Light => ElementTheme.Light,
             AppTheme.Dark => ElementTheme.Dark,
+            AppTheme.Custom => (customIsDark ?? false) ? ElementTheme.Dark : ElementTheme.Light,
             _ => ElementTheme.Default,
         };
+        RootGrid.RequestedTheme = requested;
 
         // OS が描画する Caption (min/max/close) ボタンは XAML テーマを継承しないため、
         // 実効テーマを ISystemThemeProvider で解決して明示色を設定する。
         var themeProvider = App.Services.GetRequiredService<ISystemThemeProvider>();
-        var effective = theme == AppTheme.System ? themeProvider.ResolveSystem() : theme;
+        AppTheme effective;
+        if (theme == AppTheme.Custom)
+        {
+            effective = (customIsDark ?? false) ? AppTheme.Dark : AppTheme.Light;
+        }
+        else if (theme == AppTheme.System)
+        {
+            effective = themeProvider.ResolveSystem();
+        }
+        else
+        {
+            effective = theme;
+        }
 
         var captionBar = AppWindow?.TitleBar;
         if (captionBar is null) return;

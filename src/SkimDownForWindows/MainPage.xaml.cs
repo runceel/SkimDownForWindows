@@ -1,15 +1,18 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Navigation;
 using Microsoft.UI.Input;
 using SkimDownForWindows.Application.Abstractions;
 using SkimDownForWindows.Application.Models;
+using SkimDownForWindows.Application.Theme;
 using SkimDownForWindows.Application.ViewModels;
 using SkimDownForWindows.Composition;
 using SkimDownForWindows.Domain;
@@ -25,7 +28,11 @@ public sealed partial class MainPage : Page
     private IServiceProvider? _scopeProvider;
     private IAppLogger? _logger;
     private IWindowService? _windowService;
+    private ColorSchemeRegistry? _colorSchemes;
+    private IShellService? _shellService;
+    private IColorSchemeSource? _colorSchemeSource;
     private bool _windowsChangedSubscribed;
+    private bool _themesChangedSubscribed;
     private string? _initialFolderPath;
     private bool _restoreLastFolder = true;
 
@@ -85,12 +92,21 @@ public sealed partial class MainPage : Page
             ViewModel = _scopeProvider.GetRequiredService<MainPageViewModel>();
             _logger = _scopeProvider.GetRequiredService<IAppLogger>();
             _windowService = _scopeProvider.GetRequiredService<IWindowService>();
+            _colorSchemes = _scopeProvider.GetRequiredService<ColorSchemeRegistry>();
+            _shellService = _scopeProvider.GetRequiredService<IShellService>();
+            _colorSchemeSource = _scopeProvider.GetRequiredService<IColorSchemeSource>();
 
             DataContext = ViewModel;
 
             ViewModel.PreviewLoadRequested += OnPreviewLoadRequested;
             ViewModel.PreviewClearRequested += OnPreviewClearRequested;
             ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+
+            if (!_themesChangedSubscribed)
+            {
+                _colorSchemes.ThemesChanged += OnThemesChanged;
+                _themesChangedSubscribed = true;
+            }
 
             UpdateContentVisibility();
             UpdateThemeMenuChecks();
@@ -105,6 +121,17 @@ public sealed partial class MainPage : Page
         await Preview.InitializeAsync(appWeb);
 
         var settings = ViewModel.Settings.Current;
+
+        // カスタムテーマレジストリを起動時に必ず一度ロード。
+        // その上で「保存されている Custom テーマが消えていた」状態を System に正規化し、
+        // 必要なら設定を保存 → 適用する (Reload → Normalize → Save → Apply の順序を明示)。
+        if (_colorSchemes is not null)
+        {
+            _colorSchemes.Reload();
+            await NormalizePersistedThemeAsync();
+            settings = ViewModel.Settings.Current; // reload may have rewritten Theme/CustomThemeId
+            RebuildCustomThemeMenuItems();
+        }
 
         // ペルシステンス済みサイドバー幅 / visibility / 位置を、開くフォルダーを決める前に適用する
         ApplySidebarPosition(settings.SidebarPosition);
@@ -122,14 +149,8 @@ public sealed partial class MainPage : Page
         Preview.SetZoom(settings.ZoomFactor);
 
         // ページとウィンドウに永続テーマを適用
-        RequestedTheme = settings.Theme switch
-        {
-            AppTheme.Light => ElementTheme.Light,
-            AppTheme.Dark => ElementTheme.Dark,
-            _ => ElementTheme.Default,
-        };
-        _window?.ApplyTheme(settings.Theme);
-        Preview.SetTheme(ViewModel.EffectiveTheme());
+        ApplyThemeToShell(settings.Theme);
+        PushThemeToPreview();
 
         // どのフォルダーを開くか決定する (一度だけ):
         //   1. 明示的な initialFolderPath が最優先
@@ -183,6 +204,12 @@ public sealed partial class MainPage : Page
         {
             _windowService.WindowsChanged -= OnWindowsChanged;
             _windowsChangedSubscribed = false;
+        }
+
+        if (_themesChangedSubscribed && _colorSchemes is not null)
+        {
+            _colorSchemes.ThemesChanged -= OnThemesChanged;
+            _themesChangedSubscribed = false;
         }
 
         // ViewModel と IFolderWatcher のライフサイクルは MainWindow が所有する
@@ -367,7 +394,8 @@ public sealed partial class MainPage : Page
             {
                 Preview.SetContentFolder(ViewModel.OpenedFolderPath);
             }
-            _ = Preview.LoadAsync(req.Markdown, req.RelativePath, req.Theme);
+            var (themeKey, isDark, vars) = ResolveActiveThemePayload();
+            _ = Preview.LoadAsync(req.Markdown, req.RelativePath, themeKey, isDark, vars);
         });
     }
 
@@ -728,31 +756,229 @@ public sealed partial class MainPage : Page
         await ViewModel.Settings.SaveAsync();
     }
 
-    private async void OnThemeSystemClick(object? sender, RoutedEventArgs e) => await SetThemeAsync(AppTheme.System);
-    private async void OnThemeLightClick(object? sender, RoutedEventArgs e)  => await SetThemeAsync(AppTheme.Light);
-    private async void OnThemeDarkClick(object? sender, RoutedEventArgs e)   => await SetThemeAsync(AppTheme.Dark);
+    private async void OnThemeSystemClick(object? sender, RoutedEventArgs e) => await SetThemeAsync(AppTheme.System, null);
+    private async void OnThemeLightClick(object? sender, RoutedEventArgs e)  => await SetThemeAsync(AppTheme.Light, null);
+    private async void OnThemeDarkClick(object? sender, RoutedEventArgs e)   => await SetThemeAsync(AppTheme.Dark, null);
 
-    private async Task SetThemeAsync(AppTheme theme)
+    private async void OnOpenThemesFolderClick(object? sender, RoutedEventArgs e)
     {
-        ViewModel.Settings.Current.Theme = theme;
+        if (_colorSchemeSource is null || _shellService is null)
+        {
+            return;
+        }
+        try
+        {
+            _colorSchemeSource.EnsureDirectoryExists();
+            _shellService.Reveal(_colorSchemeSource.DirectoryPath);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning($"Open Themes Folder failed: {ex.Message}");
+        }
+        await Task.CompletedTask;
+    }
+
+    private async void OnReloadThemesClick(object? sender, RoutedEventArgs e)
+    {
+        if (_colorSchemes is null)
+        {
+            return;
+        }
+        try
+        {
+            // Reload→ThemesChanged が他ウィンドウへも伝播し、各 MainPage が NormalizePersistedThemeAsync を実行する。
+            _colorSchemes.Reload();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning($"Reload Themes failed: {ex.Message}");
+        }
+        // 自分自身は ThemesChanged ハンドラ内で正規化する (重複は問題なし)。
+        await Task.CompletedTask;
+    }
+
+    private void OnCustomThemeClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuFlyoutItem item && item.Tag is string id && !string.IsNullOrEmpty(id))
+        {
+            _ = SetThemeAsync(AppTheme.Custom, id);
+        }
+    }
+
+    private async void OnThemesChanged()
+    {
+        // ColorSchemeRegistry はバックグラウンドからも呼ばれ得るため UI スレッドへ marshal。
+        if (DispatcherQueue is null)
+        {
+            return;
+        }
+        DispatcherQueue.TryEnqueue(async () =>
+        {
+            try
+            {
+                await NormalizePersistedThemeAsync();
+                ApplyThemeToShell(ViewModel.Settings.Current.Theme);
+                PushThemeToPreview();
+                RebuildCustomThemeMenuItems();
+                UpdateThemeMenuChecks();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning($"OnThemesChanged failed: {ex.Message}");
+            }
+        });
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// 設定上のテーマ選択を <see cref="ColorSchemeRegistry"/> の現在状態で正規化し、
+    /// 変化があった場合は <c>settings.json</c> に保存する。
+    /// </summary>
+    private async Task NormalizePersistedThemeAsync()
+    {
+        if (_colorSchemes is null)
+        {
+            return;
+        }
+        var settings = ViewModel.Settings.Current;
+        var current = new ThemeSelection(settings.Theme, settings.CustomThemeId);
+        var normalized = _colorSchemes.Normalize(current);
+        if (normalized.Theme != current.Theme
+            || !string.Equals(normalized.CustomThemeId, current.CustomThemeId, StringComparison.Ordinal))
+        {
+            settings.Theme = normalized.Theme;
+            settings.CustomThemeId = normalized.CustomThemeId;
+            await ViewModel.Settings.SaveAsync();
+        }
+    }
+
+    private async Task SetThemeAsync(AppTheme theme, string? customId)
+    {
+        if (_colorSchemes is null)
+        {
+            return;
+        }
+        var normalized = _colorSchemes.Normalize(new ThemeSelection(theme, customId));
+        ViewModel.Settings.Current.Theme = normalized.Theme;
+        ViewModel.Settings.Current.CustomThemeId = normalized.CustomThemeId;
+
+        ApplyThemeToShell(normalized.Theme);
+        PushThemeToPreview();
         UpdateThemeMenuChecks();
-        Preview.SetTheme(ViewModel.EffectiveTheme());
-        RequestedTheme = theme switch
+
+        await ViewModel.Settings.SaveAsync();
+    }
+
+    /// <summary>
+    /// 現在のテーマ選択を「キー名 / isDark / CSS 変数辞書」の 3 つ組みに分解する。
+    /// </summary>
+    private (string ThemeKey, bool IsDark, IReadOnlyDictionary<string, string>? Vars) ResolveActiveThemePayload()
+    {
+        var settings = ViewModel.Settings.Current;
+        if (settings.Theme == AppTheme.Custom)
+        {
+            var resolved = _colorSchemes?.Resolve(settings.CustomThemeId);
+            if (resolved is not null)
+            {
+                return ("custom", resolved.IsDark, resolved.CssVariables);
+            }
+            // フォールバック: 該当テーマが消えていれば light/dark を実効値で。
+        }
+
+        var effective = ViewModel.EffectiveTheme(); // "light" | "dark"
+        return (effective, effective == "dark", null);
+    }
+
+    private void ApplyThemeToShell(AppTheme theme)
+    {
+        var (themeKey, isDark, _) = ResolveActiveThemePayload();
+        // Page / Window の RequestedTheme は二値 (Light/Dark) なので、resolved の isDark に従って決定する。
+        ElementTheme elementTheme = theme switch
         {
             AppTheme.Light => ElementTheme.Light,
             AppTheme.Dark => ElementTheme.Dark,
+            AppTheme.Custom => isDark ? ElementTheme.Dark : ElementTheme.Light,
             _ => ElementTheme.Default,
         };
-        _window?.ApplyTheme(theme);
-        await ViewModel.Settings.SaveAsync();
+        RequestedTheme = elementTheme;
+        _window?.ApplyTheme(theme, theme == AppTheme.Custom ? isDark : null);
+    }
+
+    private void PushThemeToPreview()
+    {
+        var (themeKey, isDark, vars) = ResolveActiveThemePayload();
+        Preview.SetTheme(themeKey, isDark, vars);
+    }
+
+    private void RebuildCustomThemeMenuItems()
+    {
+        // 組み込み 3 種 + separator + 動的 custom items + separator + アクション の構成。
+        // ThemeBuiltInSeparator と ThemeActionSeparator の間の動的アイテムをクリアして再構築する。
+        var items = ThemeSubmenu.Items;
+        var startIndex = items.IndexOf(ThemeBuiltInSeparator) + 1;
+        var endIndex = items.IndexOf(ThemeActionSeparator);
+        if (startIndex < 0 || endIndex < 0 || endIndex < startIndex)
+        {
+            return;
+        }
+        for (var i = endIndex - 1; i >= startIndex; i--)
+        {
+            items.RemoveAt(i);
+        }
+
+        if (_colorSchemes is null)
+        {
+            ThemeBuiltInSeparator.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var schemes = _colorSchemes.Schemes;
+        if (schemes.Count == 0)
+        {
+            ThemeBuiltInSeparator.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        ThemeBuiltInSeparator.Visibility = Visibility.Visible;
+        var insertAt = startIndex;
+        foreach (var scheme in schemes)
+        {
+            var item = new ToggleMenuFlyoutItem
+            {
+                Text = string.IsNullOrEmpty(scheme.DisplayName) ? scheme.Id : scheme.DisplayName,
+                Tag = scheme.Id,
+            };
+            item.Click += OnCustomThemeClick;
+            items.Insert(insertAt++, item);
+        }
     }
 
     private void UpdateThemeMenuChecks()
     {
         var t = ViewModel.Settings.Current.Theme;
+        var customId = ViewModel.Settings.Current.CustomThemeId;
         ThemeSystemMenu.IsChecked = t == AppTheme.System;
         ThemeLightMenu.IsChecked  = t == AppTheme.Light;
         ThemeDarkMenu.IsChecked   = t == AppTheme.Dark;
+
+        // 動的アイテムのチェック状態を Tag で同定して更新する。
+        var startIndex = ThemeSubmenu.Items.IndexOf(ThemeBuiltInSeparator) + 1;
+        var endIndex = ThemeSubmenu.Items.IndexOf(ThemeActionSeparator);
+        if (startIndex < 0 || endIndex < 0)
+        {
+            return;
+        }
+        for (var i = startIndex; i < endIndex; i++)
+        {
+            if (ThemeSubmenu.Items[i] is ToggleMenuFlyoutItem toggle)
+            {
+                var matches = t == AppTheme.Custom
+                    && toggle.Tag is string id
+                    && !string.IsNullOrEmpty(customId)
+                    && string.Equals(id, customId, StringComparison.Ordinal);
+                toggle.IsChecked = matches;
+            }
+        }
     }
 
     // ----- Window menu -----

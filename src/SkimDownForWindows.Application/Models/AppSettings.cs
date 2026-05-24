@@ -15,6 +15,15 @@ public sealed class AppSettings
 
     public AppTheme Theme { get; set; } = AppTheme.System;
 
+    /// <summary>
+    /// <see cref="Theme"/> が <see cref="AppTheme.Custom"/> の時に有効な、登録済みカラースキーマの ID。
+    /// 組み込みテーマ (System/Light/Dark) の時は <c>null</c>。
+    ///
+    /// JSON ペイロード上は省略可能 (<c>null</c> 書き出しは抑止される)。<see cref="NormalizeAfterLoad"/>
+    /// が「Custom だが ID が無い」状態を <see cref="AppTheme.System"/> に戻す。
+    /// </summary>
+    public string? CustomThemeId { get; set; }
+
     /// <summary>WebView2 ズーム倍率 (1.0 = 100%)。範囲 0.5–3.0。</summary>
     public double ZoomFactor { get; set; } = 1.0;
 
@@ -34,6 +43,23 @@ public sealed class AppSettings
 
     /// <summary>フォルダー固有状態の辞書。キーは正規化済みフォルダー絶対パス。</summary>
     public Dictionary<string, FolderState> FolderStates { get; set; } = new();
+
+    /// <summary>
+    /// ディスクから読み込んだ直後に呼ぶ、in-place な不整合修正。
+    /// 現状は <c>Theme=Custom &amp;&amp; CustomThemeId が空</c> を <see cref="AppTheme.System"/> に戻す。
+    /// 登録テーマからの正規化 (該当 ID が見つからない時の戻し) は <c>ColorSchemeRegistry</c> 側で行う。
+    /// </summary>
+    public void NormalizeAfterLoad()
+    {
+        if (Theme == AppTheme.Custom && string.IsNullOrEmpty(CustomThemeId))
+        {
+            Theme = AppTheme.System;
+        }
+        if (Theme != AppTheme.Custom)
+        {
+            CustomThemeId = null;
+        }
+    }
 
     /// <summary>
     /// 指定フォルダーの <see cref="FolderState"/> を取得する。未登録なら新規作成して返す。

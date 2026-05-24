@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.Input;
 using SkimDownForWindows.Application.Abstractions;
 using SkimDownForWindows.Application.Markdown;
 using SkimDownForWindows.Application.Models;
+using SkimDownForWindows.Application.Theme;
 using SkimDownForWindows.Application.Utilities;
 using SkimDownForWindows.Domain;
 
@@ -31,6 +32,7 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
     private readonly IShellService _shellService;
     private readonly IClipboardService _clipboardService;
     private readonly ISystemThemeProvider _themeProvider;
+    private readonly ColorSchemeRegistry _colorSchemes;
     private readonly MarkdownScanner _scanner;
     private readonly MarkdownTreeBuilder _treeBuilder;
     private readonly InitialSelectionPicker _picker;
@@ -39,6 +41,9 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
 
     /// <summary>設定リポジトリへの直接アクセス (XAML バインドやコードビハインドから利用)。</summary>
     public ISettingsRepository Settings => _settings;
+
+    /// <summary>登録カスタムテーマ一覧 (UI 構築用)。</summary>
+    public ColorSchemeRegistry ColorSchemes => _colorSchemes;
 
     /// <summary>リンク分類器。プレビューからのリンクイベント解決に使う。</summary>
     public LinkResolver LinkResolver { get; }
@@ -82,6 +87,7 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         IShellService shellService,
         IClipboardService clipboardService,
         ISystemThemeProvider themeProvider,
+        ColorSchemeRegistry colorSchemes,
         MarkdownScanner scanner,
         MarkdownTreeBuilder treeBuilder,
         InitialSelectionPicker picker,
@@ -94,6 +100,7 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         _shellService = shellService;
         _clipboardService = clipboardService;
         _themeProvider = themeProvider;
+        _colorSchemes = colorSchemes;
         _scanner = scanner;
         _treeBuilder = treeBuilder;
         _picker = picker;
@@ -107,8 +114,45 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// 現在のテーマ設定を実効値 (<c>"light"</c> または <c>"dark"</c>) に解決する。
+    ///
+    /// カスタムテーマの場合は <see cref="ColorSchemeRegistry"/> の解決結果に従い isDark 判定する。
+    /// カスタムテーマが見つからない場合は <see cref="ISystemThemeProvider"/> 経由で OS 設定に従う。
     /// </summary>
-    public string EffectiveTheme() => _themeProvider.Resolve(_settings.Current.Theme);
+    public string EffectiveTheme()
+    {
+        var current = _settings.Current;
+        if (current.Theme == AppTheme.Custom)
+        {
+            var resolved = _colorSchemes.Resolve(current.CustomThemeId);
+            if (resolved is not null)
+            {
+                return resolved.IsDark ? "dark" : "light";
+            }
+            // カスタムテーマが消えている場合は System 扱い。
+            return _themeProvider.Resolve(AppTheme.System);
+        }
+        return _themeProvider.Resolve(current.Theme);
+    }
+
+    /// <summary>
+    /// 現在のテーマ選択を <see cref="ThemeSelection"/> として返す。
+    /// </summary>
+    public ThemeSelection CurrentThemeSelection()
+        => new(_settings.Current.Theme, _settings.Current.CustomThemeId);
+
+    /// <summary>
+    /// 現在のテーマがカスタムテーマで解決済みなら、対応する <see cref="ResolvedTheme"/> を返す。
+    /// それ以外は <c>null</c>。
+    /// </summary>
+    public ResolvedTheme? CurrentResolvedTheme()
+    {
+        var current = _settings.Current;
+        if (current.Theme != AppTheme.Custom)
+        {
+            return null;
+        }
+        return _colorSchemes.Resolve(current.CustomThemeId);
+    }
 
     public async Task OpenFolderAsync(string folderPath)
     {

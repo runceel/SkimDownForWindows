@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -43,6 +44,10 @@ public sealed partial class MarkdownPreview : UserControl
     private string? _pendingMarkdown;
     private string? _pendingRelativePath;
     private string? _pendingTheme;
+    private string? _pendingThemeType;
+    private bool? _pendingThemeIsDark;
+    private IReadOnlyDictionary<string, string>? _pendingThemeVars;
+    private bool _hasPendingThemeOnlyUpdate;
     private string? _currentFolderRoot;
 
     public MarkdownPreview()
@@ -173,12 +178,25 @@ public sealed partial class MarkdownPreview : UserControl
     /// <summary>
     /// Render the provided Markdown. <paramref name="relativePath"/> is forward-slash
     /// relative to the content host, used to resolve relative images.
+    ///
+    /// <paramref name="theme"/> drives the body data-theme attribute ("light" / "dark" / "custom").
+    /// For custom themes pass also <paramref name="themeIsDark"/> and the resolved CSS variable
+    /// dictionary in <paramref name="themeVars"/>.
     /// </summary>
-    public Task LoadAsync(string markdown, string relativePath, string theme)
+    public Task LoadAsync(
+        string markdown,
+        string relativePath,
+        string theme,
+        bool? themeIsDark = null,
+        IReadOnlyDictionary<string, string>? themeVars = null)
     {
         _pendingMarkdown = markdown;
         _pendingRelativePath = relativePath;
         _pendingTheme = theme;
+        _pendingThemeType = ResolveThemeType(theme, themeIsDark);
+        _pendingThemeIsDark = themeIsDark ?? (_pendingThemeType == "dark");
+        _pendingThemeVars = CloneThemeVars(themeVars);
+        _hasPendingThemeOnlyUpdate = false;
         return FlushPendingAsync();
     }
 
@@ -190,13 +208,75 @@ public sealed partial class MarkdownPreview : UserControl
         }
     }
 
-    public void SetTheme(string theme)
+    /// <summary>
+    /// Push a theme change to the renderer. For built-in themes, only <paramref name="theme"/>
+    /// is needed; for custom themes pass <paramref name="themeIsDark"/> and <paramref name="themeVars"/>
+    /// so the renderer can switch hljs / Mermaid and inject the CSS variables.
+    /// </summary>
+    public void SetTheme(
+        string theme,
+        bool? themeIsDark = null,
+        IReadOnlyDictionary<string, string>? themeVars = null)
     {
         _pendingTheme = theme;
+        _pendingThemeType = ResolveThemeType(theme, themeIsDark);
+        _pendingThemeIsDark = themeIsDark ?? (_pendingThemeType == "dark");
+        _pendingThemeVars = CloneThemeVars(themeVars);
+
         if (_webReady)
         {
-            Post(new { type = "theme", theme });
+            Post(new
+            {
+                type = "theme",
+                theme,
+                themeType = _pendingThemeType,
+                themeIsDark = _pendingThemeIsDark.Value,
+                themeVars = _pendingThemeVars,
+            });
+            _hasPendingThemeOnlyUpdate = false;
         }
+        else
+        {
+            // WebView2 がまだ ready でない場合は、ready 時に theme だけでも送れるよう
+            // pending フラグを立てておく (markdown が無いケース対策)。
+            _hasPendingThemeOnlyUpdate = true;
+        }
+    }
+
+    private static string ResolveThemeType(string theme, bool? themeIsDark)
+    {
+        if (themeIsDark.HasValue)
+        {
+            return themeIsDark.Value ? "dark" : "light";
+        }
+        if (string.Equals(theme, "dark", StringComparison.OrdinalIgnoreCase))
+        {
+            return "dark";
+        }
+        return "light";
+    }
+
+    private static IReadOnlyDictionary<string, string>? CloneThemeVars(IReadOnlyDictionary<string, string>? vars)
+    {
+        if (vars is null || vars.Count == 0)
+        {
+            return null;
+        }
+        var clone = new Dictionary<string, string>(vars.Count, StringComparer.Ordinal);
+        foreach (var kv in vars)
+        {
+            if (string.IsNullOrEmpty(kv.Key) || string.IsNullOrEmpty(kv.Value))
+            {
+                continue;
+            }
+            // 安全網: --skim-* プレフィックスのみ通す (renderer 側でも再チェック)。
+            if (!kv.Key.StartsWith("--skim-", StringComparison.Ordinal))
+            {
+                continue;
+            }
+            clone[kv.Key] = kv.Value;
+        }
+        return clone.Count == 0 ? null : clone;
     }
 
     public void SetZoom(double factor)
@@ -262,8 +342,27 @@ public sealed partial class MarkdownPreview : UserControl
 
     private async Task FlushPendingAsync()
     {
-        if (!_webReady || _pendingMarkdown is null)
+        if (!_webReady)
         {
+            return;
+        }
+
+        if (_pendingMarkdown is null)
+        {
+            // markdown は変わっていないが、theme だけ変えたいケース。
+            // (例: WebView ready 前に SetTheme(...) が呼ばれた)
+            if (_hasPendingThemeOnlyUpdate && _pendingTheme is not null)
+            {
+                Post(new
+                {
+                    type = "theme",
+                    theme = _pendingTheme,
+                    themeType = _pendingThemeType,
+                    themeIsDark = _pendingThemeIsDark ?? false,
+                    themeVars = _pendingThemeVars,
+                });
+                _hasPendingThemeOnlyUpdate = false;
+            }
             return;
         }
 
@@ -275,9 +374,13 @@ public sealed partial class MarkdownPreview : UserControl
             sourcePath = _pendingRelativePath ?? "",
             contentBaseUri,
             theme = _pendingTheme ?? "light",
+            themeType = _pendingThemeType ?? "light",
+            themeIsDark = _pendingThemeIsDark ?? false,
+            themeVars = _pendingThemeVars,
         });
 
         _pendingMarkdown = null;
+        _hasPendingThemeOnlyUpdate = false;
         await Task.CompletedTask;
     }
 

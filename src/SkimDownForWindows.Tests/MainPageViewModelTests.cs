@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using SkimDownForWindows.Application.Markdown;
 using SkimDownForWindows.Application.Models;
+using SkimDownForWindows.Application.Theme;
 using SkimDownForWindows.Application.ViewModels;
 using SkimDownForWindows.Domain;
 using SkimDownForWindows.Tests.TestHelpers;
@@ -34,6 +35,8 @@ public sealed class MainPageViewModelTests
     private RecordingClipboardService _clipboard = null!;
     private StubSystemThemeProvider _theme = null!;
     private RealFileSystem _fs = null!;
+    private InMemoryColorSchemeSource _colorSchemeSource = null!;
+    private ColorSchemeRegistry _colorSchemes = null!;
 
     [TestInitialize]
     public void Setup()
@@ -48,6 +51,8 @@ public sealed class MainPageViewModelTests
         _clipboard = new RecordingClipboardService();
         _theme = new StubSystemThemeProvider();
         _fs = new RealFileSystem();
+        _colorSchemeSource = new InMemoryColorSchemeSource();
+        _colorSchemes = new ColorSchemeRegistry(_colorSchemeSource);
     }
 
     [TestCleanup]
@@ -70,6 +75,7 @@ public sealed class MainPageViewModelTests
             _shell,
             _clipboard,
             _theme,
+            _colorSchemes,
             scanner,
             treeBuilder,
             picker,
@@ -564,5 +570,65 @@ public sealed class MainPageViewModelTests
         var vm = CreateViewModel();
         await vm.PersistExpansionAsync();
         Assert.AreEqual(0, _settings.SaveAsyncCalls);
+    }
+
+    // ----- Custom テーマ ----------------------------------------------------
+
+    [TestMethod]
+    public void EffectiveTheme_Custom_FollowsResolvedDarkFlag()
+    {
+        _colorSchemeSource.Add(
+            "darkish",
+            """{"name":"Darkish","type":"dark","colors":{"editor.background":"#000000"}}""");
+        _colorSchemeSource.Add(
+            "lightish",
+            """{"name":"Lightish","type":"light","colors":{"editor.background":"#ffffff"}}""");
+        _colorSchemes.Reload();
+
+        _settings.Current.Theme = AppTheme.Custom;
+        _settings.Current.CustomThemeId = "darkish";
+        var vm = CreateViewModel();
+        Assert.AreEqual("dark", vm.EffectiveTheme());
+
+        _settings.Current.CustomThemeId = "lightish";
+        Assert.AreEqual("light", vm.EffectiveTheme());
+    }
+
+    [TestMethod]
+    public void EffectiveTheme_CustomWithMissingId_FallsBackToSystemThemeProvider()
+    {
+        _colorSchemes.Reload();
+        _settings.Current.Theme = AppTheme.Custom;
+        _settings.Current.CustomThemeId = "ghost";
+        _theme.System = AppTheme.Dark;
+        var vm = CreateViewModel();
+
+        Assert.AreEqual("dark", vm.EffectiveTheme());
+    }
+
+    [TestMethod]
+    public void CurrentResolvedTheme_ReturnsNullForBuiltInThemes()
+    {
+        _colorSchemes.Reload();
+        _settings.Current.Theme = AppTheme.Light;
+        var vm = CreateViewModel();
+        Assert.IsNull(vm.CurrentResolvedTheme());
+    }
+
+    [TestMethod]
+    public void CurrentResolvedTheme_ReturnsResolvedForCustomTheme()
+    {
+        _colorSchemeSource.Add(
+            "monokai",
+            """{"name":"Monokai","type":"dark","colors":{"editor.background":"#272822"}}""");
+        _colorSchemes.Reload();
+        _settings.Current.Theme = AppTheme.Custom;
+        _settings.Current.CustomThemeId = "monokai";
+        var vm = CreateViewModel();
+
+        var resolved = vm.CurrentResolvedTheme();
+        Assert.IsNotNull(resolved);
+        Assert.AreEqual("monokai", resolved.Id);
+        Assert.AreEqual("#272822", resolved.CssVariables["--skim-bg"]);
     }
 }
