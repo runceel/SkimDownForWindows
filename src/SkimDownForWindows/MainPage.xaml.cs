@@ -1087,4 +1087,26 @@ public sealed partial class MainPage : Page
             items.Add(item);
         }
     }
+
+    // ----- Help menu -----
+
+    private async void OnAboutClick(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var appInfo = _scopeProvider?.GetService<IAppInfoService>();
+            var launcher = _scopeProvider?.GetService<IExternalUriLauncher>();
+            if (appInfo is null || launcher is null) return;
+
+            var dialog = new AboutDialog(appInfo, launcher)
+            {
+                XamlRoot = this.XamlRoot,
+            };
+            await dialog.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError("About ダイアログの表示に失敗", ex);
+        }
+    }
 }
