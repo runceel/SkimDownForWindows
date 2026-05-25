@@ -10,6 +10,10 @@
 *.sln.docstates
 artifacts/
 
+# Allow content under .github/ even when names collide with .NET build folders
+# (e.g., .github/skills/release/ is a documentation skill, not a build output).
+!.github/**
+
 # Build logs
 [Ll]og/
 [Ll]ogs/

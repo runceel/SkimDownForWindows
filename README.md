@@ -159,14 +159,14 @@ SkimDown is published under the reserved app name **SkimDown** in [Microsoft Par
 .\scripts\Build-StorePackage.ps1
 ```
 
-This produces `bin\StorePackage\45014okazuki.SkimDown_<version>.msixupload` containing a multi-architecture `.msixbundle` (x64 + ARM64 by default). Add `-IncludeX86` (or `-Architectures x64,arm64,x86`) for a tri-arch bundle. The output is **unsigned by design** — the Microsoft Store re-signs every package during ingestion.
+This produces `bin\StorePackage\45014okazuki.SkimDown_<version>.msixupload` containing a multi-architecture `.msixbundle` (x64 + ARM64 by default). Add `-IncludeX86` (or `-Architectures x64,arm64,x86`) for a tri-arch bundle. The `.msixupload` is **unsigned by design** — the Microsoft Store re-signs every package during ingestion.
 
 Internally the script:
 
 1. Runs `dotnet publish -c Release -p:PublishTrimmed=false` per architecture (trimming is disabled for Store builds because WinUI 3 / `CommunityToolkit.Mvvm` reflection code is not fully trim-safe; `ReadyToRun` stays on)
 2. Calls `winapp package` on each published layout to produce per-arch `.msix`
 3. Calls `MakeAppx.exe bundle` (via `winapp tool`) to combine them into a `.msixbundle`
-4. Wraps the bundle into a `.msixupload` zip with the bundle at the archive root
+4. Wraps the unsigned bundle into a `.msixupload` zip with the bundle at the archive root
 
 ### Upload to Partner Center
 
@@ -179,17 +179,30 @@ Internally the script:
 
 Edit `Identity/@Version` in `src/SkimDownForWindows/Package.appxmanifest`. The last segment **must remain `0`** for Store submissions (the Store reserves the revision component for its own re-signing pipeline).
 
-### Local install validation (optional)
+### Local install validation / sideload distribution (optional)
 
-For sideload testing before submission, generate and trust a dev cert that matches the manifest Publisher:
+For sideload testing or GitHub Releases distribution, run with `-Sign`:
 
 ```powershell
-.\scripts\Build-StorePackage.ps1 -Sign            # creates bin\StorePackage\devcert.pfx
-winapp cert install .\bin\StorePackage\devcert.pfx   # run as admin, one-time trust
-Add-AppxPackage .\bin\StorePackage\45014okazuki.SkimDown_1.0.0.0.msixbundle
+.\scripts\Build-StorePackage.ps1 -Sign
 ```
 
-The unsigned `.msixupload` and the signed `.msixbundle` are produced side-by-side — only the `.msixupload` should be uploaded to the Store.
+This produces the **same** unsigned `.msixupload` (for Store) **plus** these extra sideload artifacts:
+
+- `bin\StorePackage\<pkg>_<version>_sideload.msixbundle` — a separately-signed copy of the multi-arch bundle
+- `bin\StorePackage\devcert.pfx` — the generated dev certificate (private key, **never publish**)
+- `bin\StorePackage\devcert.cer` — the public certificate only (safe to publish on GitHub Releases)
+
+To install the sideload bundle locally:
+
+```powershell
+certutil -addstore -f "TrustedPeople" .\bin\StorePackage\devcert.cer   # admin, one-time
+Add-AppxPackage .\bin\StorePackage\45014okazuki.SkimDown_1.0.0.0_sideload.msixbundle
+```
+
+> ⚠️ Sideload builds use a self-signed Publisher certificate. Microsoft Store builds use a different signing chain — once a Store build of the same `Identity/Name` is installed, the sideload version cannot be upgraded in place. Uninstall the sideload version before installing the Store version.
+
+The unsigned `.msixupload` and the signed `_sideload.msixbundle` are produced side-by-side — only the `.msixupload` should be uploaded to the Store.
 
 ## License
 

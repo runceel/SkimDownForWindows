@@ -9,11 +9,14 @@
     wraps the bundle into a .msixupload zip that can be uploaded directly to
     Microsoft Partner Center.
 
-    The output is intentionally unsigned by default. The Microsoft Store re-signs
-    every package during ingestion, so production submission does not require a
-    signing certificate. Pass -Sign to also produce a locally-installable signed
-    bundle (a dev certificate that matches the manifest Publisher will be
-    generated under bin/StorePackage/devcert.pfx if -CertPath is not provided).
+    The .msixupload is intentionally unsigned: Microsoft Store re-signs every
+    package during ingestion. Production Store submission does NOT require a
+    signing certificate.
+
+    Pass -Sign to additionally produce a separately-named, locally signed
+    sideload bundle ('<pkg>_<version>_sideload.msixbundle') plus the matching
+    public certificate ('devcert.cer'). These are for GitHub Releases / local
+    Add-AppxPackage testing only and do NOT affect the Store .msixupload.
 
     Trimming is forcibly disabled (-p:PublishTrimmed=false) for Store builds
     because WinUI 3 / CommunityToolkit.Mvvm reflection-heavy code paths are not
@@ -37,13 +40,16 @@
     the final .msixupload. Defaults to <repo>\bin\StorePackage.
 
 .PARAMETER Sign
-    Also produce a signed copy of the .msixbundle (for local install / WACK).
-    Microsoft Store submission does not need this.
+    Also produce a signed sideload copy of the .msixbundle (suffixed with
+    '_sideload') for local Add-AppxPackage testing or GitHub Releases
+    distribution, plus export the matching public certificate (devcert.cer).
+    The Store .msixupload remains unsigned regardless of this flag.
 
 .PARAMETER CertPath
     Path to a .pfx whose Subject matches the manifest Publisher. If omitted
     when -Sign is set, a dev cert is auto-generated at <OutputDir>\devcert.pfx
-    via `winapp cert generate --manifest`.
+    via `winapp cert generate --manifest`. NEVER publish the .pfx — only the
+    .cer (public key) is safe to distribute.
 
 .PARAMETER CertPassword
     Password for the .pfx. Defaults to 'password' (matches `winapp cert generate`).
@@ -65,8 +71,9 @@
 .EXAMPLE
     .\scripts\Build-StorePackage.ps1 -Sign
 
-    Builds the upload package, plus a signed copy of the bundle (Add-AppxPackage
-    compatible) for local validation.
+    Builds the unsigned Store .msixupload, plus a separately-signed sideload
+    .msixbundle (suffixed with _sideload) and the public devcert.cer for
+    GitHub Releases or local Add-AppxPackage testing.
 #>
 [CmdletBinding()]
 param(
@@ -269,32 +276,15 @@ $bundleSizeMB = [math]::Round((Get-Item $bundleOut).Length / 1MB, 2)
 Write-Host "    Produced $bundleName ($bundleSizeMB MB)"
 
 # ---------------------------------------------------------------------------
-# Optional: sign the bundle for local install validation
-# ---------------------------------------------------------------------------
-if ($Sign) {
-    Write-Host ""
-    Write-Host "==> Signing bundle for local validation" -ForegroundColor Cyan
-    if (-not $CertPath) {
-        $CertPath = Join-Path $OutputDir 'devcert.pfx'
-        if (-not (Test-Path $CertPath)) {
-            Write-Host "    Generating dev certificate at $CertPath (matches manifest Publisher)"
-            & winapp cert generate --manifest $manifestFile --output $CertPath --password $CertPassword --quiet
-            if ($LASTEXITCODE -ne 0) { throw "winapp cert generate failed (exit $LASTEXITCODE)" }
-        }
-    }
-    if (-not (Test-Path $CertPath)) { throw "Signing certificate not found: $CertPath" }
-
-    & winapp sign $bundleOut $CertPath --password $CertPassword
-    if ($LASTEXITCODE -ne 0) { throw "winapp sign failed (exit $LASTEXITCODE)" }
-    Write-Host "    Bundle signed with $CertPath"
-    Write-Host "    NOTE: trust the cert with 'winapp cert install $CertPath' (admin) before Add-AppxPackage." -ForegroundColor Yellow
-}
-
-# ---------------------------------------------------------------------------
 # Wrap into .msixupload (a zip containing the bundle at the root)
+#
+# IMPORTANT: This must happen BEFORE optional signing, because Microsoft Store
+# re-signs every package during ingestion. The .msixupload that goes to
+# Partner Center must contain the UNSIGNED .msixbundle, not the locally-
+# signed sideload copy produced below.
 # ---------------------------------------------------------------------------
 Write-Host ""
-Write-Host "==> Wrapping bundle into .msixupload" -ForegroundColor Cyan
+Write-Host "==> Wrapping unsigned bundle into .msixupload (Store submission artifact)" -ForegroundColor Cyan
 $uploadName = "${packageName}_${packageVersion}.msixupload"
 $uploadOut  = Join-Path $OutputDir $uploadName
 if (Test-Path $uploadOut) { Remove-Item -LiteralPath $uploadOut -Force }
@@ -335,12 +325,70 @@ try {
 }
 
 # ---------------------------------------------------------------------------
+# Optional: produce a signed sideload bundle + extract its public cert
+#
+# This step is for GitHub Releases / local Add-AppxPackage testing only.
+# It creates a SEPARATE signed copy of the bundle (suffixed with _sideload)
+# so the unsigned .msixupload above is never modified.
+# ---------------------------------------------------------------------------
+$sideloadBundleOut = $null
+$cerOut            = $null
+if ($Sign) {
+    Write-Host ""
+    Write-Host "==> Producing signed sideload bundle (GitHub Releases artifact)" -ForegroundColor Cyan
+    if (-not $CertPath) {
+        $CertPath = Join-Path $OutputDir 'devcert.pfx'
+        if (-not (Test-Path $CertPath)) {
+            Write-Host "    Generating dev certificate at $CertPath (matches manifest Publisher)"
+            & winapp cert generate --manifest $manifestFile --output $CertPath --password $CertPassword --quiet
+            if ($LASTEXITCODE -ne 0) { throw "winapp cert generate failed (exit $LASTEXITCODE)" }
+        }
+    }
+    if (-not (Test-Path $CertPath)) { throw "Signing certificate not found: $CertPath" }
+
+    $sideloadBundleName = "${packageName}_${packageVersion}_sideload.msixbundle"
+    $sideloadBundleOut  = Join-Path $OutputDir $sideloadBundleName
+    Copy-Item -LiteralPath $bundleOut -Destination $sideloadBundleOut -Force
+
+    & winapp sign $sideloadBundleOut $CertPath --password $CertPassword
+    if ($LASTEXITCODE -ne 0) { throw "winapp sign failed (exit $LASTEXITCODE)" }
+    Write-Host "    Signed sideload bundle: $sideloadBundleOut"
+
+    # Export the public certificate (no private key) so GitHub Release consumers
+    # can trust the Publisher without ever touching the .pfx. We avoid
+    # Export-Certificate because it requires the cert to already be in a store,
+    # while X509Certificate2.Export gives us bytes directly from the .pfx.
+    $cerOut = Join-Path $OutputDir 'devcert.cer'
+    try {
+        $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
+            $CertPath,
+            $CertPassword,
+            [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
+        try {
+            $cerBytes = $cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert)
+            [System.IO.File]::WriteAllBytes($cerOut, $cerBytes)
+        } finally {
+            $cert.Dispose()
+        }
+    } catch {
+        throw "Failed to export public certificate from $CertPath`: $_"
+    }
+    Write-Host "    Exported public certificate: $cerOut"
+    Write-Host "    NOTE: never publish the .pfx — only the .cer (public key) is safe to distribute." -ForegroundColor Yellow
+    Write-Host "    Local install: 'certutil -addstore -f TrustedPeople $cerOut' (admin), then Add-AppxPackage." -ForegroundColor Yellow
+}
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 Write-Host ""
 Write-Host "==> Done." -ForegroundColor Green
-Write-Host "    Bundle  : $bundleOut"
-Write-Host "    Upload  : $uploadOut"
+Write-Host "    Bundle (unsigned, intermediate) : $bundleOut"
+Write-Host "    Upload (Store submission)       : $uploadOut"
+if ($Sign) {
+    Write-Host "    Sideload bundle (signed)        : $sideloadBundleOut"
+    Write-Host "    Public cert (.cer)              : $cerOut"
+}
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
 Write-Host "  1. Sign in to https://partner.microsoft.com/dashboard/products/9NHTZMM0XMMF"

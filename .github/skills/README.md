@@ -16,6 +16,7 @@ skill は **[ADR](../adr/)** と **[copilot-instructions.md](../copilot-instruct
 |---|---|---|---|
 | [`clean-architecture/SKILL.md`](clean-architecture/SKILL.md) | 層境界 / DI / 抽象配置 / 新規サービス追加 | [ADR-0002](../adr/0002-clean-architecture-layered-projects.md) | "アーキテクチャー (要点)", "必ず守るルール", "ファイル配置のルール" |
 | [`unit-test/SKILL.md`](unit-test/SKILL.md) | Application / Domain 単体テスト追加 / TestHelpers パターン | [ADR-0003](../adr/0003-test-strategy-and-testhelpers-pattern.md) | "ビルド・テスト・実行" |
+| [`release/SKILL.md`](release/SKILL.md) | リリース手順 / バージョン更新 / `.msixupload` / sideload `.msixbundle` / GitHub Releases 公開 | — (運用 skill, ADR なし) | "ビルド・テスト・実行" (README "Microsoft Store submission") |
 
 ## 書き方の規約
 
@@ -24,6 +25,7 @@ skill は **[ADR](../adr/)** と **[copilot-instructions.md](../copilot-instruct
 - 本文は **日本語**
 - ADR と矛盾する内容を書かない。矛盾する場合は ADR を新規作成して skill を更新する
 - ADR にまだ載っていない実装パターンを skill に書いてはいけない (ADR 先行)
+  - 例外: 純粋な運用手順 (リリース / ビルド / 検証ワークフロー) を扱う skill。アーキ判断ではなく手順そのものが主題なので ADR は不要 (該当: `release/`)
 
 ## 関連
 
