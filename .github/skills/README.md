@@ -17,6 +17,7 @@ skill は **[ADR](../adr/)** と **[copilot-instructions.md](../copilot-instruct
 | [`clean-architecture/SKILL.md`](clean-architecture/SKILL.md) | 層境界 / DI / 抽象配置 / 新規サービス追加 | [ADR-0002](../adr/0002-clean-architecture-layered-projects.md) | "アーキテクチャー (要点)", "必ず守るルール", "ファイル配置のルール" |
 | [`unit-test/SKILL.md`](unit-test/SKILL.md) | Application / Domain 単体テスト追加 / TestHelpers パターン | [ADR-0003](../adr/0003-test-strategy-and-testhelpers-pattern.md) | "ビルド・テスト・実行" |
 | [`release/SKILL.md`](release/SKILL.md) | リリース手順 / バージョン更新 / `.msixupload` / sideload `.msixbundle` / GitHub Releases 公開 | — (運用 skill, ADR なし) | "ビルド・テスト・実行" (README "Microsoft Store submission") |
+| [`gh/SKILL.md`](gh/SKILL.md) | `gh` CLI の認証・権限ハンドリング (PR / Release / Issue 作成時のアカウント切替) | — (運用 skill, ADR なし) | "よくある落とし穴" |
 
 ## 書き方の規約
 

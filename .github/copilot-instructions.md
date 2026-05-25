@@ -131,6 +131,7 @@ winapp run .\bin\<Platform>\Debug\<TargetFramework>\win-<arch> --debug-output
 - **`MainPage` のパラメーターレスコンストラクタ**: XAML 都合で必須。VM 解決は `OnNavigatedTo` で `MainPageStartArgs.ScopeProvider.GetRequiredService<MainPageViewModel>()`
 - **ウィンドウ閉じる時の `IFolderWatcher` リーク**: `MainWindow.Closed` で `IServiceScope.Dispose()` が呼ばれ、`MainPageViewModel.Dispose()` が watcher を確実に dispose する。Scoped 登録を破ると消えるので注意
 - **テストが Infrastructure を参照できない**: テストは `net10.0` ターゲット (プラットフォーム中立) のため、Infrastructure (`net10.0-windows*`) を参照しない。`IFileSystem` を必要とするテストでは `TestHelpers/RealFileSystem` を使う
+- **`gh pr create` / `gh release create` が 403 / 404 で失敗する**: Copilot CLI のデフォルトトークン (`GH_TOKEN`) は `runceel/SkimDownForWindows` に対して READ-only。書き込み API は `Remove-Item Env:\GH_TOKEN` → `gh auth switch -u runceel` で keyring の所有者アカウントに切り替えてから実行。`"workflow" scope may be required` という出力は misleading なので scope 追加では解決しない。詳細は [`.github/skills/gh/SKILL.md`](skills/gh/SKILL.md)
 
 ## やってはいけないこと (Anti-patterns)
 
