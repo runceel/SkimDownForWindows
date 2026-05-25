@@ -25,6 +25,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<IShellService, ExplorerShellService>();
         services.AddSingleton<ISystemThemeProvider, UiSettingsThemeProvider>();
         services.AddSingleton<IExternalUriLauncher, LauncherExternalUriService>();
+        services.AddSingleton<IAppInfoService, PackageAppInfoService>();
         services.AddSingleton<IAppLogger, FileAppLogger>();
 
         // FolderWatcher は IUiDispatcher に依存し、ウィンドウ単位でライフサイクルを管理するため Scoped。

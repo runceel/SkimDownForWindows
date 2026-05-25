@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentDialog
+    x:Class="SkimDownForWindows.AboutDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="About SkimDown"
+    CloseButtonText="Close"
+    DefaultButton="Close">
+
+    <StackPanel Spacing="12" MaxWidth="420">
+
+        <!-- App icon + name + version -->
+        <StackPanel Orientation="Horizontal" Spacing="16" HorizontalAlignment="Center">
+            <Image Source="ms-appx:///Assets/AppIcon.png"
+                   Width="64" Height="64"
+                   VerticalAlignment="Center" />
+            <StackPanel VerticalAlignment="Center" Spacing="2">
+                <TextBlock x:Name="DisplayNameText"
+                           Style="{ThemeResource TitleTextBlockStyle}" />
+                <TextBlock x:Name="VersionText"
+                           Opacity="0.75"
+                           Style="{ThemeResource BodyTextBlockStyle}" />
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Description -->
+        <TextBlock x:Name="DescriptionText"
+                   HorizontalAlignment="Center"
+                   TextAlignment="Center"
+                   TextWrapping="Wrap"
+                   Opacity="0.85" />
+
+        <!-- Links -->
+        <StackPanel HorizontalAlignment="Center" Spacing="0">
+            <HyperlinkButton x:Name="WindowsRepoLink"
+                             Content="Windows port repository on GitHub"
+                             Click="OnLinkClick"
+                             Tag="https://github.com/runceel/SkimDownForWindows" />
+            <HyperlinkButton x:Name="DocsLink"
+                             Content="Documentation (skimdown.07jp27.net)"
+                             Click="OnLinkClick"
+                             Tag="https://skimdown.07jp27.net" />
+            <HyperlinkButton x:Name="UpstreamRepoLink"
+                             Content="Original macOS project on GitHub"
+                             Click="OnLinkClick"
+                             Tag="https://github.com/07JP27/SkimDown" />
+        </StackPanel>
+
+        <!-- Copyright + license -->
+        <StackPanel HorizontalAlignment="Center" Spacing="4">
+            <TextBlock x:Name="CopyrightText"
+                       HorizontalAlignment="Center"
+                       Opacity="0.75"
+                       Style="{ThemeResource CaptionTextBlockStyle}" />
+            <TextBlock HorizontalAlignment="Center"
+                       Opacity="0.6"
+                       Style="{ThemeResource CaptionTextBlockStyle}">
+                <Run Text="Released under the" />
+                <Hyperlink x:Name="LicenseLink"
+                           Click="OnLicenseLinkClick">
+                    <Run Text="GNU General Public License v3.0" />
+                </Hyperlink>
+                <Run Text="." />
+            </TextBlock>
+        </StackPanel>
+
+    </StackPanel>
+</ContentDialog>

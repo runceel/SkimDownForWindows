@@ -134,6 +134,10 @@
                 <MenuFlyoutSeparator x:Name="WindowMenuListSeparator" />
                 <!-- Dynamic list of open windows is appended below the separator at runtime. -->
             </MenuBarItem>
+
+            <MenuBarItem Title="Help">
+                <MenuFlyoutItem Text="About SkimDown" Click="OnAboutClick" />
+            </MenuBarItem>
         </MenuBar>
 
         <!-- Search bar: toggled by Ctrl+F -->
