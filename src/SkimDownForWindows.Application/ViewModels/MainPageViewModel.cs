@@ -170,6 +170,10 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
 
         var files = _scanner.Scan(canonical);
         var root = _treeBuilder.Build(canonical, files);
+        // 別フォルダーへ切り替える場合、古い folder の MarkdownTreeItem 参照が
+        // 新しい RootItems と無関係な孤立インスタンスになる。先に SelectedItem を
+        // null にしておくことで、TreeView 側の選択同期が古い参照を相手取らずに済む。
+        SelectedItem = null;
         ReplaceRoot(root);
         MarkdownCount = root.MarkdownCount;
         HasAnyMarkdown = MarkdownCount > 0;
@@ -249,8 +253,11 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
 
         var rel = PathHelpers.RelativeFromRoot(OpenedFolderPath, absoluteFilePath);
         var item = FindFileItemByRelativePath(rel);
-        SelectedItem = item;
+        // 親フォルダーを先に展開してから SelectedItem を通知する。
+        // こうすることで PropertyChanged を受けて TreeView 側に選択を反映する
+        // code-behind 側で対象 TreeViewItem の Container が存在する状態になる。
         ExpandAncestors(item);
+        SelectedItem = item;
 
         var text = await _markdownReader.ReadAsync(absoluteFilePath);
 
@@ -346,8 +353,9 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
             var match = FindFileItemByRelativePath(currentSelectionRel);
             if (match is not null)
             {
-                SelectedItem = match;
+                // SelectAndLoadAsync と同じ順序: 親を先に展開してから選択を通知する。
                 ExpandAncestors(match);
+                SelectedItem = match;
             }
             else
             {
