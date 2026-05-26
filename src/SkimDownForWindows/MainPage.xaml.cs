@@ -8,6 +8,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
 using Microsoft.UI.Input;
 using SkimDownForWindows.Application.Abstractions;
@@ -222,8 +223,11 @@ public sealed partial class MainPage : Page
         {
             case nameof(MainPageViewModel.HasFolder):
             case nameof(MainPageViewModel.HasAnyMarkdown):
+                UpdateContentVisibility();
+                break;
             case nameof(MainPageViewModel.SelectedItem):
                 UpdateContentVisibility();
+                _ = SyncTreeSelectionAsync();
                 break;
             case nameof(MainPageViewModel.MarkdownCount):
                 UpdateMarkdownCount();
@@ -231,6 +235,105 @@ public sealed partial class MainPage : Page
             case nameof(MainPageViewModel.WindowTitle):
                 UpdateWindowTitle();
                 break;
+        }
+    }
+
+    /// <summary>
+    /// <see cref="MainPageViewModel.SelectedItem"/> の変更を <see cref="Tree"/> 上の
+    /// 選択ハイライトに反映する。WinUI 3 の <see cref="TreeView.SelectedItem"/> や
+    /// <see cref="TreeView.SelectedNode"/> への代入では、現状の data-binding TreeView
+    /// (DataTemplate root に inner <see cref="TreeViewItem"/> を直書きするパターン) で
+    /// 視覚的なハイライトが付かない・<see cref="TreeView.RootNodes"/> 階層に深い
+    /// node が populate されないため、visual tree を再帰的に走査して
+    /// <see cref="FrameworkElement.DataContext"/> が一致する inner
+    /// <see cref="TreeViewItem"/> を見つけ、<see cref="TreeViewItem.IsSelected"/> を
+    /// 直接 true にする。<c>SelectionMode="Single"</c> のため、他の選択は TreeView 側で
+    /// 自動的に解除される。
+    ///
+    /// folder ノードのシングルクリックも "選択" 扱いになるため、TwoWay バインドは
+    /// 採用せず、VM → TreeView の OneWay 同期だけを行う。
+    ///
+    /// RootItems の入れ替え直後や Layout pass 前は対応する <see cref="TreeViewItem"/>
+    /// がまだ realize されていない。<see cref="Task.Delay(int)"/> で時間を空けながら
+    /// 最大 <paramref name="maxAttempts"/> 回まで再試行する。<see cref="MainPageViewModel.SelectedItem"/>
+    /// が別の値に更新されていれば古い処理は捨てる (別フォルダーへの切り替えや高速な
+    /// 復元連打への防御)。
+    /// </summary>
+    private async Task SyncTreeSelectionAsync(int maxAttempts = 20, int delayMilliseconds = 50)
+    {
+        var item = ViewModel.SelectedItem;
+
+        try
+        {
+            for (var attempt = 0; attempt < maxAttempts; attempt++)
+            {
+                if (!ReferenceEquals(ViewModel.SelectedItem, item)) return;
+
+                if (item is null)
+                {
+                    ClearTreeSelection(Tree);
+                    return;
+                }
+
+                var container = FindTreeViewItemByDataContext(Tree, item);
+                if (container is not null)
+                {
+                    container.IsSelected = true;
+                    container.StartBringIntoView();
+                    return;
+                }
+
+                await Task.Delay(delayMilliseconds);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError("SyncTreeSelectionAsync failed", ex);
+        }
+    }
+
+    /// <summary>
+    /// <paramref name="root"/> 配下の visual tree を再帰的に走査し、
+    /// <see cref="FrameworkElement.DataContext"/> が <paramref name="target"/> と
+    /// 同一参照の <see cref="TreeViewItem"/> を返す。
+    /// </summary>
+    private static TreeViewItem? FindTreeViewItemByDataContext(DependencyObject root, MarkdownTreeItem target)
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is TreeViewItem tvi
+                && tvi.DataContext is MarkdownTreeItem dc
+                && ReferenceEquals(dc, target))
+            {
+                return tvi;
+            }
+            var found = FindTreeViewItemByDataContext(child, target);
+            if (found is not null)
+            {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// visual tree 内のすべての <see cref="TreeViewItem"/> の選択状態を解除する。
+    /// 「現在開いているフォルダーをクリア」のような <see cref="MainPageViewModel.SelectedItem"/>
+    /// が null になるケースで使う。
+    /// </summary>
+    private static void ClearTreeSelection(DependencyObject root)
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is TreeViewItem tvi && tvi.IsSelected)
+            {
+                tvi.IsSelected = false;
+            }
+            ClearTreeSelection(child);
         }
     }
 
