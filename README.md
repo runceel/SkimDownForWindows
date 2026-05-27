@@ -18,9 +18,10 @@ Open a folder, and SkimDown shows only the Markdown files in a sidebar tree and 
 - Read-only WebView2 preview with bundled rendering assets (no CDN required, works fully offline)
 - Markdown rendering bundled: markdown-it + highlight.js + DOMPurify + KaTeX + Mermaid + emoji; GitHub-style alerts and inline color swatches included
 - In-document search for the current file (**Ctrl+F**), plus **Edit → Use Selection for Find** (Ctrl+E)
+- Zoom the preview with **Ctrl+`+`** / **Ctrl+`-`** / **Ctrl+`0`** (View → Zoom), or smoothly with **Ctrl+mouse wheel** and **precision-touchpad pinch** — the zoom level is persisted (clamped to 50–300 %)
 - Live reload — Markdown add / delete / rename / update events refresh the tree and preview
 - **VS Code-compatible custom color schemes** — drop a `*.json` theme into the Themes folder and pick it from **View → Theme** (see [Custom color schemes](#custom-color-schemes))
-- Persists sidebar position, visibility, width, theme, font size, recent folders, last selected file, and tree expansion state
+- Persists sidebar position, visibility, width, theme, zoom level, recent folders, last selected file, and tree expansion state
 - Local-only — no telemetry, no Markdown text leaves your machine
 
 ## Architecture
