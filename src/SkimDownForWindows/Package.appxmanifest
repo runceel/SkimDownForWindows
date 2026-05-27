@@ -9,7 +9,7 @@
   <Identity
     Name="45014okazuki.SkimDown"
     Publisher="CN=57A8C5FA-395A-4109-91A0-CF1B93556B5D"
-    Version="1.0.4.0" />
+    Version="1.1.0.0" />
   <mp:PhoneIdentity PhoneProductId="9BB7808E-1D64-4BD5-B28D-768C39DF32A1" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
   <Properties>
     <DisplayName>SkimDown</DisplayName>
