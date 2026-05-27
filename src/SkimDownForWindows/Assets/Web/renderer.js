@@ -41,6 +41,21 @@
     var appliedCustomVars = [];       // CSS variable names currently set on documentElement
     var mermaidReady = false;
 
+    // ----- Zoom state -----
+    // Local mirror of the host's AppSettings.ZoomFactor. Kept in sync via:
+    //   - host -> renderer:  { type: "zoom", factor }  (menu / keyboard / restore on startup)
+    //   - renderer -> host:  { type: "zoomChanged", factor }  (Ctrl+wheel / trackpad pinch)
+    // Range matches the host clamp: [0.5, 3.0].
+    var currentZoom = 1.0;
+    var ZOOM_MIN = 0.5;
+    var ZOOM_MAX = 3.0;
+    // Debounce timer for posting "zoomChanged" back to the host. We apply the
+    // zoom locally on every wheel tick for smooth UX, but only notify the host
+    // (which triggers a settings disk write) once the user has paused.
+    var zoomPostDebounceMs = 300;
+    var zoomPostTimer = 0;
+    var zoomPendingFactor = null;
+
     // ----- Search state -----
     var search = {
         query: "",
@@ -723,9 +738,98 @@
     }
 
     function setZoom(factor) {
+        applyZoomLocal(factor);
+    }
+
+    // Host-initiated zoom (menu / keyboard / startup restore from AppSettings).
+    // Must cancel any pending debounced post so a stale gesture value doesn't
+    // overwrite the authoritative host value right after we accept it.
+    function setZoomFromHost(factor) {
+        cancelZoomPost();
+        applyZoomLocal(factor);
+    }
+
+    function applyZoomLocal(factor) {
         var f = parseFloat(factor);
         if (!isFinite(f) || f <= 0) return;
+        f = clampZoom(f);
+        currentZoom = f;
         document.body.style.zoom = String(f);
+    }
+
+    function clampZoom(f) {
+        if (!isFinite(f)) return currentZoom;
+        if (f < ZOOM_MIN) return ZOOM_MIN;
+        if (f > ZOOM_MAX) return ZOOM_MAX;
+        return f;
+    }
+
+    // Normalize wheel deltaY so the gesture coefficient is independent of the
+    // event's deltaMode. Chromium/WebView2 almost always uses pixel mode on
+    // Windows, but some drivers / accessibility tools emit line- or page-mode
+    // wheel events; we approximate to pixels so the zoom feel stays consistent.
+    function normalizeWheelDeltaY(ev) {
+        var dy = ev.deltaY;
+        if (ev.deltaMode === 1 /* DOM_DELTA_LINE */) {
+            dy *= 16;
+        } else if (ev.deltaMode === 2 /* DOM_DELTA_PAGE */) {
+            dy *= (window.innerHeight || 800);
+        }
+        return dy;
+    }
+
+    // Multiplicative zoom step. Using exp keeps the gesture symmetric
+    // (pinch-out then pinch-in by the same amount returns to the original
+    // factor) and naturally smooth for both mouse wheel and trackpad pinch:
+    //   * mouse wheel notch (deltaY ~ 100) -> ~9.5% change per notch
+    //   * trackpad pinch (deltaY ~ 1..10)  -> ~0.1%..1% per tick (smooth)
+    function applyZoomDelta(deltaY) {
+        if (!isFinite(deltaY) || deltaY === 0) return;
+        var next = clampZoom(currentZoom * Math.exp(-deltaY * 0.001));
+        if (next === currentZoom) return;
+        applyZoomLocal(next);
+        scheduleZoomPost(next);
+    }
+
+    function scheduleZoomPost(factor) {
+        zoomPendingFactor = factor;
+        if (zoomPostTimer) {
+            clearTimeout(zoomPostTimer);
+        }
+        zoomPostTimer = setTimeout(flushZoomPost, zoomPostDebounceMs);
+    }
+
+    function cancelZoomPost() {
+        if (zoomPostTimer) {
+            clearTimeout(zoomPostTimer);
+            zoomPostTimer = 0;
+        }
+        zoomPendingFactor = null;
+    }
+
+    function flushZoomPost() {
+        if (zoomPostTimer) {
+            clearTimeout(zoomPostTimer);
+            zoomPostTimer = 0;
+        }
+        if (zoomPendingFactor === null) return;
+        var f = zoomPendingFactor;
+        zoomPendingFactor = null;
+        postToHost({ type: "zoomChanged", factor: f });
+    }
+
+    // Ctrl+Wheel and trackpad pinch (Chromium synthesizes wheel events with
+    // ctrlKey=true for precision-touchpad pinch gestures on Windows). We
+    // handle both with a single capture-phase, non-passive listener so we can
+    // call preventDefault() before any inner element scrolls.
+    function handleWheelZoom(ev) {
+        if (!ev.ctrlKey) return;
+        // Skip if the user is interacting with form fields; nothing in the
+        // rendered Markdown should be editable, but be defensive.
+        if (isEditableTarget(ev.target)) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        applyZoomDelta(normalizeWheelDeltaY(ev));
     }
 
     function rewriteRelativeUrls(html) {
@@ -1210,6 +1314,20 @@
         // swallow it (e.g. KaTeX-rendered widgets).
         window.addEventListener("keydown", handleAcceleratorKey, true);
 
+        // Ctrl+Wheel zoom + trackpad pinch (Chromium delivers precision-
+        // touchpad pinches as ctrlKey wheel events). passive:false is
+        // required for preventDefault(); capture:true ensures inner
+        // scrollables don't eat the event first.
+        window.addEventListener("wheel", handleWheelZoom, { passive: false, capture: true });
+
+        // Make sure a zoom change that's still in the debounce window when
+        // the window/tab goes away gets persisted instead of being silently
+        // dropped. Both events fire on WebView2 navigation/close paths.
+        window.addEventListener("pagehide", flushZoomPost);
+        document.addEventListener("visibilitychange", function () {
+            if (document.visibilityState === "hidden") flushZoomPost();
+        });
+
         installPurifyHooks();
         initMermaid(currentThemeType);
 
@@ -1232,7 +1350,7 @@
                         setTheme(msg.theme, msg.themeType, msg.themeIsDark, msg.themeVars);
                         break;
                     case "zoom":
-                        setZoom(msg.factor);
+                        setZoomFromHost(msg.factor);
                         break;
                     case "search":
                         applySearch(msg.query, !!msg.caseSensitive, true);

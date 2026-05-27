@@ -38,6 +38,13 @@ public sealed partial class MarkdownPreview : UserControl
     /// list of ids.
     /// </summary>
     public event Action<string>? ShortcutInvoked;
+    /// <summary>
+    /// Raised when the user changes zoom via in-renderer gestures
+    /// (Ctrl+MouseWheel or trackpad pinch). The renderer applies the new
+    /// factor locally and debounces the notification so the host can persist
+    /// the final value once the gesture settles.
+    /// </summary>
+    public event Action<double>? ZoomChanged;
 
     private bool _initialized;
     private bool _webReady;
@@ -48,6 +55,7 @@ public sealed partial class MarkdownPreview : UserControl
     private bool? _pendingThemeIsDark;
     private IReadOnlyDictionary<string, string>? _pendingThemeVars;
     private bool _hasPendingThemeOnlyUpdate;
+    private double? _pendingZoom;
     private string? _currentFolderRoot;
 
     public MarkdownPreview()
@@ -96,6 +104,14 @@ public sealed partial class MarkdownPreview : UserControl
         core.Settings.IsStatusBarEnabled = false;
         core.Settings.AreDevToolsEnabled = false;
         core.Settings.IsZoomControlEnabled = false;
+
+        // Disable WebView2's built-in pinch-to-zoom on touch screens. We
+        // handle zoom ourselves in renderer.js (Ctrl+Wheel + trackpad pinch
+        // arrive as ctrlKey wheel events) so the host owns ZoomFactor as the
+        // single source of truth. Older WebView2 runtimes may not have this
+        // property — best-effort.
+        try { core.Settings.IsPinchZoomEnabled = false; }
+        catch { /* older WebView2 runtime lacks this knob; ignore */ }
 
         // Stop the browser from acting on its own accelerators (Ctrl+F find
         // bar, Ctrl+P print, Ctrl+plus/minus zoom, Ctrl+R reload, F12 dev
@@ -281,8 +297,19 @@ public sealed partial class MarkdownPreview : UserControl
 
     public void SetZoom(double factor)
     {
-        if (!_webReady) return;
-        Post(new { type = "zoom", factor });
+        if (!double.IsFinite(factor) || factor <= 0) return;
+        // Always remember the latest requested factor so we can resync the
+        // renderer even if the caller raced ahead of `_webReady` (the typical
+        // startup case: MainPage.OnLoaded restores the persisted ZoomFactor
+        // before the renderer posts "ready"). Without this the renderer would
+        // stay at its default 1.0 while AppSettings.ZoomFactor is e.g. 2.0,
+        // and a subsequent Ctrl+wheel gesture would zoom from 1.0 and
+        // overwrite the persisted setting with a wrong baseline.
+        _pendingZoom = factor;
+        if (_webReady)
+        {
+            Post(new { type = "zoom", factor });
+        }
     }
 
     public void Search(string query, bool caseSensitive)
@@ -345,6 +372,14 @@ public sealed partial class MarkdownPreview : UserControl
         if (!_webReady)
         {
             return;
+        }
+
+        // Zoom comes first so the initial render paints with the correct
+        // scale (avoids a brief 1.0 -> persisted-factor reflow flicker).
+        if (_pendingZoom is double pendingZoom)
+        {
+            Post(new { type = "zoom", factor = pendingZoom });
+            _pendingZoom = null;
         }
 
         if (_pendingMarkdown is null)
@@ -458,6 +493,15 @@ public sealed partial class MarkdownPreview : UserControl
                     if (!string.IsNullOrEmpty(id))
                     {
                         ShortcutInvoked?.Invoke(id);
+                    }
+                    break;
+                case "zoomChanged":
+                    if (doc.RootElement.TryGetProperty("factor", out var zfEl) &&
+                        zfEl.ValueKind == JsonValueKind.Number &&
+                        zfEl.TryGetDouble(out var zf) &&
+                        double.IsFinite(zf) && zf > 0)
+                    {
+                        ZoomChanged?.Invoke(zf);
                     }
                     break;
             }
