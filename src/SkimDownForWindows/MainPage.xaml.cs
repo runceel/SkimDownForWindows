@@ -53,6 +53,7 @@ public sealed partial class MainPage : Page
             Preview.ExternalLinkClicked += OnPreviewExternalLink;
             Preview.SearchResult += OnPreviewSearchResult;
             Preview.ShortcutInvoked += OnPreviewShortcut;
+            Preview.ZoomChanged += OnPreviewZoomChanged;
 
             Loaded += OnLoaded;
             Unloaded += OnUnloaded;
@@ -200,6 +201,7 @@ public sealed partial class MainPage : Page
         Preview.ExternalLinkClicked -= OnPreviewExternalLink;
         Preview.SearchResult -= OnPreviewSearchResult;
         Preview.ShortcutInvoked -= OnPreviewShortcut;
+        Preview.ZoomChanged -= OnPreviewZoomChanged;
 
         if (_windowsChangedSubscribed && _windowService is not null)
         {
@@ -856,6 +858,21 @@ public sealed partial class MainPage : Page
     {
         ViewModel.Settings.Current.ZoomFactor = factor;
         Preview.SetZoom(factor);
+        await ViewModel.Settings.SaveAsync();
+    }
+
+    // Ctrl+Wheel または トラックパッドピンチによって renderer が局所適用したズーム値を
+    // 永続化する。renderer 側で既に body.style.zoom に反映済みなので、ここでは
+    // AppSettings の同期と SaveAsync だけ行い、Preview.SetZoom は再送しない
+    // (再送するとフィードバックループ気味になる)。clamp 範囲は SetZoomAsync と同一。
+    private async void OnPreviewZoomChanged(double factor)
+    {
+        if (!double.IsFinite(factor)) return;
+        var clamped = Math.Clamp(factor, 0.5, 3.0);
+        if (ViewModel?.Settings is null) return;
+        // 微小な誤差で毎回 disk write しないよう近似一致時はスキップ。
+        if (Math.Abs(ViewModel.Settings.Current.ZoomFactor - clamped) < 0.0005) return;
+        ViewModel.Settings.Current.ZoomFactor = clamped;
         await ViewModel.Settings.SaveAsync();
     }
 
