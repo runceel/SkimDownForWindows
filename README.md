@@ -66,6 +66,8 @@ Each `MainWindow` owns its own `IServiceScope`, so window-scoped services (`IFol
 
 The Windows-port behavior spec — keyboard shortcuts, menus, single-file mode, single-instance redirect, the WebView2 two-origin model, persistence keys, and Windows-specific deltas from the macOS app — is in [`design/SPEC.md`](design/SPEC.md).
 
+A current-state technical snapshot of the codebase (project layout, DI registrations, message protocols, persistence model, theme resolution, activation flow) lives under [`docs/`](docs/). Use it when you need to know "how is the code wired right now" rather than "what should it do" (SPEC) or "why was it built this way" (ADR).
+
 Design decisions (the "why") are recorded as ADRs under [`.github/adr/`](.github/adr/). The repository-specific coding guide for humans and Copilot lives at [`.github/copilot-instructions.md`](.github/copilot-instructions.md).
 
 Detailed design documents for the upstream macOS SkimDown are in [`07JP27/SkimDown/design/`](https://github.com/07JP27/SkimDown/tree/main/design).
