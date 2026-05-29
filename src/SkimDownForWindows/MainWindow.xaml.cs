@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using SkimDownForWindows.Application.Abstractions;
+using SkimDownForWindows.Application.Models;
+using SkimDownForWindows.Application.ViewModels;
 using SkimDownForWindows.Domain;
 using Windows.UI;
 
@@ -18,10 +20,11 @@ namespace SkimDownForWindows;
 public sealed partial class MainWindow : Window
 {
     private readonly IServiceScope _scope;
+    private MainPageViewModel? _viewModel;
 
-    public MainWindow() : this(null, restoreLastFolder: true) { }
+    public MainWindow() : this(initialActivation: null, restoreLastFolder: true) { }
 
-    public MainWindow(string? initialFolderPath, bool restoreLastFolder)
+    public MainWindow(InitialActivation? initialActivation, bool restoreLastFolder)
     {
         InitializeComponent();
 
@@ -37,8 +40,42 @@ public sealed partial class MainWindow : Window
         Closed += OnClosed;
 
         // ウィンドウ固有のランタイム引数とスコープを Page に渡す
-        var startArgs = new MainPageStartArgs(this, _scope.ServiceProvider, initialFolderPath, restoreLastFolder);
+        var startArgs = new MainPageStartArgs(this, _scope.ServiceProvider, initialActivation, restoreLastFolder);
         RootFrame.Navigate(typeof(MainPage), startArgs);
+    }
+
+    /// <summary>
+    /// このウィンドウのスコープに紐付く <see cref="MainPageViewModel"/> を取得する。
+    /// VM は <see cref="MainPage.OnNavigatedTo"/> で初めて resolve されるが、それ以降は
+    /// このスコープから同一インスタンスを返す (Scoped 登録)。
+    ///
+    /// 単一インスタンス redirect で別ウィンドウから本ウィンドウの VM に
+    /// <see cref="MainPageViewModel.OpenSingleFileAsync"/> を呼び込む時に使う。
+    /// </summary>
+    public MainPageViewModel GetViewModel()
+    {
+        return _viewModel ??= _scope.ServiceProvider.GetRequiredService<MainPageViewModel>();
+    }
+
+    /// <summary>
+    /// 既存ウィンドウ再利用の判定: 何も開いていない (empty) か single-file mode のとき <c>true</c>。
+    /// folder mode 中のウィンドウは再利用候補にしない (= 新規ウィンドウで開く)。
+    /// </summary>
+    public bool IsEmptyOrSingleFile
+    {
+        get
+        {
+            try
+            {
+                var vm = GetViewModel();
+                return !vm.HasFolder || vm.IsSingleFileMode;
+            }
+            catch
+            {
+                // VM がまだ取れない (= まだロード中) → 「empty」扱いで再利用候補にする
+                return true;
+            }
+        }
     }
 
     private void OnClosed(object sender, WindowEventArgs args)
@@ -130,10 +167,14 @@ public sealed partial class MainWindow : Window
 /// </summary>
 /// <param name="Window">ホストウィンドウ。</param>
 /// <param name="ScopeProvider">このウィンドウ専用の DI スコープ。Page は ここから VM を解決する。</param>
-/// <param name="InitialFolderPath">起動時に開くフォルダー (CLI / drop 等で指定された場合)。</param>
-/// <param name="RestoreLastFolder"><see cref="InitialFolderPath"/> が <c>null</c> の時に persisted LastFolderPath を復元するか。</param>
+/// <param name="InitialActivation">
+/// 起動時に開く対象。<see cref="OpenFolderActivation"/> なら folder mode、
+/// <see cref="OpenSingleFileActivation"/> なら single-file mode、<c>null</c> なら
+/// <paramref name="RestoreLastFolder"/> に従う。
+/// </param>
+/// <param name="RestoreLastFolder"><see cref="InitialActivation"/> が <c>null</c> の時に persisted LastFolderPath を復元するか。</param>
 public sealed record MainPageStartArgs(
     MainWindow Window,
     IServiceProvider ScopeProvider,
-    string? InitialFolderPath,
+    InitialActivation? InitialActivation,
     bool RestoreLastFolder);

@@ -631,4 +631,266 @@ public sealed class MainPageViewModelTests
         Assert.AreEqual("monokai", resolved.Id);
         Assert.AreEqual("#272822", resolved.CssVariables["--skim-bg"]);
     }
+
+    // ----- OpenSingleFileAsync (single-file mode) -------------------------
+
+    [TestMethod]
+    public async Task OpenSingleFileAsync_SetsModeAndTitle()
+    {
+        Touch("README.md", "# r");
+        var vm = CreateViewModel();
+        var filePath = Path.Combine(AbsoluteRoot(), "README.md");
+
+        await vm.OpenSingleFileAsync(filePath);
+
+        Assert.IsTrue(vm.IsSingleFileMode);
+        Assert.IsTrue(vm.HasFolder);
+        Assert.IsTrue(vm.HasAnyMarkdown);
+        Assert.AreEqual(1, vm.MarkdownCount);
+        Assert.AreEqual("README.md", vm.OpenedFolderName);
+        Assert.AreEqual("README.md \u2014 SkimDown", vm.WindowTitle);
+        Assert.AreEqual(AbsoluteRoot(), vm.OpenedFolderPath);
+    }
+
+    [TestMethod]
+    public async Task OpenSingleFileAsync_DoesNotUpdateRecentFolders()
+    {
+        Touch("README.md");
+        var vm = CreateViewModel();
+        var filePath = Path.Combine(AbsoluteRoot(), "README.md");
+
+        await vm.OpenSingleFileAsync(filePath);
+
+        Assert.IsEmpty(_settings.Current.RecentFolders);
+        Assert.IsEmpty(vm.RecentFolders);
+    }
+
+    [TestMethod]
+    public async Task OpenSingleFileAsync_DoesNotUpdateLastFolderPath()
+    {
+        Touch("README.md");
+        var vm = CreateViewModel();
+        var filePath = Path.Combine(AbsoluteRoot(), "README.md");
+
+        await vm.OpenSingleFileAsync(filePath);
+
+        Assert.IsNull(_settings.Current.LastFolderPath);
+    }
+
+    [TestMethod]
+    public async Task OpenSingleFileAsync_DoesNotCreateFolderState()
+    {
+        Touch("README.md");
+        var vm = CreateViewModel();
+        var filePath = Path.Combine(AbsoluteRoot(), "README.md");
+
+        await vm.OpenSingleFileAsync(filePath);
+
+        Assert.IsEmpty(_settings.Current.FolderStates);
+    }
+
+    [TestMethod]
+    public async Task OpenSingleFileAsync_DoesNotPersist_NoSaveAsyncCalls()
+    {
+        Touch("README.md");
+        var vm = CreateViewModel();
+        var filePath = Path.Combine(AbsoluteRoot(), "README.md");
+
+        await vm.OpenSingleFileAsync(filePath);
+
+        Assert.AreEqual(0, _settings.SaveAsyncCalls,
+            "Single-file mode は永続化を一切呼ばないことが上流仕様。");
+    }
+
+    [TestMethod]
+    public async Task OpenSingleFileAsync_LeavesRootItemsEmpty()
+    {
+        Touch("README.md");
+        Touch("other.md");
+        var vm = CreateViewModel();
+        var filePath = Path.Combine(AbsoluteRoot(), "README.md");
+
+        await vm.OpenSingleFileAsync(filePath);
+
+        Assert.IsEmpty(vm.RootItems);
+    }
+
+    [TestMethod]
+    public async Task OpenSingleFileAsync_SetsSelectedItem_AndFiresPreview()
+    {
+        Touch("README.md", "# r");
+        var vm = CreateViewModel();
+        var filePath = Path.Combine(AbsoluteRoot(), "README.md");
+        _reader.SetContent(filePath, "# single-file-body");
+
+        LoadRequest? captured = null;
+        vm.PreviewLoadRequested += r => captured = r;
+
+        await vm.OpenSingleFileAsync(filePath);
+
+        Assert.IsNotNull(vm.SelectedItem);
+        Assert.AreEqual("README.md", vm.SelectedItem!.Name);
+        Assert.AreEqual(filePath, vm.SelectedItem.FullPath, ignoreCase: true);
+        Assert.IsNotNull(captured);
+        Assert.AreEqual("# single-file-body", captured!.Markdown);
+        Assert.AreEqual("README.md", captured.RelativePath);
+    }
+
+    [TestMethod]
+    public async Task OpenSingleFileAsync_StartsWatcher_OnParentFolder()
+    {
+        Touch("nested/inner.md");
+        var vm = CreateViewModel();
+        var filePath = Path.Combine(AbsoluteRoot(), "nested", "inner.md");
+
+        await vm.OpenSingleFileAsync(filePath);
+
+        Assert.AreEqual(1, _watcher.WatchCalls);
+        Assert.AreEqual(
+            Path.GetFullPath(Path.Combine(AbsoluteRoot(), "nested")).TrimEnd(Path.DirectorySeparatorChar),
+            _watcher.LastWatchedPath,
+            ignoreCase: true);
+    }
+
+    [TestMethod]
+    public async Task OpenSingleFileAsync_IsNoOp_ForNonMarkdownFile()
+    {
+        Touch("notes.txt");
+        var vm = CreateViewModel();
+        var filePath = Path.Combine(AbsoluteRoot(), "notes.txt");
+
+        var fired = 0;
+        vm.PreviewLoadRequested += _ => fired++;
+
+        await vm.OpenSingleFileAsync(filePath);
+
+        Assert.IsFalse(vm.IsSingleFileMode);
+        Assert.IsFalse(vm.HasFolder);
+        Assert.AreEqual(0, fired);
+        Assert.AreEqual(0, _watcher.WatchCalls);
+    }
+
+    [TestMethod]
+    public async Task OpenSingleFileAsync_IsNoOp_ForMissingFile()
+    {
+        var vm = CreateViewModel();
+        var filePath = Path.Combine(AbsoluteRoot(), "ghost.md");
+
+        await vm.OpenSingleFileAsync(filePath);
+
+        Assert.IsFalse(vm.IsSingleFileMode);
+        Assert.IsFalse(vm.HasFolder);
+        Assert.AreEqual(0, _watcher.WatchCalls);
+    }
+
+    [TestMethod]
+    public async Task OpenFolderAsync_AfterSingleFile_ResetsIsSingleFileMode()
+    {
+        Touch("README.md", "# r");
+        Touch("docs/intro.md");
+        var vm = CreateViewModel();
+
+        await vm.OpenSingleFileAsync(Path.Combine(AbsoluteRoot(), "README.md"));
+        Assert.IsTrue(vm.IsSingleFileMode);
+
+        await vm.OpenFolderAsync(_root);
+
+        Assert.IsFalse(vm.IsSingleFileMode);
+        Assert.IsNotEmpty(vm.RootItems);
+        // 通常 folder mode の永続化が走る (FolderState 作成 + RecentFolders 追加)。
+        Assert.IsNotEmpty(_settings.Current.RecentFolders);
+        Assert.AreEqual(AbsoluteRoot(), _settings.Current.LastFolderPath);
+    }
+
+    [TestMethod]
+    public async Task OnTreeMayHaveChanged_InSingleFileMode_DoesNotPersist()
+    {
+        Touch("README.md", "# r");
+        var vm = CreateViewModel();
+        await vm.OpenSingleFileAsync(Path.Combine(AbsoluteRoot(), "README.md"));
+        var savesBefore = _settings.SaveAsyncCalls;
+
+        // sibling ファイルを増やしても single-file mode ではツリー再走査が走らないことを
+        // SaveAsync 回数が増えないことで確認する。
+        Touch("sibling.md");
+        _watcher.RaiseTreeMayHaveChanged();
+        await Task.Yield();
+
+        Assert.AreEqual(savesBefore, _settings.SaveAsyncCalls,
+            "Single-file mode 中の tree change は no-op で SaveAsync を呼ばない。");
+    }
+
+    [TestMethod]
+    public async Task OnFileContentChanged_InSingleFileMode_ReloadsMatchingFile()
+    {
+        Touch("README.md", "# r");
+        var vm = CreateViewModel();
+        var filePath = Path.Combine(AbsoluteRoot(), "README.md");
+        _reader.SetContent(filePath, "# initial");
+        await vm.OpenSingleFileAsync(filePath);
+
+        // 初回 load の分は受け取り済みなので、reload による発火だけを観察する。
+        var captured = new List<LoadRequest>();
+        vm.PreviewLoadRequested += r => captured.Add(r);
+        _reader.SetContent(filePath, "# updated");
+
+        _watcher.RaiseFileContentChanged(filePath);
+        await Task.Yield();
+        // ReloadSingleFileAsync は ReadAsync → PreviewLoadRequested の chain なので追加 yield。
+        await Task.Yield();
+
+        Assert.AreEqual(1, captured.Count);
+        Assert.AreEqual("# updated", captured[0].Markdown);
+    }
+
+    [TestMethod]
+    public async Task OnFileContentChanged_InSingleFileMode_IgnoresOtherFile()
+    {
+        Touch("README.md", "# r");
+        Touch("other.md", "# o");
+        var vm = CreateViewModel();
+        var filePath = Path.Combine(AbsoluteRoot(), "README.md");
+        await vm.OpenSingleFileAsync(filePath);
+
+        var fired = 0;
+        vm.PreviewLoadRequested += _ => fired++;
+
+        _watcher.RaiseFileContentChanged(Path.Combine(AbsoluteRoot(), "other.md"));
+        await Task.Yield();
+
+        Assert.AreEqual(0, fired);
+    }
+
+    [TestMethod]
+    public async Task OnFileContentChanged_InSingleFileMode_DoesNotPersist()
+    {
+        Touch("README.md", "# r");
+        var vm = CreateViewModel();
+        var filePath = Path.Combine(AbsoluteRoot(), "README.md");
+        await vm.OpenSingleFileAsync(filePath);
+        var savesBefore = _settings.SaveAsyncCalls;
+        _reader.SetContent(filePath, "# updated");
+
+        _watcher.RaiseFileContentChanged(filePath);
+        await Task.Yield();
+        await Task.Yield();
+
+        Assert.AreEqual(savesBefore, _settings.SaveAsyncCalls,
+            "Single-file mode の reload は永続化を起こさない。");
+    }
+
+    [TestMethod]
+    public async Task OpenSingleFileAsync_DoesNotTouchSidebarVisibleSetting()
+    {
+        Touch("README.md");
+        // 事前に persisted SidebarVisible = true を設定する。
+        _settings.Current.SidebarVisible = true;
+        var vm = CreateViewModel();
+
+        await vm.OpenSingleFileAsync(Path.Combine(AbsoluteRoot(), "README.md"));
+
+        // Single-file mode は visual override で hide するが、persisted 設定は触らない。
+        Assert.IsTrue(_settings.Current.SidebarVisible,
+            "永続 SidebarVisible は folder mode 用の真実として保持される。");
+    }
 }

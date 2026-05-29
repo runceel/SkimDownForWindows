@@ -49,6 +49,17 @@
             <uap5:ExecutionAlias Alias="skimdown.exe" />
           </uap5:AppExecutionAlias>
         </uap5:Extension>
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="markdown">
+            <uap:SupportedFileTypes>
+              <uap:FileType>.md</uap:FileType>
+              <uap:FileType>.markdown</uap:FileType>
+            </uap:SupportedFileTypes>
+            <uap:Logo>Assets\Square44x44Logo.png</uap:Logo>
+            <uap:DisplayName>Markdown Document</uap:DisplayName>
+            <uap:EditFlags OpenIsSafe="true" />
+          </uap:FileTypeAssociation>
+        </uap:Extension>
       </Extensions>
     </Application>
   </Applications>

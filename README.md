@@ -10,7 +10,8 @@ Open a folder, and SkimDown shows only the Markdown files in a sidebar tree and 
 
 ## Highlights
 
-- Open a folder with **File → Open Folder…**, **Ctrl+O**, **Window → New Window** (Ctrl+N), by dragging a folder onto the window, or by passing a folder path on the command line — once the app is installed, a `skimdown` execution alias is registered automatically, so `skimdown D:\notes` (or `skimdown .` in any folder) works from any terminal; a Markdown file path opens its containing folder
+- Open a folder with **File → Open Folder…**, **Ctrl+O**, **Window → New Window** (Ctrl+N), by dragging a folder onto the window, or by passing a folder path on the command line — once the app is installed, a `skimdown` execution alias is registered automatically, so `skimdown D:\notes` (or `skimdown .` in any folder) works from any terminal
+- **Open a single Markdown file** by double-clicking a `.md` / `.markdown` file in Explorer (after choosing "Open with → SkimDown"), by `skimdown README.md` on the command line, or by dragging a `.md` file onto the window — opens a focused **single-file mode** window with the sidebar hidden; one process is reused across activations
 - Multiple windows for multiple folders (dropping a folder onto a window that already has one opens a new window)
 - Sidebar position is swappable left / right (**View → Move Sidebar to Right / Left**)
 - Folder-first, case-insensitive Markdown tree (recursive `.md` / `.markdown` discovery)
@@ -19,10 +20,33 @@ Open a folder, and SkimDown shows only the Markdown files in a sidebar tree and 
 - Markdown rendering bundled: markdown-it + highlight.js + DOMPurify + KaTeX + Mermaid + emoji; GitHub-style alerts and inline color swatches included
 - In-document search for the current file (**Ctrl+F**), plus **Edit → Use Selection for Find** (Ctrl+E)
 - Zoom the preview with **Ctrl+`+`** / **Ctrl+`-`** / **Ctrl+`0`** (View → Zoom), or smoothly with **Ctrl+mouse wheel** and **precision-touchpad pinch** — the zoom level is persisted (clamped to 50–300 %)
-- Live reload — Markdown add / delete / rename / update events refresh the tree and preview
+- Live reload — Markdown add / delete / rename / update events refresh the tree and preview (also works in single-file mode for the open file)
 - **VS Code-compatible custom color schemes** — drop a `*.json` theme into the Themes folder and pick it from **View → Theme** (see [Custom color schemes](#custom-color-schemes))
-- Persists sidebar position, visibility, width, theme, zoom level, recent folders, last selected file, and tree expansion state
+- Persists sidebar position, visibility, width, theme, zoom level, recent folders, last selected file, and tree expansion state (single-file mode never updates RecentFolders / LastFolderPath, so explorer double-clicks don't pollute folder history)
 - Local-only — no telemetry, no Markdown text leaves your machine
+
+## Single-file mode
+
+When you open a Markdown file directly (instead of a folder), SkimDown enters **single-file mode**:
+
+- The sidebar (folder tree) is hidden; the preview takes the full window
+- Window title shows the file name: `README.md — SkimDown`
+- **Toggle Sidebar** (Ctrl+B) and **Move Sidebar** are disabled
+- The parent folder is still watched, so external edits to the open file refresh the preview live
+- RecentFolders, LastFolderPath, and per-folder expansion state are **not** updated
+- Relative Markdown links (`[next](./next.md)`) open in a **new** single-file window
+- The persisted sidebar visibility is preserved as-is — open another folder later (File → Open Folder…) and your sidebar comes back as configured
+
+How to enter single-file mode:
+
+- **Explorer** — right-click a `.md` / `.markdown` file → **Open with → SkimDown** (set as default after the first time)
+- **Command line** — `skimdown README.md`
+- **Drag-drop** — drag a `.md` file onto a SkimDown window. If the window already has a folder or another single file, the dropped file opens in a new window
+- **Multiple files** — select several `.md` files in Explorer and choose **Open with → SkimDown**, and each file gets its own window
+
+### Single-instance behavior
+
+SkimDown runs as a **single process** per user. The second time you double-click a Markdown file, the activation is redirected to the existing process (rather than spawning a duplicate). This keeps settings (`settings.json`) from being clobbered by competing writes and matches the upstream macOS behavior.
 
 ## Architecture
 

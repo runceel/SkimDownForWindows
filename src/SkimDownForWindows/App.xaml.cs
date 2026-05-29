@@ -1,10 +1,16 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
+using Microsoft.Windows.AppLifecycle;
 using SkimDownForWindows.Application.Abstractions;
 using SkimDownForWindows.Application.CommandLine;
+using SkimDownForWindows.Application.Models;
 using SkimDownForWindows.Composition;
+using Windows.ApplicationModel.Activation;
+using Windows.Storage;
 using WinUIApplication = Microsoft.UI.Xaml.Application;
 
 namespace SkimDownForWindows;
@@ -15,6 +21,10 @@ namespace SkimDownForWindows;
 /// 旧 <c>static App.DispatcherQueue</c> プロパティと旧 <c>static WindowManager</c> クラスを廃し、
 /// <see cref="Services"/> をルート <see cref="IServiceProvider"/> として公開する。
 /// 各 <see cref="MainWindow"/> はここから <see cref="IServiceScope"/> を作って自身のスコープとする。
+///
+/// 単一インスタンス redirect (<see cref="Program.Main"/> 経由) を介して 2 回目以降のアクティベーションを
+/// <see cref="OnRedirectedActivation"/> で受け取り、UI スレッドに dispatch して既存 WindowService 経由で
+/// 新規ウィンドウを開く。
 /// </summary>
 public partial class App : WinUIApplication
 {
@@ -23,6 +33,14 @@ public partial class App : WinUIApplication
     /// <see cref="OnLaunched(LaunchActivatedEventArgs)"/> で初期化される。
     /// </summary>
     public static IServiceProvider Services { get; private set; } = null!;
+
+    /// <summary>UI スレッドの DispatcherQueue (redirect ハンドラから UI に dispatch するため保持)。</summary>
+    private static DispatcherQueue? s_uiDispatcher;
+
+    /// <summary>Services / UI が ready になる前に届いた redirect activation を一時保管するキュー。</summary>
+    private static readonly object s_pendingGate = new();
+    private static readonly Queue<AppActivationArguments> s_pendingActivations = new();
+    private static bool s_isReady;
 
     public App()
     {
@@ -53,38 +71,261 @@ public partial class App : WinUIApplication
         e.Handled = true;
     }
 
-    protected override void OnLaunched(LaunchActivatedEventArgs args)
+    protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
         // 起動時の UI スレッドのディスパッチャを取得 (App.OnLaunched は UI スレッドで呼ばれる)
         var uiDispatcher = DispatcherQueue.GetForCurrentThread();
+        s_uiDispatcher = uiDispatcher;
 
         // ルートの IServiceProvider を構築する。windowFactory / onLastWindowClosed の中で
         // App.Services を参照するが、ここでは遅延評価のクロージャなので循環は問題にならない
         Services = ServiceProviderFactory.Build(
             uiDispatcher,
-            windowFactory: (initialFolderPath, restoreLastFolder) => new MainWindow(initialFolderPath, restoreLastFolder),
+            windowFactory: (initialActivation, restoreLastFolder) => new MainWindow(initialActivation, restoreLastFolder),
             onLastWindowClosed: ExitApp);
 
         // 設定をディスクからロード
         var settings = Services.GetRequiredService<ISettingsRepository>();
         settings.Load();
 
-        // "skimdown <folder>" / "skimdown <file.md>" CLI 起動を尊重する。
-        // CLI 用に一時スコープを作って CommandLineLauncher を解決する。
-        string? cliFolder;
+        // 起動時のアクティベーションを解決して 1 個目のウィンドウを開く。
+        // - CLI / Launch: Environment.GetCommandLineArgs() を CommandLineLauncher で classify
+        // - File activation (Explorer ダブルクリック): FileActivatedEventArgs.Files を Classify
+        var startupActivation = AppInstance.GetCurrent().GetActivatedEventArgs();
+        var startupTargets = ExtractActivationTargets(startupActivation);
+        OpenFirstWindowFromActivation(startupTargets);
+
+        // OnLaunched が走り終わったら ready とし、pending queue を drain する。
+        // (Program.Main で thisInstance.Activated を subscribe しているので、
+        //  Application.Start ～ ここまでの間に redirect 受信があれば queue に入っている)
+        List<AppActivationArguments> pending;
+        lock (s_pendingGate)
+        {
+            s_isReady = true;
+            pending = new List<AppActivationArguments>(s_pendingActivations);
+            s_pendingActivations.Clear();
+        }
+        foreach (var p in pending)
+        {
+            HandleRedirectedActivation(p);
+        }
+    }
+
+    /// <summary>
+    /// 二次インスタンスから redirect されたアクティベーションを受け取るハンドラ。
+    /// <see cref="Program.Main"/> で <c>AppInstance.GetCurrent().Activated</c> に登録される。
+    ///
+    /// このハンドラは redirect を投げてきたプロセスの thread から呼ばれる可能性があるため、
+    /// UI スレッドの DispatcherQueue に必ず dispatch して扱う。
+    /// </summary>
+    public static void OnRedirectedActivation(object? sender, AppActivationArguments e)
+    {
+        if (e is null) return;
+
+        // ready 前に届いた redirect は queue に貯めて OnLaunched 完了後に drain。
+        lock (s_pendingGate)
+        {
+            if (!s_isReady || s_uiDispatcher is null)
+            {
+                s_pendingActivations.Enqueue(e);
+                return;
+            }
+        }
+
+        var dq = s_uiDispatcher!;
+        dq.TryEnqueue(() => HandleRedirectedActivation(e));
+    }
+
+    private static void HandleRedirectedActivation(AppActivationArguments e)
+    {
+        try
+        {
+            var targets = ExtractActivationTargets(e);
+            DispatchActivationTargets(targets, allowReuseExisting: true);
+        }
+        catch (Exception ex)
+        {
+            try { Services?.GetService<IAppLogger>()?.LogError("Redirected activation failed", ex); }
+            catch { /* best-effort */ }
+        }
+    }
+
+    /// <summary>
+    /// 起動時用: targets から最初の 1 ウィンドウを決める。何もなければ通常起動 (last folder 復元)。
+    /// </summary>
+    private static void OpenFirstWindowFromActivation(IReadOnlyList<string> targets)
+    {
+        var windowService = Services.GetRequiredService<IWindowService>();
+
+        if (targets.Count == 0)
+        {
+            // 引数も File activation も無い → 通常起動 (last folder 復元)
+            var win = windowService.CreateWindow(initialFolderPath: null, restoreLastFolder: true);
+            win.Activate();
+            return;
+        }
+
+        // CommandLineLauncher 経由で各 target を classify。
+        // 最初の usable activation を初回ウィンドウに、残りを batch 処理。
+        InitialActivation? first = null;
+        var rest = new List<InitialActivation>();
         using (var startupScope = Services.CreateScope())
         {
             var cli = startupScope.ServiceProvider.GetRequiredService<CommandLineLauncher>();
-            cliFolder = cli.TryGetInitialFolderPath(
-                Environment.GetCommandLineArgs(),
-                Environment.CurrentDirectory);
+            var cwd = Environment.CurrentDirectory;
+            foreach (var target in targets)
+            {
+                var classified = cli.Classify(target, cwd);
+                if (classified is null) continue;
+                if (first is null) first = classified;
+                else rest.Add(classified);
+            }
         }
 
+        if (first is null)
+        {
+            // すべての target が classify 失敗 → 通常起動扱い
+            var win = windowService.CreateWindow(initialFolderPath: null, restoreLastFolder: true);
+            win.Activate();
+            return;
+        }
+
+        // 初回ウィンドウ: first を渡して new MainWindow(...) する (空ウィンドウを作って再利用はしない)。
+        // CreateWindow は IWindowService の API 上は string? を受け取るので OpenSingleFile / OpenFolderInNewWindow を直接呼ぶ
+        // (ただし「最初の 1 個目」は明示的に "再利用しない" 新規ウィンドウとして開く)。
+        IWindowHandle initialWindow;
+        if (first is OpenSingleFileActivation osfa)
+        {
+            initialWindow = windowService.OpenSingleFileInNewWindow(osfa.FilePath);
+        }
+        else if (first is OpenFolderActivation ofa)
+        {
+            initialWindow = windowService.CreateWindow(initialFolderPath: ofa.FolderPath, restoreLastFolder: false);
+        }
+        else
+        {
+            initialWindow = windowService.CreateWindow(initialFolderPath: null, restoreLastFolder: true);
+        }
+        initialWindow.Activate();
+
+        // 残りは新規ウィンドウで開く (Explorer の複数ファイル選択を想定)。
+        foreach (var r in rest)
+        {
+            if (r is OpenSingleFileActivation osfa2)
+            {
+                windowService.OpenSingleFileInNewWindow(osfa2.FilePath);
+            }
+            else if (r is OpenFolderActivation ofa2)
+            {
+                windowService.OpenFolderInNewWindow(ofa2.FolderPath);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Redirect 受信時用: targets を全部処理。
+    /// 1 個目だけ「空 / single-file ウィンドウ再利用」を許す。残りは常に新規ウィンドウ。
+    /// </summary>
+    private static void DispatchActivationTargets(IReadOnlyList<string> targets, bool allowReuseExisting)
+    {
+        if (targets.Count == 0) return;
+
         var windowService = Services.GetRequiredService<IWindowService>();
-        var first = cliFolder is null
-            ? windowService.CreateWindow(initialFolderPath: null, restoreLastFolder: true)
-            : windowService.CreateWindow(initialFolderPath: cliFolder, restoreLastFolder: false);
-        first.Activate();
+
+        var classifiedList = new List<InitialActivation>();
+        using (var scope = Services.CreateScope())
+        {
+            var cli = scope.ServiceProvider.GetRequiredService<CommandLineLauncher>();
+            var cwd = Environment.CurrentDirectory;
+            foreach (var target in targets)
+            {
+                var c = cli.Classify(target, cwd);
+                if (c is not null) classifiedList.Add(c);
+            }
+        }
+
+        if (classifiedList.Count == 0) return;
+
+        var first = true;
+        foreach (var act in classifiedList)
+        {
+            if (first && allowReuseExisting)
+            {
+                first = false;
+                if (act is OpenSingleFileActivation osfa)
+                {
+                    var h = windowService.OpenSingleFile(osfa.FilePath);
+                    h.Activate();
+                }
+                else if (act is OpenFolderActivation ofa)
+                {
+                    // フォルダーは folder mode ウィンドウを必ず新規で開く (上流仕様に合わせ)
+                    var h = windowService.OpenFolderInNewWindow(ofa.FolderPath);
+                    h.Activate();
+                }
+            }
+            else
+            {
+                if (act is OpenSingleFileActivation osfa)
+                {
+                    windowService.OpenSingleFileInNewWindow(osfa.FilePath);
+                }
+                else if (act is OpenFolderActivation ofa)
+                {
+                    windowService.OpenFolderInNewWindow(ofa.FolderPath);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// <see cref="AppActivationArguments"/> から「開く対象パス」のリストを抽出する。
+    /// - <c>Launch</c>: <see cref="Environment.GetCommandLineArgs"/> を使う (Args は raw command line)
+    /// - <c>File</c>: <see cref="FileActivatedEventArgs.Files"/> を絶対パスに変換
+    /// - その他の kind: 空リスト
+    /// </summary>
+    private static IReadOnlyList<string> ExtractActivationTargets(AppActivationArguments? args)
+    {
+        if (args is null) return Array.Empty<string>();
+
+        // ExtendedKind は ExtendedActivationKind 列挙
+        switch (args.Kind)
+        {
+            case ExtendedActivationKind.File:
+                if (args.Data is FileActivatedEventArgs fileArgs && fileArgs.Files is not null)
+                {
+                    var paths = new List<string>();
+                    foreach (var f in fileArgs.Files)
+                    {
+                        if (f is StorageFile sf && !string.IsNullOrEmpty(sf.Path))
+                        {
+                            paths.Add(sf.Path);
+                        }
+                        else if (f is StorageFolder sfd && !string.IsNullOrEmpty(sfd.Path))
+                        {
+                            paths.Add(sfd.Path);
+                        }
+                    }
+                    return paths;
+                }
+                return Array.Empty<string>();
+
+            case ExtendedActivationKind.Launch:
+            default:
+                // CLI で起動された場合: Environment.GetCommandLineArgs() の args[1..] を返す。
+                // args[0] (exe path) は CommandLineLauncher 側でスキップされる前提で全部含めて返す。
+                var cmd = Environment.GetCommandLineArgs();
+                if (cmd.Length <= 1) return Array.Empty<string>();
+                var list = new List<string>(cmd.Length - 1);
+                for (int i = 1; i < cmd.Length; i++)
+                {
+                    if (!string.IsNullOrWhiteSpace(cmd[i]) && !cmd[i].StartsWith('-'))
+                    {
+                        list.Add(cmd[i]);
+                    }
+                }
+                return list;
+        }
     }
 
     /// <summary>

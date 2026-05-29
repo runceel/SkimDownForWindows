@@ -22,7 +22,7 @@ internal static class ServiceProviderFactory
     /// <param name="onLastWindowClosed">最終ウィンドウが閉じた時のコールバック。アプリ終了処理を呼び出す。</param>
     public static IServiceProvider Build(
         DispatcherQueue uiDispatcher,
-        Func<string?, bool, MainWindow> windowFactory,
+        Func<SkimDownForWindows.Application.Models.InitialActivation?, bool, MainWindow> windowFactory,
         Action onLastWindowClosed)
     {
         var services = new ServiceCollection();

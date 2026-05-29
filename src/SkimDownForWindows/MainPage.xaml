@@ -78,13 +78,17 @@
             </MenuBarItem>
 
             <MenuBarItem Title="View">
-                <MenuFlyoutItem Text="Toggle Sidebar" Click="OnToggleSidebarClick">
+                <MenuFlyoutItem x:Name="ToggleSidebarMenuItem"
+                                Text="Toggle Sidebar"
+                                IsEnabled="{x:Bind IsNotSingleFileMode(ViewModel.IsSingleFileMode), Mode=OneWay}"
+                                Click="OnToggleSidebarClick">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="B" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutItem x:Name="MoveSidebarMenuItem"
                                 Text="Move Sidebar to Right"
+                                IsEnabled="{x:Bind IsNotSingleFileMode(ViewModel.IsSingleFileMode), Mode=OneWay}"
                                 Click="OnMoveSidebarClick" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutSubItem Text="Zoom">

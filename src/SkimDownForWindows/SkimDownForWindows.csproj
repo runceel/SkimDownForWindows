@@ -13,6 +13,13 @@
     <EnableMsixTooling>true</EnableMsixTooling>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!--
+      自前 Program.Main で AppInstance の single-instance redirect を行うため、
+      WinUI 3 が自動生成する Main を抑止する。
+      Program.cs 側で STAThread / WinRT.ComWrappersSupport.InitializeComWrappers /
+      Application.Start を明示的に実装する。
+    -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
