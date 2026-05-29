@@ -32,3 +32,4 @@ skill は **[ADR](../adr/)** と **[copilot-instructions.md](../copilot-instruct
 
 - [ADR README](../adr/README.md): ADR の運用ルール
 - [copilot-instructions.md](../copilot-instructions.md): 全体方針 (skill より高い優先度)
+- [`docs/`](../../docs/): 現状の技術スナップショット (実装構造リファレンス、ADR は歴史 / `docs/` はいま)

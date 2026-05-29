@@ -145,7 +145,9 @@ winapp run .\bin\<Platform>\Debug\<TargetFramework>\win-<arch> --debug-output
 
 ## さらに知るには
 
+- 現状の技術スナップショット (実装構造リファレンス): [`docs/`](docs/) (アーキテクチャー / DI / WebView2 / テーマ / 設定 / アクティベーション)
 - コーディング時のチェックリスト / 具体例: [`.github/skills/`](.github/skills/) (Clean Architecture / 単体テストの実装パターン)
 - 設計判断の歴史: [`.github/adr/`](.github/adr/)
+- 振る舞いの仕様 (要件): [`design/SPEC.md`](design/SPEC.md)
 - リポジトリ概要 / ビルド手順: [`README.md`](README.md)
 - 上流 macOS アプリ: <https://github.com/07JP27/SkimDown>
