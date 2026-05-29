@@ -80,6 +80,12 @@ Presentation (App, WinUI 3)
    - 層境界・外部依存・横断ポリシー・セキュリティモデルを変える時は `.github/adr/` に新 ADR を追加 (運用ルールは [`.github/adr/README.md`](.github/adr/README.md))
    - Accepted な ADR の本文は書き換えず、撤回時は新 ADR + `Superseded by NNNN`
 
+8. **現状スナップショット (`docs/`) はコードと同じ PR で更新する**
+   - リポジトリルートの [`docs/`](docs/) は「いまコードがどう実装されているか」を中立に説明する技術リファレンス。ADR (歴史) / SPEC (要件) / README (使い方) / この `copilot-instructions.md` (規約) のいずれとも役割が違う
+   - アーキ境界 / DI 登録 / 主要 I/F / WebView2 メッセージプロトコル / `AppSettings` schema / activation flow / Markdown パイプライン / テーマ解決ロジック を変える PR は、対応する `docs/*.md` も同じ PR で更新する
+   - どの変更でどの `docs/` を更新するかの早見表は [`docs/README.md` の「更新ライフサイクル」](docs/README.md#更新ライフサイクル-ドリフト対策)。書き方の規約と PR レビューチェックリストは [`.github/skills/docs/SKILL.md`](.github/skills/docs/SKILL.md)
+   - `docs/` は **現在形・中立**で書く。命令形 (「〜してください」「〜は禁止」) は書かない (それはこの規約 / SKILL の役割)
+
 ## ファイル配置のルール
 
 | 種類 | 配置 |
@@ -96,6 +102,7 @@ Presentation (App, WinUI 3)
 | WinRT 実装 | `SkimDownForWindows.Infrastructure/Windows/` |
 | コンポジションルート / WindowsAppSDK 依存実装 | `SkimDownForWindows/Composition/` |
 | XAML / Page / Window / UserControl | `SkimDownForWindows/` |
+| 現状スナップショット (実装構造リファレンス) | `docs/*.md` |
 
 ## 命名規約
 
@@ -142,6 +149,8 @@ winapp run .\bin\<Platform>\Debug\<TargetFramework>\win-<arch> --debug-output
 - WindowsAppSDK の API を Infrastructure 内で使う (Presentation に置く)
 - クラスライブラリに `.xaml` ファイルを置く
 - ADR を更新する代わりに Accepted ADR を書き換える
+- アーキ境界 / DI 登録 / WebView2 メッセージプロトコル / `AppSettings` schema / activation flow / Markdown パイプライン / テーマ解決ロジック を変えるのに `docs/` を更新しない (= 現状スナップショットがコードと乖離する)
+- `docs/` 本文に命令形や規約を書く (規約は `copilot-instructions.md`、チェックリストは SKILL。`docs/` は現在形・中立)
 
 ## さらに知るには
 
