@@ -64,9 +64,11 @@ The solution is split into 4 + 1 projects following clean-architecture-style lay
 
 Each `MainWindow` owns its own `IServiceScope`, so window-scoped services (`IFolderWatcher`, `MainPageViewModel`, Markdown pure services, `CommandLineLauncher`) are deterministically disposed when the window is closed.
 
-Design decisions are recorded as ADRs under [`.github/adr/`](.github/adr/). The repository-specific coding guide for humans and Copilot lives at [`.github/copilot-instructions.md`](.github/copilot-instructions.md).
+The Windows-port behavior spec — keyboard shortcuts, menus, single-file mode, single-instance redirect, the WebView2 two-origin model, persistence keys, and Windows-specific deltas from the macOS app — is in [`design/SPEC.md`](design/SPEC.md).
 
-Detailed design documents for SkimDown itself are in the upstream project: [`07JP27/SkimDown/design/`](https://github.com/07JP27/SkimDown/tree/main/design).
+Design decisions (the "why") are recorded as ADRs under [`.github/adr/`](.github/adr/). The repository-specific coding guide for humans and Copilot lives at [`.github/copilot-instructions.md`](.github/copilot-instructions.md).
+
+Detailed design documents for the upstream macOS SkimDown are in [`07JP27/SkimDown/design/`](https://github.com/07JP27/SkimDown/tree/main/design).
 
 ## Development
 
