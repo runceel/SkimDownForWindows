@@ -14,6 +14,7 @@ using Microsoft.UI.Input;
 using SkimDownForWindows.Application.Abstractions;
 using SkimDownForWindows.Application.Models;
 using SkimDownForWindows.Application.Theme;
+using SkimDownForWindows.Application.Utilities;
 using SkimDownForWindows.Application.ViewModels;
 using SkimDownForWindows.Composition;
 using SkimDownForWindows.Domain;
@@ -34,7 +35,7 @@ public sealed partial class MainPage : Page
     private IColorSchemeSource? _colorSchemeSource;
     private bool _windowsChangedSubscribed;
     private bool _themesChangedSubscribed;
-    private string? _initialFolderPath;
+    private InitialActivation? _initialActivation;
     private bool _restoreLastFolder = true;
 
     /// <summary>
@@ -87,7 +88,7 @@ public sealed partial class MainPage : Page
         {
             _window = args.Window;
             _scopeProvider = args.ScopeProvider;
-            _initialFolderPath = args.InitialFolderPath;
+            _initialActivation = args.InitialActivation;
             _restoreLastFolder = args.RestoreLastFolder;
 
             // スコープから VM・横断サービスを取得 (この時点で VM は IFolderWatcher 等を保持済み)
@@ -137,16 +138,7 @@ public sealed partial class MainPage : Page
 
         // ペルシステンス済みサイドバー幅 / visibility / 位置を、開くフォルダーを決める前に適用する
         ApplySidebarPosition(settings.SidebarPosition);
-        if (settings.SidebarVisible)
-        {
-            SetActiveSidebarWidth(new GridLength(Math.Max(180, settings.SidebarWidth)));
-            Sidebar.Visibility = Visibility.Visible;
-        }
-        else
-        {
-            SetActiveSidebarWidth(new GridLength(0));
-            Sidebar.Visibility = Visibility.Collapsed;
-        }
+        ApplySidebarVisualState();
 
         Preview.SetZoom(settings.ZoomFactor);
 
@@ -154,25 +146,23 @@ public sealed partial class MainPage : Page
         ApplyThemeToShell(settings.Theme);
         PushThemeToPreview();
 
-        // どのフォルダーを開くか決定する (一度だけ):
-        //   1. 明示的な initialFolderPath が最優先
-        //   2. _restoreLastFolder が true で LastFolderPath が有効ならそれを復元
+        // どのファイル / フォルダーを開くか決定する (一度だけ):
+        //   1. InitialActivation が指定されていればそれを優先 (CLI / File activation / drag-drop)
+        //   2. なければ _restoreLastFolder true かつ LastFolderPath が有効ならそれを folder mode で復元
         //   3. 上記いずれもなければ empty 状態のまま
-        string? folderToOpen = null;
-        if (!string.IsNullOrEmpty(_initialFolderPath) && Directory.Exists(_initialFolderPath))
+        if (_initialActivation is OpenSingleFileActivation singleFile)
         {
-            folderToOpen = _initialFolderPath;
+            await ViewModel.OpenSingleFileAsync(singleFile.FilePath);
+        }
+        else if (_initialActivation is OpenFolderActivation folderAct)
+        {
+            await ViewModel.OpenFolderAsync(folderAct.FolderPath);
         }
         else if (_restoreLastFolder &&
                  !string.IsNullOrEmpty(settings.LastFolderPath) &&
                  Directory.Exists(settings.LastFolderPath))
         {
-            folderToOpen = settings.LastFolderPath;
-        }
-
-        if (folderToOpen is not null)
-        {
-            await ViewModel.OpenFolderAsync(folderToOpen);
+            await ViewModel.OpenFolderAsync(settings.LastFolderPath);
         }
 
         BuildRecentFoldersMenu();
@@ -237,6 +227,42 @@ public sealed partial class MainPage : Page
             case nameof(MainPageViewModel.WindowTitle):
                 UpdateWindowTitle();
                 break;
+            case nameof(MainPageViewModel.IsSingleFileMode):
+                // Single-file mode との切り替えで visible state を再適用 + Move Sidebar 表示の更新。
+                ApplySidebarVisualState();
+                UpdateMoveSidebarLabel();
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Single-file mode と folder mode の visual な切り替えを集中管理する。
+    ///
+    /// - Single-file mode: サイドバーを強制的に折り畳む。永続 <see cref="AppSettings.SidebarVisible"/> は触らない。
+    /// - Folder mode: 永続設定 (<see cref="AppSettings.SidebarVisible"/> / <see cref="AppSettings.SidebarWidth"/>) を適用。
+    ///
+    /// 上流 macOS 版は <c>settings.isSidebarVisible</c> を書き換える設計だが、Windows 版では
+    /// 「永続設定 = folder mode 用の真実」「single-file mode = 一時的な visual override」として分離する。
+    /// </summary>
+    private void ApplySidebarVisualState()
+    {
+        var settings = ViewModel.Settings.Current;
+        if (ViewModel.IsSingleFileMode)
+        {
+            Sidebar.Visibility = Visibility.Collapsed;
+            SetActiveSidebarWidth(new GridLength(0));
+            return;
+        }
+
+        if (settings.SidebarVisible)
+        {
+            SetActiveSidebarWidth(new GridLength(Math.Max(180, settings.SidebarWidth)));
+            Sidebar.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            SetActiveSidebarWidth(new GridLength(0));
+            Sidebar.Visibility = Visibility.Collapsed;
         }
     }
 
@@ -263,6 +289,10 @@ public sealed partial class MainPage : Page
     /// </summary>
     private async Task SyncTreeSelectionAsync(int maxAttempts = 20, int delayMilliseconds = 50)
     {
+        // Single-file mode では RootItems が空なのでツリーの選択同期は意味がない。
+        // 空のツリーを 1 秒間ループしないために早期 return する。
+        if (ViewModel.IsSingleFileMode) return;
+
         var item = ViewModel.SelectedItem;
 
         try
@@ -346,6 +376,12 @@ public sealed partial class MainPage : Page
         NoMarkdownState.Visibility = folderButHasNoMd ? Visibility.Visible : Visibility.Collapsed;
         Preview.Visibility = Visibility.Visible;
     }
+
+    /// <summary>
+    /// XAML の <c>{x:Bind IsNotSingleFileMode(ViewModel.IsSingleFileMode), Mode=OneWay}</c> から
+    /// 呼ばれる helper。Toggle/Move Sidebar メニューの <c>IsEnabled</c> 用。
+    /// </summary>
+    public bool IsNotSingleFileMode(bool isSingleFile) => !isSingleFile;
 
     private void UpdateMarkdownCount()
     {
@@ -438,7 +474,7 @@ public sealed partial class MainPage : Page
         if (e.DataView.Contains(StandardDataFormats.StorageItems))
         {
             e.AcceptedOperation = DataPackageOperation.Link;
-            if (ViewModel.HasFolder)
+            if (ViewModel.HasFolder || ViewModel.IsSingleFileMode)
             {
                 e.DragUIOverride.Caption = "Open in new SkimDown window";
             }
@@ -457,29 +493,50 @@ public sealed partial class MainPage : Page
         {
             if (!e.DataView.Contains(StandardDataFormats.StorageItems)) return;
             var items = await e.DataView.GetStorageItemsAsync();
+
+            // 優先順: フォルダー (任意の 1 つ) > Markdown ファイル群
             var folder = items.OfType<StorageFolder>().FirstOrDefault();
-
-            string? folderPath = folder?.Path;
-            if (folderPath is null)
+            if (folder is not null && !string.IsNullOrEmpty(folder.Path))
             {
-                var file = items.OfType<StorageFile>().FirstOrDefault();
-                if (file is not null)
+                if (ViewModel.HasFolder || ViewModel.IsSingleFileMode)
                 {
-                    var parent = Path.GetDirectoryName(file.Path);
-                    if (!string.IsNullOrEmpty(parent)) folderPath = parent;
+                    _windowService?.OpenFolderInNewWindow(folder.Path);
                 }
+                else
+                {
+                    await ViewModel.OpenFolderAsync(folder.Path);
+                    BuildRecentFoldersMenu();
+                }
+                return;
             }
-            if (string.IsNullOrEmpty(folderPath)) return;
 
-            // SPEC: フォルダーを既に開いているウィンドウに drop した場合は新ウィンドウで開く
-            if (ViewModel.HasFolder)
+            // Markdown ファイル群
+            var mdFiles = items.OfType<StorageFile>()
+                .Where(f => !string.IsNullOrEmpty(f.Path) && PathHelpers.IsMarkdownFile(f.Path))
+                .Select(f => f.Path)
+                .ToList();
+            if (mdFiles.Count == 0)
             {
-                _windowService?.OpenFolderInNewWindow(folderPath);
+                return;
+            }
+
+            if (ViewModel.HasFolder || ViewModel.IsSingleFileMode)
+            {
+                // 現ウィンドウは folder mode か single-file mode (= 別ファイルを表示中)。
+                // drop された Markdown はすべて新規ウィンドウで開く。
+                foreach (var p in mdFiles)
+                {
+                    _windowService?.OpenSingleFileInNewWindow(p);
+                }
             }
             else
             {
-                await ViewModel.OpenFolderAsync(folderPath);
-                BuildRecentFoldersMenu();
+                // 空ウィンドウ → 1 つ目を現ウィンドウで表示し、残りは新規ウィンドウへ。
+                await ViewModel.OpenSingleFileAsync(mdFiles[0]);
+                for (int i = 1; i < mdFiles.Count; i++)
+                {
+                    _windowService?.OpenSingleFileInNewWindow(mdFiles[i]);
+                }
             }
         }
         catch (Exception ex)
@@ -516,6 +573,13 @@ public sealed partial class MainPage : Page
             ViewModel.OpenedFolderPath, ViewModel.SelectedItem.FullPath, href);
         if (classification.Kind == LinkKind.RelativeMarkdown && classification.ResolvedFullPath is { } target)
         {
+            // Single-file mode 中の相対 markdown リンクは、新しい single-file ウィンドウで開く。
+            // 同モード中は「1 ファイル 1 ウィンドウ」を守るため、folder mode の SelectAndLoadAsync には流さない。
+            if (ViewModel.IsSingleFileMode)
+            {
+                _windowService?.OpenSingleFileInNewWindow(target);
+                return;
+            }
             await ViewModel.SelectAndLoadAsync(target);
         }
     }
@@ -692,6 +756,9 @@ public sealed partial class MainPage : Page
 
     private async void OnToggleSidebarClick(object? sender, RoutedEventArgs e)
     {
+        // Single-file mode 中はサイドバー切替を無効化 (上流仕様に合わせて永続設定を触らない)。
+        if (ViewModel.IsSingleFileMode) return;
+
         var visible = Sidebar.Visibility == Visibility.Visible;
         if (visible)
         {
@@ -711,6 +778,9 @@ public sealed partial class MainPage : Page
 
     private async void OnMoveSidebarClick(object? sender, RoutedEventArgs e)
     {
+        // Single-file mode 中はサイドバー操作を無効化。
+        if (ViewModel.IsSingleFileMode) return;
+
         var current = ViewModel.Settings.Current.SidebarPosition;
         var next = current == SidebarPosition.Left ? SidebarPosition.Right : SidebarPosition.Left;
 

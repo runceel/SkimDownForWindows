@@ -29,6 +29,22 @@ public interface IWindowService
     /// <summary>新規ウィンドウで指定フォルダーを開く (フォルダー drop で既にフォルダーを開いているウィンドウに drop された時用)。</summary>
     IWindowHandle OpenFolderInNewWindow(string folderPath);
 
+    /// <summary>
+    /// 指定 Markdown ファイル群を single-file mode で開く。
+    /// 1 個目は空 / 既に single-file mode のウィンドウがあれば再利用、
+    /// 2 個目以降は常に新規ウィンドウ。
+    /// </summary>
+    void OpenSingleFilesInWindows(System.Collections.Generic.IReadOnlyList<string> filePaths);
+
+    /// <summary>1 個の Markdown ファイルを必ず新規ウィンドウで single-file mode 表示する。</summary>
+    IWindowHandle OpenSingleFileInNewWindow(string filePath);
+
+    /// <summary>
+    /// 1 個の Markdown ファイルを、既存の空 / single-file mode ウィンドウがあれば再利用、
+    /// なければ新規ウィンドウで single-file mode 表示する。
+    /// </summary>
+    IWindowHandle OpenSingleFile(string filePath);
+
     /// <summary>指定ウィンドウを前面に持ってきてアクティブ化する。</summary>
     void ActivateWindow(IWindowHandle window);
 

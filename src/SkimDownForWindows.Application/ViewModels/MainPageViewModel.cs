@@ -39,6 +39,13 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
 
     private bool _disposed;
 
+    /// <summary>
+    /// Single-file mode で表示している絶対ファイルパス。folder mode 中は <c>null</c>。
+    /// <see cref="OpenedFolderPath"/> はリソース解決のため親フォルダーを保持するが、
+    /// 「実際に開いているファイル」を識別するためにこれを別途持つ。
+    /// </summary>
+    private string? _singleFilePath;
+
     /// <summary>設定リポジトリへの直接アクセス (XAML バインドやコードビハインドから利用)。</summary>
     public ISettingsRepository Settings => _settings;
 
@@ -72,6 +79,22 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     public partial string WindowTitle { get; set; } = "SkimDown";
+
+    /// <summary>
+    /// Single-file mode (1 個の Markdown ファイルだけを表示する mode) であるかどうか。
+    /// 上流 macOS 版の <c>isSingleFileMode</c> 相当。Explorer ダブルクリック / CLI <c>.md</c> 引数 /
+    /// ファイル drag-drop で <c>true</c> になり、<see cref="OpenFolderAsync"/> で <c>false</c> に戻る。
+    ///
+    /// この mode 中は:
+    /// <list type="bullet">
+    ///   <item>サイドバー (ツリー) は強制的に非表示</item>
+    ///   <item><see cref="RootItems"/> は空</item>
+    ///   <item><see cref="ISettingsRepository"/> の RecentFolders / LastFolderPath / FolderStates は更新されない</item>
+    ///   <item>SidebarVisible 永続設定は触らない (= folder mode 用の真実として保持)</item>
+    /// </list>
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsSingleFileMode { get; set; }
 
     /// <summary>新しい Markdown 内容をプレビューに反映させたい時に発火する。</summary>
     public event Action<LoadRequest>? PreviewLoadRequested;
@@ -163,6 +186,11 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
 
         var canonical = PathHelpers.Canonicalize(folderPath);
 
+        // Single-file mode から folder mode への切り替え。code-behind 側で
+        // IsSingleFileMode の変化を見てサイドバー visual state を復元する。
+        IsSingleFileMode = false;
+        _singleFilePath = null;
+
         OpenedFolderPath = canonical;
         OpenedFolderName = Path.GetFileName(canonical) ?? canonical;
         HasFolder = true;
@@ -197,6 +225,80 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         RebuildRecentFolders();
 
         _watcher.Watch(canonical);
+    }
+
+    /// <summary>
+    /// 指定 Markdown ファイル 1 件だけを表示する single-file mode に入る。
+    /// 上流 macOS 版の <c>DocumentWindowController.openFile</c> 相当の挙動。
+    ///
+    /// 設定リポジトリの RecentFolders / LastFolderPath / FolderStates / SidebarVisible は
+    /// **一切更新しない**。サイドバーの visual な hide は呼び出し元 (Presentation 層) が
+    /// <see cref="IsSingleFileMode"/> プロパティを購読して行う。
+    ///
+    /// 親フォルダーを <see cref="IFolderWatcher"/> で監視するため、外部編集で対象ファイルが
+    /// 変更されると <see cref="OnFileContentChanged"/> 経由で <see cref="ReloadSingleFileAsync"/>
+    /// が走り preview が更新される。
+    /// </summary>
+    public async Task OpenSingleFileAsync(string filePath)
+    {
+        if (string.IsNullOrEmpty(filePath) || !_fileSystem.FileExists(filePath))
+        {
+            return;
+        }
+        if (!PathHelpers.IsMarkdownFile(filePath))
+        {
+            return;
+        }
+
+        var canonicalFile = PathHelpers.Canonicalize(filePath);
+        var parent = Path.GetDirectoryName(canonicalFile);
+        if (string.IsNullOrEmpty(parent) || !_fileSystem.DirectoryExists(parent))
+        {
+            return;
+        }
+        var canonicalParent = PathHelpers.Canonicalize(parent);
+
+        IsSingleFileMode = true;
+        _singleFilePath = canonicalFile;
+
+        // OpenedFolderPath はリソース解決 (相対 link や画像) のための base としてだけ使う。
+        // ナビゲーションのため (= folder mode のツリー root) ではない点に注意。
+        OpenedFolderPath = canonicalParent;
+        var fileName = Path.GetFileName(canonicalFile);
+        OpenedFolderName = fileName;
+        HasFolder = true;
+        WindowTitle = $"{fileName} \u2014 SkimDown";
+
+        // ツリーは空のまま (サイドバーは hidden)。empty-state overlay を出さないため
+        // HasAnyMarkdown / MarkdownCount を 1 にセット。
+        RootItems.Clear();
+        MarkdownCount = 1;
+        HasAnyMarkdown = true;
+
+        // synthetic な MarkdownTreeItem を SelectedItem に割り当てる。
+        // RootItems には入れない (= サイドバー hidden + tree empty を保つ)。
+        var rel = PathHelpers.RelativeFromRoot(canonicalParent, canonicalFile);
+        var syntheticItem = new MarkdownTreeItem(fileName, canonicalFile, rel, isFolder: false);
+        SelectedItem = syntheticItem;
+
+        // dedicated reload を走らせる。SelectAndLoadAsync は folder mode 用なので使わない。
+        await ReloadSingleFileAsync();
+
+        _watcher.Watch(canonicalParent);
+    }
+
+    /// <summary>
+    /// Single-file mode 中の対象ファイルを再読込し、preview に流し直す。
+    /// 設定の保存・選択状態の永続化は一切行わない。
+    /// </summary>
+    private async Task ReloadSingleFileAsync()
+    {
+        if (_singleFilePath is null || OpenedFolderPath is null) return;
+        if (!_fileSystem.FileExists(_singleFilePath)) return;
+
+        var text = await _markdownReader.ReadAsync(_singleFilePath);
+        var rel = PathHelpers.RelativeFromRoot(OpenedFolderPath, _singleFilePath);
+        PreviewLoadRequested?.Invoke(new LoadRequest(text, rel, EffectiveTheme()));
     }
 
     private void ReplaceRoot(MarkdownTreeItem root)
@@ -327,6 +429,16 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
 
     private void OnFileContentChanged(string absolutePath)
     {
+        if (IsSingleFileMode)
+        {
+            if (_singleFilePath is not null &&
+                string.Equals(_singleFilePath, absolutePath, StringComparison.OrdinalIgnoreCase))
+            {
+                _ = ReloadSingleFileAsync();
+            }
+            return;
+        }
+
         if (SelectedItem is null) return;
         if (string.Equals(SelectedItem.FullPath, absolutePath, StringComparison.OrdinalIgnoreCase))
         {
@@ -336,6 +448,11 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
 
     private async void OnTreeMayHaveChanged()
     {
+        // Single-file mode ではツリーを使わないので再走査も不要。
+        // 親フォルダー上の add/delete/rename は無視し、対象ファイルの content 変更だけ
+        // OnFileContentChanged 側で reload させる。
+        if (IsSingleFileMode) return;
+
         if (string.IsNullOrEmpty(OpenedFolderPath)) return;
 
         var expansion = CollectExpandedFolders();
