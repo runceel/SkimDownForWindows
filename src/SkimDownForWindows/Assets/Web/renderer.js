@@ -412,13 +412,96 @@
         var blocks = contentEl.querySelectorAll("pre.mermaid");
         if (blocks.length === 0) return;
         try {
-            window.mermaid.run({
+            var p = window.mermaid.run({
                 querySelector: "#content pre.mermaid",
                 suppressErrors: true,
             });
+            // mermaid.run() returns a Promise; normalize after it resolves so
+            // each rendered SVG carries explicit pixel width/height attributes
+            // (Chromium's CSS `zoom` does not scale inline SVG sized with
+            // `width="100%"` + `style="max-width: NNNpx"`, which is mermaid v11's
+            // default output). The synchronous try/catch above only catches
+            // setup-time throws, not async render failures, so attach a .catch
+            // to log them without leaving an unhandled rejection.
+            if (p && typeof p.then === "function") {
+                p.then(function () { normalizeMermaidSvgSizes(contentEl); })
+                 .catch(function (e) {
+                     logToHost("mermaid.run rejected: " + (e && e.message ? e.message : e));
+                 });
+            } else {
+                normalizeMermaidSvgSizes(contentEl);
+            }
         } catch (e) {
             logToHost("mermaid.run failed: " + (e && e.message ? e.message : e));
         }
+    }
+
+    // Rewrite each freshly rendered mermaid SVG so CSS `zoom` (Chromium) scales
+    // it together with the surrounding markdown. Mermaid v11 emits
+    //   <svg width="100%" style="max-width: NNNpx" viewBox="X Y W H">
+    // which Chromium's `zoom` leaves at its intrinsic size. Replacing the
+    // percentage width with explicit pixel attributes makes the SVG behave like
+    // a replaced element with intrinsic dimensions, which `zoom` handles
+    // correctly. We keep the CSS `.skim-mermaid-wrap svg { max-width: 100%;
+    // height: auto }` for responsive shrink in narrow previews.
+    function normalizeMermaidSvgSizes(root) {
+        if (!root || typeof root.querySelectorAll !== "function") return;
+        var svgs = root.querySelectorAll(".skim-mermaid-wrap svg");
+        for (var i = 0; i < svgs.length; i++) {
+            var svg = svgs[i];
+            // Already normalized (e.g., re-entry from theme refresh after this
+            // SVG has been touched) — skip to avoid recomputing from a width
+            // attribute we already overwrote.
+            if (svg.getAttribute("data-skim-size-normalized") === "true") continue;
+
+            var naturalWidth = readMermaidNaturalWidth(svg);
+            var aspect = readSvgViewBoxAspect(svg);
+            // Fall back to viewBox width when style.maxWidth is absent (e.g.,
+            // diagrams rendered with `useMaxWidth: false`, or future mermaid
+            // output variations). Skip silently if neither source is usable.
+            if (!isFinitePositive(naturalWidth) && aspect.width > 0) {
+                naturalWidth = aspect.width;
+            }
+            if (!isFinitePositive(naturalWidth)) continue;
+
+            var naturalHeight = aspect.ratio > 0 ? naturalWidth * aspect.ratio : null;
+            svg.setAttribute("width", String(naturalWidth));
+            if (naturalHeight !== null && isFinitePositive(naturalHeight)) {
+                svg.setAttribute("height", String(naturalHeight));
+            }
+            // Drop mermaid's `max-width: NNNpx` inline cap — `width` attribute
+            // now fixes the natural size, and CSS `max-width: 100%` still
+            // shrinks the SVG in narrow viewports.
+            try { svg.style.removeProperty("max-width"); } catch (e) { /* best-effort */ }
+            svg.setAttribute("data-skim-size-normalized", "true");
+        }
+    }
+
+    function readMermaidNaturalWidth(svg) {
+        // Mermaid sets style="max-width: NNNpx" when useMaxWidth: true.
+        var styleAttr = svg.getAttribute("style") || "";
+        var m = styleAttr.match(/max-width\s*:\s*([\d.]+)\s*px/i);
+        if (!m) return NaN;
+        var v = parseFloat(m[1]);
+        return isFinitePositive(v) ? v : NaN;
+    }
+
+    function readSvgViewBoxAspect(svg) {
+        var vb = svg.getAttribute("viewBox");
+        if (!vb) return { width: 0, ratio: 0 };
+        var parts = vb.trim().split(/[\s,]+/);
+        if (parts.length < 4) return { width: 0, ratio: 0 };
+        // viewBox = "min-x min-y width height"; min-x/min-y may legitimately be
+        // negative, so only width (parts[2]) and height (parts[3]) must be
+        // positive finite numbers.
+        var w = parseFloat(parts[2]);
+        var h = parseFloat(parts[3]);
+        if (!isFinitePositive(w) || !isFinitePositive(h)) return { width: 0, ratio: 0 };
+        return { width: w, ratio: h / w };
+    }
+
+    function isFinitePositive(n) {
+        return typeof n === "number" && isFinite(n) && n > 0;
     }
 
     // ----- GitHub Alerts (> [!NOTE], > [!TIP], > [!IMPORTANT], > [!WARNING], > [!CAUTION]) -----
@@ -1390,5 +1473,14 @@
         document.addEventListener("DOMContentLoaded", onReady);
     } else {
         onReady();
+    }
+
+    // Expose pure-DOM helpers for jsdom-based smoke tests. Production code
+    // never reads this; it's only here so smoke-renderer.js can exercise
+    // edge cases of normalizeMermaidSvgSizes without booting real mermaid.
+    if (typeof window !== "undefined") {
+        window.__skimDownInternal = {
+            normalizeMermaidSvgSizes: normalizeMermaidSvgSizes,
+        };
     }
 })();
