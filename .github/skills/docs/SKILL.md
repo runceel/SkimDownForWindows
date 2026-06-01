@@ -16,6 +16,7 @@ description: SkimDown for Windows の現状スナップショット (リポジ�
   - `Program.Main` / `AppInstance` redirect / `IWindowService` API
   - `MarkdownScanner` / `MarkdownTreeBuilder` / `InitialSelectionPicker` / `LinkResolver` / `IFolderWatcher` ロジック
   - `ColorMapping` / `ColorValueValidator` / `ResolvedTheme` / `ColorSchemeRegistry` の挙動
+  - UI 文字列リソース (`Strings/<locale>/Resources.resw` への追加・削除、`ResourceLoader` 利用箇所、新規ロケール追加)
 - PR レビューで「コード変えてるのに `docs/` が古いまま」を指摘する時
 
 `docs/` を **新規に作る** タスクではなく、**既存の `docs/` を維持する**ことが主眼。新規ドキュメント追加は既存 8 ファイルへの追記で済むケースが大半。
@@ -46,6 +47,7 @@ description: SkimDown for Windows の現状スナップショット (リポジ�
 | `AppSettings` / `FolderState` / `settings.json` schema | `docs/settings-and-state.md` |
 | テーマ解決 / VS Code key マッピング | `docs/theming.md` |
 | `Program.Main` / `AppInstance` redirect / `IWindowService` | `docs/activation-and-single-instance.md` |
+| UI 文字列 (`Strings/<locale>/Resources.resw`, `x:Uid`, `ResourceLoader`, 新規ロケール) | `docs/localization.md` |
 
 上記のうち複数に該当する変更 (例: 新しい `I<X>` を Application に追加 + Infrastructure 実装 + DI 登録 + 既存 ViewModel から呼ぶ) は **複数ページの更新**になる。1 つだけ直して終わりにしない。
 

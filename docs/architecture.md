@@ -127,10 +127,11 @@ sequenceDiagram
 | WinRT 実装 | `SkimDownForWindows.Infrastructure/Windows/` |
 | コンポジションルート / WindowsAppSDK 依存実装 | `SkimDownForWindows/Composition/` |
 | XAML / Page / Window / UserControl | `SkimDownForWindows/` |
+| UI 文字列リソース (locale 別) | `SkimDownForWindows/Strings/<locale>/Resources.resw` |
 
 ## 関連
 
-- ADR: [0001 ADR 運用ルール](../.github/adr/0001-record-architecture-decisions.md), [0002 クリーンアーキテクチャー風の層分割と DI](../.github/adr/0002-clean-architecture-layered-projects.md)
+- ADR: [0001 ADR 運用ルール](../.github/adr/0001-record-architecture-decisions.md), [0002 クリーンアーキテクチャー風の層分割と DI](../.github/adr/0002-clean-architecture-layered-projects.md), [0006 UI 文字列ローカライズに MRT (resw) と ResourceLoader を採用する](../.github/adr/0006-localization-with-resw-and-resourceloader.md)
 - skill: [`clean-architecture/SKILL.md`](../.github/skills/clean-architecture/SKILL.md) (層境界 / DI / 抽象配置のチェックリスト)
 - copilot-instructions: [`copilot-instructions.md`](../.github/copilot-instructions.md) (「必ず守るルール」「ファイル配置のルール」)
-- 隣接ドキュメント: [`dependency-injection.md`](dependency-injection.md), [`markdown-content-pipeline.md`](markdown-content-pipeline.md)
+- 隣接ドキュメント: [`dependency-injection.md`](dependency-injection.md), [`markdown-content-pipeline.md`](markdown-content-pipeline.md), [`localization.md`](localization.md)

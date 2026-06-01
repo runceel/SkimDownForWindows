@@ -19,6 +19,7 @@
 | [settings-and-state.md](settings-and-state.md) | `AppSettings` / `FolderState` / `RecentFolders` / 永続化境界 |
 | [theming.md](theming.md) | システム / 組み込み / カスタムテーマ / `ResolvedTheme` / WebView2 への反映 |
 | [activation-and-single-instance.md](activation-and-single-instance.md) | `Program.Main` / `AppInstance` redirect / `IWindowService` / single-file mode の起動経路 |
+| [localization.md](localization.md) | `Strings/<locale>/Resources.resw` / `x:Uid` / `ResourceLoader` / サポートロケール / レイヤー境界 |
 
 ## このリポジトリのドキュメントランドスケープ
 
@@ -53,6 +54,7 @@
 | カスタムテーマ | 「Themes フォルダーに `*.json` を置く」「マッピング表」 | 「テーマ切替時に preview を再描画する」 | 「`ColorSchemeRegistry` が `IColorSchemeSource` から読み、`ResolvedTheme` を解決し、WebView2 に `{type: "theme", themeVars: ...}` を送る」 | 「VS Code 互換 JSON を採用した理由」 |
 | Single-file mode | 「Explorer ダブルクリック / `skimdown README.md`」 | 「サイドバー強制非表示・relative link は新ウィンドウ」 | 「`Program.Main` → `AppInstance.FindOrRegisterForKey` → 二次インスタンスが `RedirectActivationToAsync`」 | 「`InitialActivation` 型を導入した理由」 |
 | 設定永続化 | (触れない) | 「サイドバー幅・テーマ・ズーム倍率を永続化する」 | 「`JsonSettingsRepository` が `SemaphoreSlim` で single-flight、tmp + atomic move」 | (該当 ADR は無し) |
+| ローカライズ (UI 文字列) | (触れない) | (現在は要件として明示せず) | 「`Strings/<locale>/Resources.resw` に集約、XAML は `x:Uid`、code は `ResourceLoader.GetForViewIndependentUse().GetString("Foo/Bar")`、Presentation 専有」 | 「MRT (resw) + `ResourceLoader` を採用した理由 / `IStringLocalizer` 抽象を採らなかった理由」 |
 
 ## 更新ライフサイクル (ドリフト対策)
 
@@ -68,6 +70,7 @@
 | `AppSettings` / `FolderState` のフィールド追加 / 削除 / 既定値変更 | `settings-and-state.md` |
 | カスタムテーマ解決 (`ColorMapping` / `ColorValueValidator` / `ResolvedTheme`) の変更 | `theming.md` |
 | `Program.Main` / `AppInstance` redirect / `IWindowService` API の変更 | `activation-and-single-instance.md` |
+| UI 文字列リソース (`Strings/<locale>/Resources.resw` 追加・削除 / `ResourceLoader` 利用箇所 / 新規ロケール) | `localization.md` |
 
 ### docs / ADR / SPEC が食い違った場合の真実
 

@@ -22,6 +22,7 @@ Presentation (SkimDownForWindows, net10.0-windows10.0.26100.0)
   - XAML / Page / Window / UserControl
   - コンポジションルート (App.xaml.cs, MainWindow.xaml.cs)
   - WindowsAppSDK 依存実装 (DispatcherQueueUiDispatcher, WindowService)
+  - UI 文字列リソース (Strings/<locale>/Resources.resw + ResourceLoader)
   │
   ├──> Infrastructure (SkimDownForWindows.Infrastructure, net10.0-windows10.0.26100.0)
   │     - LocalFileSystem, LocalMarkdownFileReader, FileSystemFolderWatcher,
@@ -63,9 +64,10 @@ Presentation ──> Infrastructure ──> Application ──> Domain
 > 詳細は [copilot-instructions.md の「必ず守るルール」](../../copilot-instructions.md) を参照。本 skill ではコーディング時に必要な要点のみ。
 
 1. **Application / ViewModel から外部 I/O 型を `using` しない**
-   - 禁止: `System.IO.File`, `System.IO.Directory`, `System.Diagnostics.Process`, `Windows.UI.ViewManagement.*`, `Windows.ApplicationModel.DataTransfer.*`, `Windows.Storage.*`, `Windows.System.Launcher`
+   - 禁止: `System.IO.File`, `System.IO.Directory`, `System.Diagnostics.Process`, `Windows.UI.ViewManagement.*`, `Windows.ApplicationModel.DataTransfer.*`, `Windows.ApplicationModel.Resources.*`, `Windows.Storage.*`, `Windows.System.Launcher`
    - 必ず `I<X>` 抽象経由で呼ぶ
    - 例外: `Application/Utilities/PathHelpers` は `System.IO.Path` の**純粋計算 API のみ**使用可
+   - `Windows.ApplicationModel.Resources` (`ResourceLoader`) は **Presentation 専有** (ADR-0006)。Application 層は UI 文字列を保持せず、Page 側のコードビハインドで解決する
 2. **可変状態を持つ `static` シングルトンを書かない**
    - `static MyService Instance => ...` / `static class WindowManager` 禁止
    - DI Singleton 登録で置き換える
@@ -78,6 +80,10 @@ Presentation ──> Infrastructure ──> Application ──> Domain
    - WindowsAppSDK に依存する実装 (Dispatcher / Window 系) は **Presentation の `Composition/` 配下**に置く
 5. **XAML / Page / UserControl / ResourceDictionary は App プロジェクトに閉じる**
    - クラスライブラリに `.xaml` を置かない
+6. **UI 文字列は `Strings/<locale>/Resources.resw` に置く** (ADR-0006)
+   - XAML は `x:Uid="<UidName>"`、resw は `<UidName>.<PropertyName>` で書く
+   - 動的文字列はコードビハインドで `ResourceLoader.GetForViewIndependentUse().GetString("Category/Key")` で取得
+   - a11y 文言 (`AutomationProperties.Name`, `ToolTipService.ToolTip`) も resw に書く (ハードコード禁止)
 
 ## 新規 I/F を追加する 4 ステップ
 
@@ -170,6 +176,7 @@ public MainPageViewModel(..., IXxxWriter xxxWriter, ...)
 | WinRT 実装 | `SkimDownForWindows.Infrastructure/Windows/` | `WindowsClipboardService.cs`, `ExplorerShellService.cs` |
 | コンポジションルート / WindowsAppSDK 依存実装 | `SkimDownForWindows/Composition/` | `DispatcherQueueUiDispatcher.cs`, `WindowService.cs` |
 | XAML / Page / Window / UserControl | `SkimDownForWindows/` | `MainWindow.xaml`, `MainPage.xaml`, `MarkdownPreview.xaml` |
+| UI 文字列リソース | `SkimDownForWindows/Strings/<locale>/` | `Strings/en-US/Resources.resw` |
 
 ## 命名規約
 
@@ -275,6 +282,39 @@ using Microsoft.UI.Dispatching;  // WindowsAppSDK は Infrastructure では参�
 // src/SkimDownForWindows/MarkdownPreview.xaml
 ```
 
+### ❌ UI 文字列をハードコード
+
+```xml
+<!-- ❌ NG - XAML に直接英語を埋め込む -->
+<MenuFlyoutItem Text="Open Folder…" Click="OnOpenFolderClick" />
+```
+
+```xml
+<!-- ✅ OK - x:Uid で resw 経由 -->
+<MenuFlyoutItem x:Uid="OpenFolderMenuItem" Click="OnOpenFolderClick" />
+<!-- Strings/en-US/Resources.resw に <data name="OpenFolderMenuItem.Text"> -->
+```
+
+```csharp
+// ❌ NG - code-behind で英語を組み立てる
+MarkdownCountText.Text = count == 1
+    ? "1 markdown file"
+    : $"{count} markdown files";
+```
+
+```csharp
+// ✅ OK - ResourceLoader 経由
+MarkdownCountText.Text = count == 1
+    ? _strings.GetString("MarkdownCount/OneFile")
+    : string.Format(_strings.GetString("MarkdownCount/ManyFiles"), count);
+```
+
+```csharp
+// ❌ NG - Application 層に Windows.ApplicationModel.Resources を持ち込む
+// src/SkimDownForWindows.Application/ViewModels/MainPageViewModel.cs
+using Windows.ApplicationModel.Resources;  // net10.0 ターゲットでは using 不可
+```
+
 ### ❌ ADR 本文書き換え
 
 - Accepted な ADR の本文は書き換えない (typo / リンク修正以外)
@@ -290,6 +330,8 @@ using Microsoft.UI.Dispatching;  // WindowsAppSDK は Infrastructure では参�
 - [ ] `IDisposable` を必要とするサービスは Scoped で登録されているか
 - [ ] WindowsAppSDK 依存型を Infrastructure に持ち込んでいないか
 - [ ] クラスライブラリに `.xaml` を置いていないか
+- [ ] 新規 UI 文字列を resw に追加したか (`x:Uid` または `ResourceLoader.GetString` 経由)
+- [ ] Application / Infrastructure / Domain で `Windows.ApplicationModel.Resources` を using していないか
 - [ ] 既存の設計判断を変える必要があれば、新 ADR を起こしているか
 
 ## 設計判断を変えたい時
@@ -305,6 +347,7 @@ using Microsoft.UI.Dispatching;  // WindowsAppSDK は Infrastructure では参�
 
 - [ADR-0001 アーキテクチャー判断を ADR として記録する](../../adr/0001-record-architecture-decisions.md)
 - [ADR-0002 クリーンアーキテクチャー風の層分割と DI コンテナの導入](../../adr/0002-clean-architecture-layered-projects.md)
+- [ADR-0006 UI 文字列ローカライズに MRT (resw) と ResourceLoader を採用する](../../adr/0006-localization-with-resw-and-resourceloader.md)
 - [copilot-instructions.md](../../copilot-instructions.md)
 - [ADR README (運用ルール)](../../adr/README.md)
 - [unit-test skill](../unit-test/SKILL.md)
