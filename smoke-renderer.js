@@ -615,6 +615,35 @@ async function main() {
             "rule body: " + scrollRule[0]);
     }
 
+    // [22] The scroll card (`.skim-mermaid-wrap`) itself must hug a narrow
+    // diagram (so the card isn't a giant full-width box with a thin SVG
+    // floating inside) and stay capped to the markdown body width for
+    // wide diagrams (so its inner `.skim-mermaid-scroll` can take over
+    // horizontal scrolling). The recipe is:
+    //   width: fit-content;          /* shrink to the SVG's natural size  */
+    //   max-width: 100%;             /* but never exceed the body width   */
+    //   margin: 1em auto;            /* center the card in the body       */
+    // Together with `.skim-mermaid-wrap svg { display:block; margin:auto }`
+    // this gives: narrow TD diagram → card hugs the SVG, centered in body;
+    // wide LR diagram → card spans body width, SVG scrolls inside.
+    console.log("[22] Mermaid scroll card hugs the diagram and centers in body");
+    var wrapRule = cssText.match(/main\.markdown-body\s+\.skim-mermaid-wrap\s*\{[^}]*\}/);
+    check(".skim-mermaid-wrap CSS rule exists in skimdown.css",
+        wrapRule !== null,
+        "could not locate `.skim-mermaid-wrap { ... }` selector");
+    if (wrapRule) {
+        var wrapBody = wrapRule[0];
+        check(".skim-mermaid-wrap uses `width: fit-content` so the card hugs a narrow SVG",
+            /width\s*:\s*fit-content/i.test(wrapBody),
+            "rule body: " + wrapBody);
+        check(".skim-mermaid-wrap caps itself to the body via `max-width: 100%` so wide SVGs use inner scroll instead of overflowing the card",
+            /max-width\s*:\s*100\s*%/i.test(wrapBody),
+            "rule body: " + wrapBody);
+        check(".skim-mermaid-wrap uses `margin: ... auto` so the card itself centers within the markdown body",
+            /margin\s*:\s*[^;]*\bauto\b/i.test(wrapBody),
+            "rule body: " + wrapBody);
+    }
+
     console.log("");
     if (failures === 0) {
         console.log("✅ ALL RENDERER SMOKE CHECKS PASSED");

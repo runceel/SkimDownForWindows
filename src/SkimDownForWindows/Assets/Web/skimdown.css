@@ -194,8 +194,22 @@ main.markdown-body .skim-code-copy .skim-code-copy-label {
 
 main.markdown-body .skim-mermaid-wrap {
     position: relative;
-    margin: 1em 0;
+    margin: 1em auto;
     cursor: zoom-in;
+    /* Fit the wrap (and therefore the scroll card and the zoom-hint
+       badge) to the diagram's intrinsic width so a narrow TD diagram
+       sits in a card hugged to its content instead of stretching a
+       full-width card around a thin diagram. `max-width: 100%` keeps
+       wide diagrams (e.g., long LR flows) constrained to the markdown
+       body's content area; the inner `.skim-mermaid-scroll` (with
+       `overflow-x: auto`) then provides horizontal scrolling for the
+       overflowing SVG. `margin: 1em auto` centers the wrap within the
+       markdown body. Combined with the `.skim-mermaid-wrap svg` rule
+       below (`display: block; margin: 0 auto`), this gives:
+         - narrow diagram: card hugs the SVG and is centered in body
+         - wide diagram:   card spans the body width, SVG scrolls inside */
+    width: fit-content;
+    max-width: 100%;
 }
 
 main.markdown-body .skim-mermaid-scroll {
