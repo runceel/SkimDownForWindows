@@ -82,9 +82,15 @@ Presentation (App, WinUI 3)
 
 8. **現状スナップショット (`docs/`) はコードと同じ PR で更新する**
    - リポジトリルートの [`docs/`](docs/) は「いまコードがどう実装されているか」を中立に説明する技術リファレンス。ADR (歴史) / SPEC (要件) / README (使い方) / この `copilot-instructions.md` (規約) のいずれとも役割が違う
-   - アーキ境界 / DI 登録 / 主要 I/F / WebView2 メッセージプロトコル / `AppSettings` schema / activation flow / Markdown パイプライン / テーマ解決ロジック を変える PR は、対応する `docs/*.md` も同じ PR で更新する
+   - アーキ境界 / DI 登録 / 主要 I/F / WebView2 メッセージプロトコル / `AppSettings` schema / activation flow / Markdown パイプライン / テーマ解決ロジック / UI 文字列リソース を変える PR は、対応する `docs/*.md` も同じ PR で更新する
    - どの変更でどの `docs/` を更新するかの早見表は [`docs/README.md` の「更新ライフサイクル」](docs/README.md#更新ライフサイクル-ドリフト対策)。書き方の規約と PR レビューチェックリストは [`.github/skills/docs/SKILL.md`](.github/skills/docs/SKILL.md)
    - `docs/` は **現在形・中立**で書く。命令形 (「〜してください」「〜は禁止」) は書かない (それはこの規約 / SKILL の役割)
+
+9. **ユーザー向け文字列は resw 経由で扱い、Presentation 専有とする**
+   - 新規 UI 文字列 (`TextBlock.Text` / `MenuFlyoutItem.Text` / `ToolTipService.ToolTip` / `AutomationProperties.Name` 等) は `src/SkimDownForWindows/Strings/<locale>/Resources.resw` に追加する (ハードコード禁止)
+   - XAML では `x:Uid="<UidName>"` で参照し、resw 側に `<UidName>.<PropertyName>` で書く (例: `OpenFolderMenuItem.Text`)
+   - 動的に組み立てる文字列はコードビハインドで `private readonly ResourceLoader _strings = ResourceLoader.GetForViewIndependentUse();` を持ち、`_strings.GetString("Category/Key")` で取得する (resw の `.` は code 側では `/` に置換)
+   - `Windows.ApplicationModel.Resources` は **Presentation 専有 API**。Application / Infrastructure / Domain プロジェクトから `using` しない (ADR-0006)
 
 ## ファイル配置のルール
 
@@ -102,6 +108,7 @@ Presentation (App, WinUI 3)
 | WinRT 実装 | `SkimDownForWindows.Infrastructure/Windows/` |
 | コンポジションルート / WindowsAppSDK 依存実装 | `SkimDownForWindows/Composition/` |
 | XAML / Page / Window / UserControl | `SkimDownForWindows/` |
+| UI 文字列リソース | `SkimDownForWindows/Strings/<locale>/Resources.resw` |
 | 現状スナップショット (実装構造リファレンス) | `docs/*.md` |
 
 ## 命名規約
@@ -151,10 +158,12 @@ winapp run .\bin\<Platform>\Debug\<TargetFramework>\win-<arch> --debug-output
 - ADR を更新する代わりに Accepted ADR を書き換える
 - アーキ境界 / DI 登録 / WebView2 メッセージプロトコル / `AppSettings` schema / activation flow / Markdown パイプライン / テーマ解決ロジック を変えるのに `docs/` を更新しない (= 現状スナップショットがコードと乖離する)
 - `docs/` 本文に命令形や規約を書く (規約は `copilot-instructions.md`、チェックリストは SKILL。`docs/` は現在形・中立)
+- UI 文字列を XAML / コードビハインドにハードコードする (`Resources.resw` に追加して `x:Uid` / `ResourceLoader.GetString` 経由で参照する。a11y 文言 `AutomationProperties.Name` / `ToolTipService.ToolTip` も例外なく resw)
+- Application / Infrastructure / Domain プロジェクトで `Windows.ApplicationModel.Resources` を `using` する (Presentation 専有 API)
 
 ## さらに知るには
 
-- 現状の技術スナップショット (実装構造リファレンス): [`docs/`](docs/) (アーキテクチャー / DI / WebView2 / テーマ / 設定 / アクティベーション)
+- 現状の技術スナップショット (実装構造リファレンス): [`docs/`](docs/) (アーキテクチャー / DI / WebView2 / テーマ / 設定 / アクティベーション / ローカライズ)
 - コーディング時のチェックリスト / 具体例: [`.github/skills/`](.github/skills/) (Clean Architecture / 単体テストの実装パターン)
 - 設計判断の歴史: [`.github/adr/`](.github/adr/)
 - 振る舞いの仕様 (要件): [`design/SPEC.md`](design/SPEC.md)
