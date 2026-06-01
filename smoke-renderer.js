@@ -573,6 +573,48 @@ async function main() {
         }
     }
 
+    // --- 21. Mermaid SVG stays at intrinsic 1:1 size (no max-width: 100% cap) ---
+    //
+    // The font sync (section 20) is only effective if the rendered SVG also
+    // stays at its intrinsic 1:1 size. Capping with `max-width: 100%`
+    // proportionally shrinks the whole SVG — including in-diagram text
+    // driven by `themeVariables.fontSize = bodyStyle.fontSize` — whenever
+    // the wrap is narrower than the diagram's natural width. Upstream macOS
+    // SkimDown deliberately leaves Mermaid SVGs at intrinsic size and lets
+    // the surrounding card handle overflow (see upstream comment "renders
+    // at its intrinsic (1:1) size where in-diagram text matches body
+    // font-size"). The Windows port keeps `normalizeMermaidSvgSizes`
+    // turning percentage width into pixel width (needed so the document-
+    // level CSS `zoom` scales the SVG), but the CSS must NOT re-cap the
+    // SVG. Verify skimdown.css follows that policy and `.skim-mermaid-
+    // scroll` keeps `overflow-x: auto` to host horizontal scrolling.
+    console.log("[21] Mermaid SVG stays at intrinsic 1:1 size");
+    var cssPath = path.join(ROOT, "skimdown.css");
+    var cssText = fs.readFileSync(cssPath, "utf-8");
+    var mermaidSvgRule = cssText.match(/main\.markdown-body\s+\.skim-mermaid-wrap\s+svg\s*\{[^}]*\}/);
+    check(".skim-mermaid-wrap svg CSS rule exists in skimdown.css",
+        mermaidSvgRule !== null,
+        "could not locate `.skim-mermaid-wrap svg { ... }` selector");
+    if (mermaidSvgRule) {
+        var ruleBody = mermaidSvgRule[0];
+        check(".skim-mermaid-wrap svg does NOT set max-width: 100% (which would shrink in-diagram text)",
+            !/max-width\s*:\s*100\s*%/i.test(ruleBody),
+            "rule body: " + ruleBody);
+        check(".skim-mermaid-wrap svg uses display: block + margin auto so narrow diagrams center without text-align clipping",
+            /display\s*:\s*block/i.test(ruleBody) &&
+            /margin-(?:left|right|inline-(?:start|end))\s*:\s*auto/i.test(ruleBody),
+            "rule body: " + ruleBody);
+    }
+    var scrollRule = cssText.match(/main\.markdown-body\s+\.skim-mermaid-scroll\s*\{[^}]*\}/);
+    check(".skim-mermaid-scroll CSS rule exists",
+        scrollRule !== null,
+        "could not locate `.skim-mermaid-scroll { ... }` selector");
+    if (scrollRule) {
+        check(".skim-mermaid-scroll keeps `overflow-x: auto` to host horizontal scroll for wide diagrams",
+            /overflow-x\s*:\s*auto/i.test(scrollRule[0]),
+            "rule body: " + scrollRule[0]);
+    }
+
     console.log("");
     if (failures === 0) {
         console.log("✅ ALL RENDERER SMOKE CHECKS PASSED");

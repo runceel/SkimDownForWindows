@@ -223,8 +223,25 @@ main.markdown-body .skim-mermaid-wrap pre.mermaid {
     color: var(--skim-fg);
 }
 
+/* Render Mermaid SVG at its intrinsic (1:1) size — do NOT cap with
+   `max-width: 100%`. Capping shrinks the whole SVG when the wrap is
+   narrower than the diagram, and SVG content (including in-diagram
+   text driven by `themeVariables.fontSize = bodyStyle.fontSize`)
+   scales together with the SVG box. The intent is to keep Mermaid
+   labels visually the same size as surrounding prose, mirroring
+   upstream macOS SkimDown (07JP27/SkimDown). When the diagram is
+   wider than the wrap, the parent `.skim-mermaid-scroll
+   { overflow-x: auto }` handles horizontal scrolling.
+
+   `display: block` + `margin-left/right: auto` centers narrow
+   diagrams inside the scroll container without relying on
+   `text-align: center` (which would clip the left edge of wider
+   SVGs in some browsers — the centered overflow extends past the
+   left scroll origin). */
 main.markdown-body .skim-mermaid-wrap svg {
-    max-width: 100%;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
     height: auto;
 }
 

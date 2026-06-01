@@ -545,8 +545,13 @@
     // which Chromium's `zoom` leaves at its intrinsic size. Replacing the
     // percentage width with explicit pixel attributes makes the SVG behave like
     // a replaced element with intrinsic dimensions, which `zoom` handles
-    // correctly. We keep the CSS `.skim-mermaid-wrap svg { max-width: 100%;
-    // height: auto }` for responsive shrink in narrow previews.
+    // correctly. We deliberately do NOT pair this with a CSS `max-width: 100%`
+    // on the SVG — capping the width would proportionally shrink the entire SVG
+    // (including in-diagram text driven by `themeVariables.fontSize`) whenever
+    // the wrap is narrower than the diagram's natural width, breaking the font
+    // sync with the surrounding prose. Horizontal overflow is handled by the
+    // parent `.skim-mermaid-scroll { overflow-x: auto }` instead, mirroring the
+    // upstream macOS SkimDown approach of leaving SVG at intrinsic 1:1 size.
     function normalizeMermaidSvgSizes(root) {
         if (!root || typeof root.querySelectorAll !== "function") return;
         var svgs = root.querySelectorAll(".skim-mermaid-wrap svg");
@@ -573,8 +578,9 @@
                 svg.setAttribute("height", String(naturalHeight));
             }
             // Drop mermaid's `max-width: NNNpx` inline cap — `width` attribute
-            // now fixes the natural size, and CSS `max-width: 100%` still
-            // shrinks the SVG in narrow viewports.
+            // now fixes the natural size. Horizontal overflow is delegated to
+            // the parent `.skim-mermaid-scroll { overflow-x: auto }` so the
+            // SVG stays at 1:1 (keeping in-diagram text matched to body font).
             try { svg.style.removeProperty("max-width"); } catch (e) { /* best-effort */ }
             svg.setAttribute("data-skim-size-normalized", "true");
         }
