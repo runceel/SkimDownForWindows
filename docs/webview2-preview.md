@@ -86,6 +86,7 @@ sequenceDiagram
 | `render` | `markdown`, `sourcePath`, `contentBaseUri`, `theme`, `themeType`, `themeIsDark`, `themeVars` | Markdown 本文を渡して描画させる |
 | `theme` | `theme`, `themeType`, `themeIsDark`, `themeVars` | テーマだけを切替 (Markdown は再描画しない) |
 | `zoom` | `factor` | レンダラー zoom 倍率を設定 (host の `ZoomFactor` と sync) |
+| `contentMaxWidth` | `value` (CSS 値: `"760px"` / `"960px"` / `"1200px"` / `"none"`) | 本文 (`main.markdown-body`) の `max-width` を `--skim-content-max` CSS 変数経由で上書きする (`AppSettings.ContentMaxWidth` と sync) |
 | `empty` | (なし) | 空状態にクリア |
 | `search` | `query`, `caseSensitive` | 検索開始 |
 | `search/next` / `search/prev` / `search/clear` | (なし) | 検索の前後移動 / クリア |

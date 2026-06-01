@@ -15,6 +15,7 @@ SkimDown for Windows は、グローバル設定 (テーマ・サイドバー幅
 | `SidebarWidth` | `double` | `280` | グローバル |
 | `SidebarVisible` | `bool` | `true` | グローバル (folder mode 用) |
 | `SidebarPosition` | `SidebarPosition` | `Left` | グローバル |
+| `ContentMaxWidth` | `ContentMaxWidth` | `Standard` | グローバル。Markdown プレビュー本文の最大幅段階 (Standard=760px / Wide=960px / ExtraWide=1200px / Full=無制限)。CSS の `max-width` として効くため、ウィンドウが指定段階より狭ければ本文はウィンドウ幅にフィットし、広ければ指定段階で頭打ちになる |
 | `RecentFolders` | `List<string>` | `[]` | 最新が先頭。最大 `MaxRecentFolders = 16` 件 |
 | `LastFolderPath` | `string?` | `null` | 起動時の復元キー |
 | `FolderStates` | `Dictionary<string, FolderState>` | `{}` | キーは正規化済みフォルダー絶対パス |

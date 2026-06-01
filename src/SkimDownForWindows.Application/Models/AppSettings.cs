@@ -36,6 +36,13 @@ public sealed class AppSettings
     /// <summary>サイドバーがウィンドウの左右どちらに表示されるか。既定は <see cref="SidebarPosition.Left"/>。</summary>
     public SidebarPosition SidebarPosition { get; set; } = SidebarPosition.Left;
 
+    /// <summary>
+    /// Markdown プレビュー本文の最大幅段階。既定は <see cref="ContentMaxWidth.Standard"/> (760px)。
+    /// CSS の <c>max-width</c> として効くため、ウィンドウがこの値より狭ければ本文はウィンドウ幅に
+    /// フィットし、広ければ指定段階で頭打ちになる。
+    /// </summary>
+    public ContentMaxWidth ContentMaxWidth { get; set; } = ContentMaxWidth.Standard;
+
     /// <summary>直近に開いたフォルダーのパス、最新が先頭。最大 <see cref="MaxRecentFolders"/> 件。</summary>
     public List<string> RecentFolders { get; set; } = new();
 
@@ -46,7 +53,11 @@ public sealed class AppSettings
 
     /// <summary>
     /// ディスクから読み込んだ直後に呼ぶ、in-place な不整合修正。
-    /// 現状は <c>Theme=Custom &amp;&amp; CustomThemeId が空</c> を <see cref="AppTheme.System"/> に戻す。
+    /// 現状の補正対象:
+    /// <list type="bullet">
+    ///   <item><c>Theme=Custom &amp;&amp; CustomThemeId が空</c> を <see cref="AppTheme.System"/> に戻す。</item>
+    ///   <item><c>ContentMaxWidth</c> が enum 定義外の値 (将来バージョンからのダウングレード等) なら <see cref="ContentMaxWidth.Standard"/> に戻す。</item>
+    /// </list>
     /// 登録テーマからの正規化 (該当 ID が見つからない時の戻し) は <c>ColorSchemeRegistry</c> 側で行う。
     /// </summary>
     public void NormalizeAfterLoad()
@@ -58,6 +69,10 @@ public sealed class AppSettings
         if (Theme != AppTheme.Custom)
         {
             CustomThemeId = null;
+        }
+        if (!Enum.IsDefined(ContentMaxWidth))
+        {
+            ContentMaxWidth = ContentMaxWidth.Standard;
         }
     }
 
