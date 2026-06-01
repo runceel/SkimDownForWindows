@@ -12,6 +12,7 @@ using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
 using Microsoft.UI.Input;
 using SkimDownForWindows.Application.Abstractions;
+using Windows.ApplicationModel.Resources;
 using SkimDownForWindows.Application.Models;
 using SkimDownForWindows.Application.Theme;
 using SkimDownForWindows.Application.Utilities;
@@ -26,6 +27,8 @@ namespace SkimDownForWindows;
 
 public sealed partial class MainPage : Page
 {
+    private readonly ResourceLoader _strings = ResourceLoader.GetForViewIndependentUse();
+
     private MainWindow? _window;
     private IServiceProvider? _scopeProvider;
     private IAppLogger? _logger;
@@ -386,8 +389,8 @@ public sealed partial class MainPage : Page
     private void UpdateMarkdownCount()
     {
         MarkdownCountText.Text = ViewModel.MarkdownCount == 1
-            ? "1 markdown file"
-            : $"{ViewModel.MarkdownCount} markdown files";
+            ? _strings.GetString("MarkdownCount/OneFile")
+            : string.Format(_strings.GetString("MarkdownCount/ManyFiles"), ViewModel.MarkdownCount);
     }
 
     private void UpdateWindowTitle()
@@ -400,7 +403,11 @@ public sealed partial class MainPage : Page
         RecentFoldersMenu.Items.Clear();
         if (ViewModel.RecentFolders.Count == 0)
         {
-            var empty = new MenuFlyoutItem { Text = "(no recent folders)", IsEnabled = false };
+            var empty = new MenuFlyoutItem
+            {
+                Text = _strings.GetString("RecentFolders/Empty"),
+                IsEnabled = false,
+            };
             RecentFoldersMenu.Items.Add(empty);
             return;
         }
@@ -415,7 +422,7 @@ public sealed partial class MainPage : Page
         }
 
         RecentFoldersMenu.Items.Add(new MenuFlyoutSeparator());
-        var clear = new MenuFlyoutItem { Text = "Clear Recent" };
+        var clear = new MenuFlyoutItem { Text = _strings.GetString("RecentFolders/Clear") };
         clear.Click += async (_, _) =>
         {
             ViewModel.Settings.Current.RecentFolders.Clear();
@@ -476,11 +483,11 @@ public sealed partial class MainPage : Page
             e.AcceptedOperation = DataPackageOperation.Link;
             if (ViewModel.HasFolder || ViewModel.IsSingleFileMode)
             {
-                e.DragUIOverride.Caption = "Open in new SkimDown window";
+                e.DragUIOverride.Caption = _strings.GetString("DragDrop/OpenInNewWindow");
             }
             else
             {
-                e.DragUIOverride.Caption = "Open in SkimDown";
+                e.DragUIOverride.Caption = _strings.GetString("DragDrop/OpenInSkimDown");
             }
             e.DragUIOverride.IsCaptionVisible = true;
             e.DragUIOverride.IsContentVisible = true;
@@ -605,7 +612,9 @@ public sealed partial class MainPage : Page
     {
         if (total == 0)
         {
-            SearchStatus.Text = string.IsNullOrEmpty(SearchBox.Text) ? "" : "No results";
+            SearchStatus.Text = string.IsNullOrEmpty(SearchBox.Text)
+                ? string.Empty
+                : _strings.GetString("Search/NoResults");
         }
         else
         {
@@ -841,8 +850,8 @@ public sealed partial class MainPage : Page
     {
         var pos = ViewModel.Settings.Current.SidebarPosition;
         MoveSidebarMenuItem.Text = pos == SidebarPosition.Left
-            ? "Move Sidebar to Right"
-            : "Move Sidebar to Left";
+            ? _strings.GetString("Sidebar/MoveToRight")
+            : _strings.GetString("Sidebar/MoveToLeft");
     }
 
     // ----- Sidebar splitter (drag to resize) -----

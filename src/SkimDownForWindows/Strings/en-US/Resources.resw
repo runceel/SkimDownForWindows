@@ -51,4 +51,163 @@
   <data name="NoMarkdownOpenAnotherFolderButton.Content" xml:space="preserve">
     <value>Open Another Folder…</value>
   </data>
+  <data name="MainWindow.Title" xml:space="preserve">
+    <value>SkimDown</value>
+  </data>
+  <data name="AppTitleBar.Title" xml:space="preserve">
+    <value>SkimDown</value>
+  </data>
+  <data name="FileMenuBarItem.Title" xml:space="preserve">
+    <value>File</value>
+  </data>
+  <data name="OpenFolderMenuItem.Text" xml:space="preserve">
+    <value>Open Folder…</value>
+  </data>
+  <data name="OpenRecentMenuItem.Text" xml:space="preserve">
+    <value>Open Recent</value>
+  </data>
+  <data name="RevealInExplorerMenuItem.Text" xml:space="preserve">
+    <value>Reveal in File Explorer</value>
+  </data>
+  <data name="CopyFilePathMenuItem.Text" xml:space="preserve">
+    <value>Copy File Path</value>
+  </data>
+  <data name="CloseWindowMenuItem.Text" xml:space="preserve">
+    <value>Close Window</value>
+  </data>
+  <data name="EditMenuBarItem.Title" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="CopyMenuItem.Text" xml:space="preserve">
+    <value>Copy</value>
+  </data>
+  <data name="SelectAllMenuItem.Text" xml:space="preserve">
+    <value>Select All</value>
+  </data>
+  <data name="FindMenuItem.Text" xml:space="preserve">
+    <value>Find…</value>
+  </data>
+  <data name="FindNextMenuItem.Text" xml:space="preserve">
+    <value>Find Next</value>
+  </data>
+  <data name="FindPreviousMenuItem.Text" xml:space="preserve">
+    <value>Find Previous</value>
+  </data>
+  <data name="UseSelectionForFindMenuItem.Text" xml:space="preserve">
+    <value>Use Selection for Find</value>
+  </data>
+  <data name="ViewMenuBarItem.Title" xml:space="preserve">
+    <value>View</value>
+  </data>
+  <data name="ToggleSidebarMenuItem.Text" xml:space="preserve">
+    <value>Toggle Sidebar</value>
+  </data>
+  <data name="MoveSidebarMenuItem.Text" xml:space="preserve">
+    <value>Move Sidebar to Right</value>
+  </data>
+  <data name="ZoomMenuItem.Text" xml:space="preserve">
+    <value>Zoom</value>
+  </data>
+  <data name="ZoomInMenuItem.Text" xml:space="preserve">
+    <value>Zoom In</value>
+  </data>
+  <data name="ZoomOutMenuItem.Text" xml:space="preserve">
+    <value>Zoom Out</value>
+  </data>
+  <data name="ActualSizeMenuItem.Text" xml:space="preserve">
+    <value>Actual Size</value>
+  </data>
+  <data name="ThemeMenuItem.Text" xml:space="preserve">
+    <value>Theme</value>
+  </data>
+  <data name="ThemeSystemMenuItem.Text" xml:space="preserve">
+    <value>System</value>
+  </data>
+  <data name="ThemeLightMenuItem.Text" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="ThemeDarkMenuItem.Text" xml:space="preserve">
+    <value>Dark</value>
+  </data>
+  <data name="OpenThemesFolderMenuItem.Text" xml:space="preserve">
+    <value>Open Themes Folder</value>
+  </data>
+  <data name="ReloadThemesMenuItem.Text" xml:space="preserve">
+    <value>Reload Themes</value>
+  </data>
+  <data name="WindowMenuBarItem.Title" xml:space="preserve">
+    <value>Window</value>
+  </data>
+  <data name="NewWindowMenuItem.Text" xml:space="preserve">
+    <value>New Window</value>
+  </data>
+  <data name="MinimizeMenuItem.Text" xml:space="preserve">
+    <value>Minimize</value>
+  </data>
+  <data name="ZoomWindowMenuItem.Text" xml:space="preserve">
+    <value>Zoom</value>
+  </data>
+  <data name="BringAllToFrontMenuItem.Text" xml:space="preserve">
+    <value>Bring All to Front</value>
+  </data>
+  <data name="HelpMenuBarItem.Title" xml:space="preserve">
+    <value>Help</value>
+  </data>
+  <data name="AboutSkimDownMenuItem.Text" xml:space="preserve">
+    <value>About SkimDown</value>
+  </data>
+  <data name="SearchBox.PlaceholderText" xml:space="preserve">
+    <value>Find in document</value>
+  </data>
+  <data name="SearchCaseSensitive.Content" xml:space="preserve">
+    <value>Aa</value>
+  </data>
+  <data name="SearchCaseSensitive.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Match case</value>
+  </data>
+  <data name="SearchPreviousButton.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Previous (Shift+Enter)</value>
+  </data>
+  <data name="SearchPreviousButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Previous result</value>
+  </data>
+  <data name="SearchNextButton.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Next (Enter)</value>
+  </data>
+  <data name="SearchNextButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Next result</value>
+  </data>
+  <data name="SearchCloseButton.ToolTipService.ToolTip" xml:space="preserve">
+    <value>Close (Esc)</value>
+  </data>
+  <data name="SearchCloseButton.AutomationProperties.Name" xml:space="preserve">
+    <value>Close search</value>
+  </data>
+  <data name="MarkdownCount.OneFile" xml:space="preserve">
+    <value>1 markdown file</value>
+  </data>
+  <data name="MarkdownCount.ManyFiles" xml:space="preserve">
+    <value>{0} markdown files</value>
+  </data>
+  <data name="RecentFolders.Empty" xml:space="preserve">
+    <value>(no recent folders)</value>
+  </data>
+  <data name="RecentFolders.Clear" xml:space="preserve">
+    <value>Clear Recent</value>
+  </data>
+  <data name="DragDrop.OpenInNewWindow" xml:space="preserve">
+    <value>Open in new SkimDown window</value>
+  </data>
+  <data name="DragDrop.OpenInSkimDown" xml:space="preserve">
+    <value>Open in SkimDown</value>
+  </data>
+  <data name="Search.NoResults" xml:space="preserve">
+    <value>No results</value>
+  </data>
+  <data name="Sidebar.MoveToRight" xml:space="preserve">
+    <value>Move Sidebar to Right</value>
+  </data>
+  <data name="Sidebar.MoveToLeft" xml:space="preserve">
+    <value>Move Sidebar to Left</value>
+  </data>
 </root>
