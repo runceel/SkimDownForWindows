@@ -37,11 +37,11 @@ public sealed class AppSettings
     public SidebarPosition SidebarPosition { get; set; } = SidebarPosition.Left;
 
     /// <summary>
-    /// Markdown プレビュー本文の最大幅段階。既定は <see cref="ContentMaxWidth.Standard"/> (760px)。
+    /// Markdown プレビュー本文の最大幅段階。既定は <see cref="ContentMaxWidth.Full"/> (上限なし)。
     /// CSS の <c>max-width</c> として効くため、ウィンドウがこの値より狭ければ本文はウィンドウ幅に
     /// フィットし、広ければ指定段階で頭打ちになる。
     /// </summary>
-    public ContentMaxWidth ContentMaxWidth { get; set; } = ContentMaxWidth.Standard;
+    public ContentMaxWidth ContentMaxWidth { get; set; } = ContentMaxWidth.Full;
 
     /// <summary>直近に開いたフォルダーのパス、最新が先頭。最大 <see cref="MaxRecentFolders"/> 件。</summary>
     public List<string> RecentFolders { get; set; } = new();

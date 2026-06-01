@@ -197,7 +197,7 @@ public sealed class AppSettingsTests
         Assert.AreEqual(280d, s.SidebarWidth);
         Assert.IsTrue(s.SidebarVisible);
         Assert.AreEqual(SidebarPosition.Left, s.SidebarPosition);
-        Assert.AreEqual(ContentMaxWidth.Standard, s.ContentMaxWidth);
+        Assert.AreEqual(ContentMaxWidth.Full, s.ContentMaxWidth);
         Assert.IsEmpty(s.RecentFolders);
         Assert.IsNull(s.LastFolderPath);
         Assert.IsEmpty(s.FolderStates);
