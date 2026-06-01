@@ -225,4 +225,25 @@
   <data name="Sidebar.MoveToLeft" xml:space="preserve">
     <value>Move Sidebar to Left</value>
   </data>
+  <data name="MermaidZoom.OpenHint" xml:space="preserve">
+    <value>⤢ Click to enlarge</value>
+  </data>
+  <data name="MermaidZoom.DialogLabel" xml:space="preserve">
+    <value>Mermaid diagram zoomed view</value>
+  </data>
+  <data name="MermaidZoom.ZoomIn" xml:space="preserve">
+    <value>Zoom in</value>
+  </data>
+  <data name="MermaidZoom.ZoomOut" xml:space="preserve">
+    <value>Zoom out</value>
+  </data>
+  <data name="MermaidZoom.Reset" xml:space="preserve">
+    <value>Reset</value>
+  </data>
+  <data name="MermaidZoom.Close" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="MermaidZoom.Hint" xml:space="preserve">
+    <value>Wheel: zoom · Drag: pan · Esc: close</value>
+  </data>
 </root>

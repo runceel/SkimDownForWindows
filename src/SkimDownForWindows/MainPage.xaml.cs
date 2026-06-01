@@ -127,6 +127,10 @@ public sealed partial class MainPage : Page
         var appWeb = Path.Combine(AppContext.BaseDirectory, "Assets", "Web");
         await Preview.InitializeAsync(appWeb);
 
+        // Renderer 側 (Mermaid 拡大モーダル等) で使うローカライズ文字列を
+        // 送る。pending として保持され、初回 render より前に flush される。
+        Preview.SetStrings(BuildPreviewLocalizedStrings(_strings));
+
         var settings = ViewModel.Settings.Current;
 
         // カスタムテーマレジストリを起動時に必ず一度ロード。
@@ -870,6 +874,43 @@ public sealed partial class MainPage : Page
         MoveSidebarMenuItem.Text = pos == SidebarPosition.Left
             ? _strings.GetString("Sidebar/MoveToRight")
             : _strings.GetString("Sidebar/MoveToLeft");
+    }
+
+    /// <summary>
+    /// Map renderer-internal string keys (JS-friendly identifiers) to the
+    /// matching <c>Resources.resw</c> entries. The renderer keeps English
+    /// defaults so any missing localization just falls back gracefully —
+    /// this method returns a flat dictionary that <see cref="MarkdownPreview.SetStrings"/>
+    /// sends as <c>{ type: "strings", strings: { ... } }</c>.
+    ///
+    /// Adding a new <c>MermaidZoom/*</c> resource entry: append it here too
+    /// so it gets pushed across the WebView2 boundary. Keep keys ordered the
+    /// same as the resw file to make audits trivial.
+    /// </summary>
+    private static IReadOnlyDictionary<string, string> BuildPreviewLocalizedStrings(ResourceLoader loader)
+    {
+        var dict = new Dictionary<string, string>(StringComparer.Ordinal);
+        AddIfPresent(dict, loader, "mermaidZoom.openHint", "MermaidZoom/OpenHint");
+        AddIfPresent(dict, loader, "mermaidZoom.dialogLabel", "MermaidZoom/DialogLabel");
+        AddIfPresent(dict, loader, "mermaidZoom.zoomIn", "MermaidZoom/ZoomIn");
+        AddIfPresent(dict, loader, "mermaidZoom.zoomOut", "MermaidZoom/ZoomOut");
+        AddIfPresent(dict, loader, "mermaidZoom.reset", "MermaidZoom/Reset");
+        AddIfPresent(dict, loader, "mermaidZoom.close", "MermaidZoom/Close");
+        AddIfPresent(dict, loader, "mermaidZoom.hint", "MermaidZoom/Hint");
+        return dict;
+    }
+
+    private static void AddIfPresent(
+        Dictionary<string, string> dict,
+        ResourceLoader loader,
+        string jsKey,
+        string reswKey)
+    {
+        var value = loader.GetString(reswKey);
+        if (!string.IsNullOrEmpty(value))
+        {
+            dict[jsKey] = value;
+        }
     }
 
     // ----- Sidebar splitter (drag to resize) -----

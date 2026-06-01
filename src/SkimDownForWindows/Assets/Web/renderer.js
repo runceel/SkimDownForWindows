@@ -65,6 +65,77 @@
         current: -1,
     };
 
+    // ----- Localization -----
+    // English defaults so the renderer remains usable even before the host
+    // has had a chance to post a "strings" message. The host (MainPage) reads
+    // localized values from Resources.resw and posts a flat dictionary that
+    // setStrings() merges over these defaults. Keys are namespaced (dotted)
+    // to leave room for future feature areas.
+    var DEFAULT_STRINGS = {
+        "mermaidZoom.openHint": "\u2922 Click to enlarge",
+        "mermaidZoom.dialogLabel": "Mermaid diagram zoomed view",
+        "mermaidZoom.zoomIn": "Zoom in",
+        "mermaidZoom.zoomOut": "Zoom out",
+        "mermaidZoom.reset": "Reset",
+        "mermaidZoom.close": "Close",
+        "mermaidZoom.hint": "Wheel: zoom \u00B7 Drag: pan \u00B7 Esc: close",
+    };
+    var currentStrings = {};
+    for (var __k in DEFAULT_STRINGS) {
+        if (Object.prototype.hasOwnProperty.call(DEFAULT_STRINGS, __k)) {
+            currentStrings[__k] = DEFAULT_STRINGS[__k];
+        }
+    }
+
+    function t(key) {
+        if (typeof key !== "string") return "";
+        if (Object.prototype.hasOwnProperty.call(currentStrings, key)) {
+            return currentStrings[key];
+        }
+        if (Object.prototype.hasOwnProperty.call(DEFAULT_STRINGS, key)) {
+            return DEFAULT_STRINGS[key];
+        }
+        return key;
+    }
+
+    function setStrings(strings) {
+        if (!strings || typeof strings !== "object") return;
+        for (var key in strings) {
+            if (!Object.prototype.hasOwnProperty.call(strings, key)) continue;
+            if (typeof key !== "string" || key.length === 0) continue;
+            var value = strings[key];
+            if (typeof value !== "string" || value.length === 0) continue;
+            currentStrings[key] = value;
+        }
+        applyStringsToZoomModal();
+        applyStringsToZoomHints();
+    }
+
+    // ----- Mermaid zoom modal state -----
+    var zoomModal = null;          // root .skim-zoom-modal element
+    var zoomStage = null;          // inner stage that owns pointer / wheel input
+    var zoomContent = null;        // SVG host (transformed)
+    var zoomInfo = null;           // % readout
+    var zoomBtnIn = null;
+    var zoomBtnOut = null;
+    var zoomBtnReset = null;
+    var zoomBtnClose = null;
+    var zoomHintEl = null;         // bottom hint text
+    var zoomLastFocused = null;    // element to restore focus to on close
+    var zoomState = {
+        scale: 1,
+        tx: 0,
+        ty: 0,
+    };
+    var zoomPointers = new Map(); // pointerId -> {x, y, startTx, startTy}
+    var zoomPinch = null;          // { startDist, startScale, startMidX, startMidY, startTx, startTy }
+    var ZOOM_MODAL_MIN = 0.2;
+    var ZOOM_MODAL_MAX = 8.0;
+
+    function isZoomModalOpen() {
+        return !!(zoomModal && zoomModal.classList.contains("open"));
+    }
+
     function postToHost(payload) {
         try {
             if (window.chrome && window.chrome.webview) {
@@ -277,10 +348,15 @@
 
             if (lang === "mermaid") {
                 // Emit a placeholder Mermaid block; we render it post-sanitize.
+                // The inner `.skim-mermaid-scroll` owns the horizontal scroll so
+                // that the outer `.skim-mermaid-wrap` can host an absolutely-
+                // positioned zoom-hint badge that stays visible regardless of
+                // the diagram's intrinsic width.
                 return '<div class="skim-mermaid-wrap">' +
+                       '<div class="skim-mermaid-scroll">' +
                        '<pre class="mermaid" data-source="' + escapeAttr(rawCode) + '">' +
                        escapeHtml(rawCode) +
-                       '</pre></div>';
+                       '</pre></div></div>';
             }
 
             if (lang === "math") {
@@ -409,9 +485,18 @@
     }
 
     function renderMermaidBlocks() {
-        if (!window.mermaid || !contentEl) return;
+        if (!contentEl) return Promise.resolve();
+        // Even if mermaid is not loaded (e.g. jsdom smoke tests), still bind
+        // the zoom hint badge so structure-level tests can verify the wiring.
+        if (!window.mermaid) {
+            bindZoomToMermaidWraps();
+            return Promise.resolve();
+        }
         var blocks = contentEl.querySelectorAll("pre.mermaid");
-        if (blocks.length === 0) return;
+        if (blocks.length === 0) {
+            bindZoomToMermaidWraps();
+            return Promise.resolve();
+        }
         try {
             var p = window.mermaid.run({
                 querySelector: "#content pre.mermaid",
@@ -423,17 +508,23 @@
             // `width="100%"` + `style="max-width: NNNpx"`, which is mermaid v11's
             // default output). The synchronous try/catch above only catches
             // setup-time throws, not async render failures, so attach a .catch
-            // to log them without leaving an unhandled rejection.
+            // to log them without leaving an unhandled rejection. Once the
+            // SVGs exist (success OR failure), wire up the zoom hint/click.
             if (p && typeof p.then === "function") {
-                p.then(function () { normalizeMermaidSvgSizes(contentEl); })
-                 .catch(function (e) {
-                     logToHost("mermaid.run rejected: " + (e && e.message ? e.message : e));
-                 });
-            } else {
-                normalizeMermaidSvgSizes(contentEl);
+                return p
+                    .then(function () { normalizeMermaidSvgSizes(contentEl); })
+                    .catch(function (e) {
+                        logToHost("mermaid.run rejected: " + (e && e.message ? e.message : e));
+                    })
+                    .then(function () { bindZoomToMermaidWraps(); });
             }
+            normalizeMermaidSvgSizes(contentEl);
+            bindZoomToMermaidWraps();
+            return Promise.resolve();
         } catch (e) {
             logToHost("mermaid.run failed: " + (e && e.message ? e.message : e));
+            bindZoomToMermaidWraps();
+            return Promise.resolve();
         }
     }
 
@@ -503,6 +594,499 @@
 
     function isFinitePositive(n) {
         return typeof n === "number" && isFinite(n) && n > 0;
+    }
+
+    // ----- Mermaid zoom modal -----
+    //
+    // Click any rendered Mermaid diagram to open it in an overlay where the
+    // user can pan (mouse drag / 1-finger touch) and zoom (Ctrl+wheel /
+    // 2-finger pinch / toolbar / +/- keys). The modal is appended directly
+    // under <body> — outside the #skim-zoom-root that owns the document zoom
+    // — so the body-level CSS `zoom` does not double-scale this overlay.
+    //
+    // The modal DOM is created via createElement/textContent (never innerHTML)
+    // so localized strings are never interpreted as markup.
+
+    function ensureZoomModal() {
+        if (zoomModal) return zoomModal;
+        if (!document.body) return null;
+
+        zoomModal = document.createElement("div");
+        zoomModal.className = "skim-zoom-modal";
+        zoomModal.setAttribute("role", "dialog");
+        zoomModal.setAttribute("aria-modal", "true");
+
+        zoomStage = document.createElement("div");
+        zoomStage.className = "skim-zoom-stage";
+
+        var toolbar = document.createElement("div");
+        toolbar.className = "skim-zoom-toolbar";
+
+        zoomBtnOut = document.createElement("button");
+        zoomBtnOut.type = "button";
+        zoomBtnOut.textContent = "\u2212"; // minus sign
+        zoomBtnOut.addEventListener("click", function () { setZoomModalScale(zoomState.scale / 1.25); });
+
+        zoomInfo = document.createElement("span");
+        zoomInfo.className = "skim-zoom-info";
+        zoomInfo.textContent = "100%";
+
+        zoomBtnIn = document.createElement("button");
+        zoomBtnIn.type = "button";
+        zoomBtnIn.textContent = "+";
+        zoomBtnIn.addEventListener("click", function () { setZoomModalScale(zoomState.scale * 1.25); });
+
+        zoomBtnReset = document.createElement("button");
+        zoomBtnReset.type = "button";
+        zoomBtnReset.textContent = "\u21BB"; // clockwise arrow
+        zoomBtnReset.addEventListener("click", function () { fitZoomModalToStage(); });
+
+        zoomBtnClose = document.createElement("button");
+        zoomBtnClose.type = "button";
+        zoomBtnClose.textContent = "\u2715"; // multiplication X
+        zoomBtnClose.addEventListener("click", closeZoomModal);
+
+        toolbar.appendChild(zoomBtnOut);
+        toolbar.appendChild(zoomInfo);
+        toolbar.appendChild(zoomBtnIn);
+        toolbar.appendChild(zoomBtnReset);
+        toolbar.appendChild(zoomBtnClose);
+
+        zoomContent = document.createElement("div");
+        zoomContent.className = "skim-zoom-content";
+
+        zoomHintEl = document.createElement("div");
+        zoomHintEl.className = "skim-zoom-hint";
+
+        zoomStage.appendChild(toolbar);
+        zoomStage.appendChild(zoomContent);
+        zoomStage.appendChild(zoomHintEl);
+        zoomModal.appendChild(zoomStage);
+
+        // Click on the backdrop (outside the stage) closes.
+        zoomModal.addEventListener("click", function (ev) {
+            if (ev.target === zoomModal) closeZoomModal();
+        });
+
+        // Pointer-events wiring lives on the stage so toolbar clicks are not
+        // interpreted as pan starts.
+        zoomStage.addEventListener("pointerdown", onZoomPointerDown);
+        zoomStage.addEventListener("pointermove", onZoomPointerMove);
+        zoomStage.addEventListener("pointerup", onZoomPointerEnd);
+        zoomStage.addEventListener("pointercancel", onZoomPointerEnd);
+        zoomStage.addEventListener("lostpointercapture", onZoomPointerEnd);
+
+        // Stage-level wheel zoom. capture: false + passive: false so the
+        // global handleWheelZoom early-returns when the event target is
+        // inside the modal and we get the wheel here.
+        zoomStage.addEventListener("wheel", onZoomWheel, { passive: false });
+
+        // Forward Mermaid `<a>` clicks inside the cloned SVG to the host's
+        // link pipeline (external -> default browser, relative -> open .md).
+        zoomStage.addEventListener("click", onZoomStageClick);
+
+        document.body.appendChild(zoomModal);
+        applyStringsToZoomModal();
+        return zoomModal;
+    }
+
+    function applyStringsToZoomModal() {
+        if (!zoomModal) return;
+        zoomModal.setAttribute("aria-label", t("mermaidZoom.dialogLabel"));
+        if (zoomBtnIn)    zoomBtnIn.setAttribute("aria-label", t("mermaidZoom.zoomIn"));
+        if (zoomBtnIn)    zoomBtnIn.setAttribute("title", t("mermaidZoom.zoomIn"));
+        if (zoomBtnOut)   zoomBtnOut.setAttribute("aria-label", t("mermaidZoom.zoomOut"));
+        if (zoomBtnOut)   zoomBtnOut.setAttribute("title", t("mermaidZoom.zoomOut"));
+        if (zoomBtnReset) zoomBtnReset.setAttribute("aria-label", t("mermaidZoom.reset"));
+        if (zoomBtnReset) zoomBtnReset.setAttribute("title", t("mermaidZoom.reset"));
+        if (zoomBtnClose) zoomBtnClose.setAttribute("aria-label", t("mermaidZoom.close"));
+        if (zoomBtnClose) zoomBtnClose.setAttribute("title", t("mermaidZoom.close"));
+        if (zoomHintEl)   zoomHintEl.textContent = t("mermaidZoom.hint");
+    }
+
+    function applyStringsToZoomHints() {
+        if (!contentEl) return;
+        var hints = contentEl.querySelectorAll(".skim-mermaid-zoom-hint");
+        for (var i = 0; i < hints.length; i++) {
+            hints[i].textContent = t("mermaidZoom.openHint");
+        }
+        // Already-bound wraps also keep the same string as their accessible
+        // name. New wraps pick it up on bind via t() at construction time.
+        var boundWraps = contentEl.querySelectorAll(".skim-mermaid-wrap[data-zoom-bound='1']");
+        for (var j = 0; j < boundWraps.length; j++) {
+            boundWraps[j].setAttribute("aria-label", t("mermaidZoom.openHint"));
+        }
+    }
+
+    // Attach a click-to-zoom hint + click handler to every Mermaid wrap that
+    // does not yet have one. Idempotent via dataset.zoomBound.
+    function bindZoomToMermaidWraps() {
+        if (!contentEl) return;
+        var wraps = contentEl.querySelectorAll(".skim-mermaid-wrap");
+        for (var i = 0; i < wraps.length; i++) {
+            var wrap = wraps[i];
+            if (wrap.dataset.zoomBound === "1") continue;
+            wrap.dataset.zoomBound = "1";
+
+            // Mark the wrap as a click target for accessibility tools.
+            wrap.setAttribute("role", "button");
+            wrap.setAttribute("tabindex", "0");
+            wrap.setAttribute("aria-label", t("mermaidZoom.openHint"));
+
+            // The hint badge has to be re-added every time we rebind, because
+            // theme refresh wipes inner DOM (see refreshMermaidForTheme).
+            // Ensure idempotency by removing any stray previous hint first.
+            var existingHint = wrap.querySelector(":scope > .skim-mermaid-zoom-hint");
+            if (existingHint) existingHint.remove();
+
+            var hint = document.createElement("div");
+            hint.className = "skim-mermaid-zoom-hint";
+            hint.setAttribute("aria-hidden", "true");
+            hint.textContent = t("mermaidZoom.openHint");
+            wrap.appendChild(hint);
+
+            // Event listeners are wired once for the lifetime of the wrap
+            // node so theme refresh (which re-runs bind to restore the hint)
+            // does not leak duplicate handlers. `dataset.zoomListener` is the
+            // permanent marker; `dataset.zoomBound` may be cleared and reset
+            // to trigger a hint rebuild.
+            if (wrap.dataset.zoomListener !== "1") {
+                wrap.dataset.zoomListener = "1";
+                wrap.addEventListener("click", onMermaidWrapClick);
+                wrap.addEventListener("keydown", onMermaidWrapKey);
+            }
+        }
+    }
+
+    function onMermaidWrapKey(ev) {
+        // Enter / Space activate the wrap exactly like a real <button>.
+        if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            onMermaidWrapClick({
+                currentTarget: ev.currentTarget,
+                target: ev.target,
+            });
+        }
+    }
+
+    function onMermaidWrapClick(ev) {
+        // Do not open the modal when the user clicked a Mermaid-internal
+        // hyperlink (Mermaid emits `<a xlink:href="...">` and similar for
+        // `click NODE href "URL"` syntax). Let the existing #content click
+        // delegate route the link to the host.
+        if (ev.target && typeof ev.target.closest === "function") {
+            if (ev.target.closest("a")) return;
+            // Toolbar / copy buttons should never count as a zoom trigger.
+            if (ev.target.closest(".skim-code-copy")) return;
+        }
+        // Skip if the user is currently selecting text.
+        try {
+            var sel = window.getSelection();
+            if (sel && sel.toString && sel.toString().length > 0) return;
+        } catch (e) { /* defensive */ }
+
+        var wrap = ev.currentTarget;
+        if (!wrap) return;
+        var svg = wrap.querySelector("svg");
+        if (!svg) return;
+        openZoomModal(svg);
+    }
+
+    function openZoomModal(svgEl) {
+        if (!svgEl) return;
+        var modal = ensureZoomModal();
+        if (!modal) return;
+
+        // Remember focus so we can restore it on close.
+        try { zoomLastFocused = document.activeElement; } catch (e) { zoomLastFocused = null; }
+
+        // Clone the SVG so the original keeps rendering inline. Strip mermaid's
+        // max-width cap so the modal can scale freely.
+        var clone = svgEl.cloneNode(true);
+        clone.removeAttribute("style");
+        clone.style.maxWidth = "none";
+        clone.style.maxHeight = "none";
+        clone.style.display = "block";
+
+        var dim = computeSvgNaturalSize(clone, svgEl);
+        clone.setAttribute("width", String(dim.width));
+        clone.setAttribute("height", String(dim.height));
+
+        zoomContent.innerHTML = "";
+        zoomContent.style.width  = dim.width  + "px";
+        zoomContent.style.height = dim.height + "px";
+        zoomContent.appendChild(clone);
+
+        modal.classList.add("open");
+        document.body.style.overflow = "hidden";
+
+        // Take the markdown body OUT of the accessibility tree while the
+        // modal owns the screen. `inert` (where available) also blocks
+        // focus + pointer events on background content; aria-hidden is the
+        // wider-support fallback for AT.
+        var zoomRoot = document.getElementById("skim-zoom-root");
+        if (zoomRoot) {
+            zoomRoot.setAttribute("aria-hidden", "true");
+            try { zoomRoot.inert = true; } catch (e) { /* older WebView2 */ }
+        }
+
+        // Compute fit-to-screen after the stage has its actual size.
+        var raf = window.requestAnimationFrame || function (cb) { return setTimeout(cb, 0); };
+        raf(function () { fitZoomModalToStage(); });
+
+        // Focus the close button so keyboard users land somewhere meaningful.
+        try { zoomBtnClose.focus(); } catch (e) { /* best-effort */ }
+    }
+
+    function computeSvgNaturalSize(clone, sourceSvg) {
+        // Prefer the post-normalize explicit pixel size (set by
+        // normalizeMermaidSvgSizes for the live SVG). If those aren't
+        // available, fall back to viewBox dimensions; finally, fall back to
+        // the rendered bounding rect.
+        var w = 0, h = 0;
+        if (sourceSvg) {
+            var aw = parseFloat(sourceSvg.getAttribute("width"));
+            var ah = parseFloat(sourceSvg.getAttribute("height"));
+            if (isFinitePositive(aw) && isFinitePositive(ah)) {
+                w = aw; h = ah;
+            }
+        }
+        if (!w || !h) {
+            var vb = clone.getAttribute("viewBox");
+            if (vb) {
+                var p = vb.split(/[\s,]+/).map(parseFloat);
+                if (p.length === 4 && isFinitePositive(p[2]) && isFinitePositive(p[3])) {
+                    w = p[2]; h = p[3];
+                }
+            }
+        }
+        if (!w || !h) {
+            try {
+                var rect = sourceSvg.getBoundingClientRect();
+                w = rect.width || 800;
+                h = rect.height || 600;
+            } catch (e) {
+                w = 800; h = 600;
+            }
+        }
+        return { width: w, height: h };
+    }
+
+    function closeZoomModal() {
+        if (!zoomModal) return;
+        zoomModal.classList.remove("open");
+        if (zoomContent) zoomContent.innerHTML = "";
+        document.body.style.overflow = "";
+
+        // Restore the markdown body to the accessibility tree.
+        var zoomRoot = document.getElementById("skim-zoom-root");
+        if (zoomRoot) {
+            zoomRoot.removeAttribute("aria-hidden");
+            try { zoomRoot.inert = false; } catch (e) { /* older WebView2 */ }
+        }
+
+        // Reset transform + pointer / pinch state.
+        zoomState.scale = 1;
+        zoomState.tx = 0;
+        zoomState.ty = 0;
+        zoomPointers.clear();
+        zoomPinch = null;
+        if (zoomStage) zoomStage.classList.remove("dragging");
+
+        // Restore focus to whatever had it before the modal opened.
+        try {
+            if (zoomLastFocused && typeof zoomLastFocused.focus === "function") {
+                zoomLastFocused.focus();
+            }
+        } catch (e) { /* best-effort */ }
+        zoomLastFocused = null;
+    }
+
+    function applyZoomModalTransform() {
+        if (!zoomContent || !zoomInfo) return;
+        zoomContent.style.transform =
+            "translate(calc(-50% + " + zoomState.tx + "px), calc(-50% + " + zoomState.ty + "px)) scale(" + zoomState.scale + ")";
+        zoomInfo.textContent = Math.round(zoomState.scale * 100) + "%";
+    }
+
+    function setZoomModalScale(next) {
+        if (!isFinite(next)) return;
+        zoomState.scale = Math.min(ZOOM_MODAL_MAX, Math.max(ZOOM_MODAL_MIN, next));
+        applyZoomModalTransform();
+    }
+
+    function fitZoomModalToStage() {
+        if (!zoomStage || !zoomContent) return;
+        var w = parseFloat(zoomContent.style.width) || 0;
+        var h = parseFloat(zoomContent.style.height) || 0;
+        if (w <= 0 || h <= 0) {
+            zoomState.scale = 1;
+            zoomState.tx = 0;
+            zoomState.ty = 0;
+            applyZoomModalTransform();
+            return;
+        }
+        var rect = zoomStage.getBoundingClientRect();
+        var padding = 40;
+        var availW = (rect.width || 0) - padding;
+        var availH = (rect.height || 0) - padding;
+        var fit = 1;
+        if (availW > 0 && availH > 0) {
+            fit = Math.min(availW / w, availH / h);
+        }
+        zoomState.scale = Math.min(4, Math.max(ZOOM_MODAL_MIN, fit > 0 ? fit : 1));
+        zoomState.tx = 0;
+        zoomState.ty = 0;
+        applyZoomModalTransform();
+    }
+
+    function onZoomWheel(ev) {
+        ev.preventDefault();
+        var factor = ev.deltaY < 0 ? 1.1 : 1 / 1.1;
+        setZoomModalScale(zoomState.scale * factor);
+    }
+
+    function onZoomPointerDown(ev) {
+        // Toolbar buttons own their clicks — never start a pan there.
+        if (ev.target && typeof ev.target.closest === "function" &&
+            ev.target.closest(".skim-zoom-toolbar")) {
+            return;
+        }
+        ev.preventDefault();
+        try { zoomStage.setPointerCapture(ev.pointerId); } catch (e) { /* defensive */ }
+
+        zoomPointers.set(ev.pointerId, {
+            x: ev.clientX,
+            y: ev.clientY,
+            originX: ev.clientX,
+            originY: ev.clientY,
+            startTx: zoomState.tx,
+            startTy: zoomState.ty,
+        });
+
+        if (zoomPointers.size === 1) {
+            zoomStage.classList.add("dragging");
+            zoomPinch = null;
+        } else if (zoomPointers.size === 2) {
+            // Bootstrap pinch state from the two active pointers.
+            zoomPinch = computePinchSnapshot();
+            zoomStage.classList.remove("dragging");
+        }
+    }
+
+    function onZoomPointerMove(ev) {
+        if (!zoomPointers.has(ev.pointerId)) return;
+        var rec = zoomPointers.get(ev.pointerId);
+        rec.x = ev.clientX;
+        rec.y = ev.clientY;
+
+        if (zoomPointers.size >= 2 && zoomPinch) {
+            // Pinch: scale by distance ratio, pan by midpoint delta.
+            var pts = Array.from(zoomPointers.values());
+            var p0 = pts[0], p1 = pts[1];
+            var dx = p1.x - p0.x, dy = p1.y - p0.y;
+            var dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > 0 && zoomPinch.startDist > 0) {
+                var nextScale = zoomPinch.startScale * (dist / zoomPinch.startDist);
+                nextScale = Math.min(ZOOM_MODAL_MAX, Math.max(ZOOM_MODAL_MIN, nextScale));
+                zoomState.scale = nextScale;
+            }
+            var midX = (p0.x + p1.x) / 2;
+            var midY = (p0.y + p1.y) / 2;
+            zoomState.tx = zoomPinch.startTx + (midX - zoomPinch.startMidX);
+            zoomState.ty = zoomPinch.startTy + (midY - zoomPinch.startMidY);
+            applyZoomModalTransform();
+        } else if (zoomPointers.size === 1) {
+            // Single-pointer pan: delta is from the down position.
+            zoomState.tx = rec.startTx + (rec.x - rec.originX);
+            zoomState.ty = rec.startTy + (rec.y - rec.originY);
+            applyZoomModalTransform();
+        }
+    }
+
+    function computePinchSnapshot() {
+        var pts = Array.from(zoomPointers.values());
+        var p0 = pts[0], p1 = pts[1];
+        var dx = p1.x - p0.x, dy = p1.y - p0.y;
+        return {
+            startDist: Math.sqrt(dx * dx + dy * dy),
+            startScale: zoomState.scale,
+            startMidX: (p0.x + p1.x) / 2,
+            startMidY: (p0.y + p1.y) / 2,
+            startTx: zoomState.tx,
+            startTy: zoomState.ty,
+        };
+    }
+
+    function onZoomPointerEnd(ev) {
+        if (zoomPointers.has(ev.pointerId)) {
+            zoomPointers.delete(ev.pointerId);
+        }
+        try { zoomStage.releasePointerCapture(ev.pointerId); } catch (e) { /* best-effort */ }
+
+        if (zoomPointers.size < 2) {
+            zoomPinch = null;
+        }
+        // When a pinch ends with one finger remaining, that pointer's
+        // stored start coordinates and startTx/Ty still reflect the
+        // pre-pinch drag baseline. Continuing to drag from there would
+        // jump from the wrong reference. Reset the remaining pointer's
+        // baseline to its current position + the new pan offset so the
+        // very next move is a continuation, not a snap.
+        if (zoomPointers.size === 1) {
+            var remaining = zoomPointers.values().next().value;
+            if (remaining) {
+                remaining.originX = remaining.x;
+                remaining.originY = remaining.y;
+                remaining.startTx = zoomState.tx;
+                remaining.startTy = zoomState.ty;
+            }
+        }
+        if (zoomPointers.size === 0) {
+            zoomStage.classList.remove("dragging");
+        }
+    }
+
+    function onZoomStageClick(ev) {
+        // SVG <a> elements: emulate the host link routing so external links
+        // launch the default browser (not navigate the WebView itself).
+        var target = ev.target;
+        if (!target || typeof target.closest !== "function") return;
+        var anchor = target.closest("a");
+        if (!anchor) return;
+        var href = anchor.getAttribute("href")
+            || anchor.getAttributeNS("http://www.w3.org/1999/xlink", "href")
+            || anchor.getAttribute("xlink:href");
+        if (!href) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        closeZoomModal();
+        postToHost({
+            type: "link",
+            href: href,
+            kind: isExternalUrl(href) ? "external" : "relative",
+        });
+    }
+
+    // Tab / Shift+Tab focus trap among the 4 toolbar buttons.
+    function trapZoomModalFocus(ev) {
+        if (!isZoomModalOpen()) return;
+        if (ev.key !== "Tab") return;
+        var buttons = [zoomBtnOut, zoomBtnIn, zoomBtnReset, zoomBtnClose].filter(function (b) { return !!b; });
+        if (buttons.length === 0) return;
+        var active = document.activeElement;
+        var idx = buttons.indexOf(active);
+        if (idx === -1) {
+            // Focus had escaped the modal; pull it back to the close button.
+            ev.preventDefault();
+            zoomBtnClose.focus();
+            return;
+        }
+        var next = ev.shiftKey ? idx - 1 : idx + 1;
+        if (next < 0) next = buttons.length - 1;
+        else if (next >= buttons.length) next = 0;
+        ev.preventDefault();
+        buttons[next].focus();
     }
 
     // ----- GitHub Alerts (> [!NOTE], > [!TIP], > [!IMPORTANT], > [!WARNING], > [!CAUTION]) -----
@@ -733,8 +1317,12 @@
 
     function refreshMermaidForTheme() {
         if (!window.mermaid || !contentEl) return;
-        var blocks = contentEl.querySelectorAll("pre.mermaid, .skim-mermaid-wrap > pre, .skim-mermaid-wrap svg");
+        var blocks = contentEl.querySelectorAll("pre.mermaid, .skim-mermaid-wrap pre, .skim-mermaid-wrap svg");
         if (blocks.length === 0) return;
+        // If the zoom modal is showing a clone of an SVG that's about to be
+        // re-rendered under the new theme, close it so the user doesn't see
+        // stale colors.
+        if (isZoomModalOpen()) closeZoomModal();
         // Reset each Mermaid block back to its source so .run() will re-render under the new theme.
         var wraps = contentEl.querySelectorAll(".skim-mermaid-wrap");
         wraps.forEach(function (wrap) {
@@ -744,12 +1332,19 @@
                 src = existing ? (existing.getAttribute("data-source") || existing.textContent) : "";
                 wrap.setAttribute("data-source", src);
             }
+            // Rebuild the inner DOM but preserve the wrap/scroll split. The
+            // zoom-hint badge (if already bound) is also flushed; the
+            // post-render bindZoomToMermaidWraps() call re-attaches it idempotently.
             wrap.innerHTML = '';
+            wrap.removeAttribute('data-zoom-bound');
+            var scroll = document.createElement("div");
+            scroll.className = "skim-mermaid-scroll";
             var pre = document.createElement("pre");
             pre.className = "mermaid";
             pre.setAttribute("data-source", src);
             pre.textContent = src;
-            wrap.appendChild(pre);
+            scroll.appendChild(pre);
+            wrap.appendChild(scroll);
         });
         renderMermaidBlocks();
     }
@@ -838,7 +1433,17 @@
         if (!isFinite(f) || f <= 0) return;
         f = clampZoom(f);
         currentZoom = f;
-        document.body.style.zoom = String(f);
+        // Apply zoom to the dedicated zoom-root wrapper (not body) so the
+        // Mermaid zoom modal — which is appended directly under <body> — is
+        // not double-scaled by the document zoom.
+        var root = document.getElementById("skim-zoom-root");
+        if (root) {
+            root.style.zoom = String(f);
+        } else {
+            // Fallback for environments without the wrapper (e.g. tests with
+            // a synthetic DOM).
+            document.body.style.zoom = String(f);
+        }
     }
 
     function clampZoom(f) {
@@ -908,6 +1513,12 @@
     // call preventDefault() before any inner element scrolls.
     function handleWheelZoom(ev) {
         if (!ev.ctrlKey) return;
+        // Mermaid zoom modal owns wheel/pinch when open — do not also adjust
+        // the document zoom in that case. The modal's own stage handler will
+        // (re-)act on the wheel event.
+        if (isZoomModalOpen() && zoomModal && zoomModal.contains(ev.target)) {
+            return;
+        }
         // Skip if the user is interacting with form fields; nothing in the
         // rendered Markdown should be editable, but be defensive.
         if (isEditableTarget(ev.target)) return;
@@ -995,6 +1606,10 @@
 
     function render(markdown, sourcePath, contentBaseUri, theme, themeType, themeIsDark, themeVars) {
         if (typeof markdown !== "string") markdown = "";
+        // If the user switches to another file while the zoom modal is open,
+        // the clone in the modal now points at a diagram that's about to be
+        // detached. Close the modal so we never leave a stale view on top.
+        if (isZoomModalOpen()) closeZoomModal();
         currentContentBaseUri = contentBaseUri || "";
         // sourceDir is the relative folder portion of sourcePath, forward-slash form.
         currentSourceDir = "";
@@ -1037,7 +1652,10 @@
         // textContent with SVG once it runs, so theme-refresh later needs
         // this attribute to recover the original source.
         if (contentEl) {
-            contentEl.querySelectorAll(".skim-mermaid-wrap > pre.mermaid").forEach(function (pre) {
+            // Descendant selector (not `>`) because the wrap layout puts
+            // <pre> inside `.skim-mermaid-scroll`:
+            //   .skim-mermaid-wrap > .skim-mermaid-scroll > pre.mermaid
+            contentEl.querySelectorAll(".skim-mermaid-wrap pre.mermaid").forEach(function (pre) {
                 if (!pre.hasAttribute("data-source")) {
                     pre.setAttribute("data-source", pre.textContent || "");
                 }
@@ -1124,7 +1742,15 @@
 
         var anchor = ev.target.closest && ev.target.closest("a");
         if (!anchor) return;
-        var href = anchor.getAttribute("href");
+        // Mermaid emits `<a xlink:href="URL">` for `click NODE href "URL"`
+        // syntax, so an inline diagram link only has the namespaced form.
+        // Try plain href first (HTML5 / most cases), then both forms of the
+        // xlink attribute. Without the xlink fallback, in-diagram external
+        // links would bypass IExternalUriLauncher and navigate inside the
+        // WebView.
+        var href = anchor.getAttribute("href")
+            || anchor.getAttributeNS("http://www.w3.org/1999/xlink", "href")
+            || anchor.getAttribute("xlink:href");
         if (!href) return;
 
         if (href.charAt(0) === "#") {
@@ -1385,6 +2011,47 @@
     }
 
     function handleAcceleratorKey(ev) {
+        // When the Mermaid zoom modal is open, intercept its keyboard
+        // shortcuts (Esc / +/- / 0 / Tab) BEFORE the host-shortcut path so
+        // they don't double-fire (e.g. "0" would normally be ignored by
+        // shortcutIdFromEvent because it requires Ctrl, but the modal owns
+        // these plain keys).
+        if (isZoomModalOpen()) {
+            // Tab focus trap.
+            if (ev.key === "Tab") {
+                trapZoomModalFocus(ev);
+                return;
+            }
+            if (ev.key === "Escape") {
+                ev.preventDefault();
+                ev.stopPropagation();
+                closeZoomModal();
+                return;
+            }
+            // Plain +/- and Ctrl+/- both adjust the modal scale while open.
+            if (!isEditableTarget(ev.target)) {
+                if (ev.key === "+" || ev.key === "=") {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    setZoomModalScale(zoomState.scale * 1.25);
+                    return;
+                }
+                if (ev.key === "-" || ev.key === "_") {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    setZoomModalScale(zoomState.scale / 1.25);
+                    return;
+                }
+                if (ev.key === "0") {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    fitZoomModalToStage();
+                    return;
+                }
+            }
+            // Other keys (e.g. Ctrl+W to close window) still fall through.
+        }
+
         // Don't hijack keystrokes the user is typing into a real input.
         if (isEditableTarget(ev.target)) return;
 
@@ -1421,6 +2088,9 @@
 
         installPurifyHooks();
         initMermaid(currentThemeType);
+        // Construct the Mermaid zoom modal eagerly so we can apply localized
+        // strings as soon as the host posts them.
+        ensureZoomModal();
 
         if (window.chrome && window.chrome.webview) {
             window.chrome.webview.addEventListener("message", function (ev) {
@@ -1436,6 +2106,11 @@
                             msg.themeType,
                             msg.themeIsDark,
                             msg.themeVars);
+                        break;
+                    case "strings":
+                        if (msg.strings && typeof msg.strings === "object") {
+                            setStrings(msg.strings);
+                        }
                         break;
                     case "theme":
                         setTheme(msg.theme, msg.themeType, msg.themeIsDark, msg.themeVars);
@@ -1495,10 +2170,26 @@
 
     // Expose pure-DOM helpers for jsdom-based smoke tests. Production code
     // never reads this; it's only here so smoke-renderer.js can exercise
-    // edge cases of normalizeMermaidSvgSizes without booting real mermaid.
+    // edge cases without booting real mermaid.
     if (typeof window !== "undefined") {
         window.__skimDownInternal = {
             normalizeMermaidSvgSizes: normalizeMermaidSvgSizes,
+            setStrings: setStrings,
+            t: t,
+            getZoomModal: function () { return zoomModal; },
+            openZoomModal: openZoomModal,
+            closeZoomModal: closeZoomModal,
+            isZoomModalOpen: isZoomModalOpen,
+            getZoomState: function () { return { scale: zoomState.scale, tx: zoomState.tx, ty: zoomState.ty }; },
+            bindZoomToMermaidWraps: bindZoomToMermaidWraps,
+            simulateMermaidWrapClick: function (wrap, opts) {
+                onMermaidWrapClick({
+                    currentTarget: wrap,
+                    target: (opts && opts.target) || wrap,
+                });
+            },
+            handleWheelZoom: handleWheelZoom,
+            applyZoomLocal: applyZoomLocal,
         };
     }
 })();
