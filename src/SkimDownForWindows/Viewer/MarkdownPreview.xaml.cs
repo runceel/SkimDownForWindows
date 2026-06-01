@@ -57,6 +57,7 @@ public sealed partial class MarkdownPreview : UserControl
     private bool _hasPendingThemeOnlyUpdate;
     private double? _pendingZoom;
     private string? _pendingContentMaxWidth;
+    private IReadOnlyDictionary<string, string>? _pendingStrings;
     private string? _currentFolderRoot;
 
     public MarkdownPreview()
@@ -328,6 +329,36 @@ public sealed partial class MarkdownPreview : UserControl
         }
     }
 
+    /// <summary>
+    /// Push a localized strings dictionary to the renderer (currently used by
+    /// the Mermaid zoom modal — "mermaidZoom.openHint" etc.). Keys are
+    /// renderer-internal JS-friendly identifiers; values are display strings
+    /// already resolved from <c>Resources.resw</c> by the caller.
+    ///
+    /// The renderer keeps English defaults so this can be called any number
+    /// of times (including zero) without breaking the UI. The next call wins
+    /// (merge semantics inside the renderer).
+    /// </summary>
+    public void SetStrings(IReadOnlyDictionary<string, string>? strings)
+    {
+        if (strings is null || strings.Count == 0) return;
+        // Defensive copy to keep host -> renderer invariants stable across the
+        // pending/flush boundary (caller cannot mutate after handing off).
+        var clone = new Dictionary<string, string>(strings.Count, StringComparer.Ordinal);
+        foreach (var kv in strings)
+        {
+            if (string.IsNullOrEmpty(kv.Key) || kv.Value is null) continue;
+            clone[kv.Key] = kv.Value;
+        }
+        if (clone.Count == 0) return;
+        _pendingStrings = clone;
+        if (_webReady)
+        {
+            Post(new { type = "strings", strings = _pendingStrings });
+            _pendingStrings = null;
+        }
+    }
+
     public void Search(string query, bool caseSensitive)
     {
         if (!_webReady) return;
@@ -403,6 +434,15 @@ public sealed partial class MarkdownPreview : UserControl
         {
             Post(new { type = "contentMaxWidth", value = pendingContentMax });
             _pendingContentMaxWidth = null;
+        }
+
+        // ローカライズ文字列も render より前に届ける。これで Mermaid の
+        // 「クリックで拡大」ヒント等が、初期描画時から localized で出る
+        // (英語デフォルトのちらつきを防ぐ)。
+        if (_pendingStrings is { } pendingStrings)
+        {
+            Post(new { type = "strings", strings = pendingStrings });
+            _pendingStrings = null;
         }
 
         if (_pendingMarkdown is null)

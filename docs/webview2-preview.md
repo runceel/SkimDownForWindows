@@ -87,6 +87,7 @@ sequenceDiagram
 | `theme` | `theme`, `themeType`, `themeIsDark`, `themeVars` | テーマだけを切替 (Markdown は再描画しない) |
 | `zoom` | `factor` | レンダラー zoom 倍率を設定 (host の `ZoomFactor` と sync) |
 | `contentMaxWidth` | `value` (CSS 値: `"760px"` / `"960px"` / `"1200px"` / `"none"`) | 本文 (`main.markdown-body`) の `max-width` を `--skim-content-max` CSS 変数経由で上書きする (`AppSettings.ContentMaxWidth` と sync) |
+| `strings` | `strings` (flat object: `{ "mermaidZoom.openHint": "..." , ... }`) | renderer 内のローカライズ可能 UI 文字列 (現状は Mermaid 拡大モーダル) を差し替える。renderer は英語デフォルトを内包しており、欠落キーはフォールバックする。`FlushPendingAsync` は `render` より前に送って初回描画の英語ちらつきを防ぐ |
 | `empty` | (なし) | 空状態にクリア |
 | `search` | `query`, `caseSensitive` | 検索開始 |
 | `search/next` / `search/prev` / `search/clear` | (なし) | 検索の前後移動 / クリア |
@@ -127,6 +128,19 @@ renderer は markdown-it のレンダリング結果に DOMPurify を必ず通�
 `{type:"theme"}` のペイロードに含まれる `themeVars` は **`--skim-*` プレフィックスのみ** が host 側 `CloneThemeVars` で安全網フィルタを通過する。renderer 側でも同じプレフィックスを再チェックする (二重防御)。値の妥当性は Application 層の [`ColorValueValidator`](../src/SkimDownForWindows.Application/Theme/ColorValueValidator.cs) で事前検証されているので、`var(--x)` / `calc(...)` / `;` / `{` / `}` 等が混ざることはない。
 
 テーマ全体の解決経路は [theming.md](theming.md) を参照。
+
+## Mermaid 拡大モーダル
+
+複雑な図を細部まで読めるようにするため、Mermaid 図には「クリックで拡大」のヒント (右上に absolute 位置のバッジ) が付き、wrap 全体クリックで全画面オーバーレイ (`role="dialog"` の zoom modal) が開く。
+
+- DOM 構造: 各 Mermaid fence は `<div class="skim-mermaid-wrap"><div class="skim-mermaid-scroll"><pre class="mermaid">...</pre></div></div>` として吐かれる。外側の wrap は `position: relative` のみで、横スクロールは内側 `.skim-mermaid-scroll` が担当する (絶対位置のバッジが横スクロールで隠れないようにするため)。バインドは `bindZoomToMermaidWraps()` が `mermaid.run()` の Promise chain 末尾で冪等に行う (`data-zoom-bound="1"`)。
+- クリック: wrap 全体が開く対象。ただし `<a>` (Mermaid の `click NODE href` で生成された xlink/href リンク) や `.skim-code-copy` ボタンの中、テキスト選択中は無視する。`role="button"` + `tabindex="0"` を持ち、Enter / Space でも開く。
+- モーダル: `document.body` 直下に append される (後述の zoom isolation 参照)。SVG はクローンして `viewBox` から自然サイズを `width` / `height` 属性に明示。ステージ確定後に `requestAnimationFrame` で fit-to-stage。
+- 操作: mouse wheel zoom / drag pan、Pointer Events で 1 指 pan / 2 指 pinch (`setPointerCapture` + `pointerup` / `pointercancel` / `lostpointercapture` の 3 種で active map を片付け、touch-action: none で browser ジェスチャと衝突回避)、ツールバー (− / % / + / ↻ / ✕)、Esc 閉じる、+ / − / 0 のキー。
+- アクセシビリティ: open 時に直前の `activeElement` を保存して閉じるボタンに focus、Tab / Shift+Tab で modal 内 focusable 要素を循環、close 時に元の focus を復元。
+- モーダル内リンク転送: クローン SVG 内の `<a xlink:href>` / `<a href>` クリックは modal を閉じてから `{type:"link", kind:"external"}` を host に post する (通常の外部リンクと同じ経路)。
+- zoom isolation: host の `ZoomFactor` (`{type:"zoom"}`) は `<div id="skim-zoom-root">` (renderer.html で `<main id="content">` をラップ) に `style.zoom` で適用される。モーダルは zoom-root の兄弟 (`body` 直下) に置くので、ドキュメント zoom の影響を受けない。グローバル Ctrl+wheel ハンドラもモーダル open 中はモーダル内 target を見て早期 return する (`isInsideModal(ev.target)`)。
+- ローカライズ: バッジ / ダイアログラベル / ツールバーボタン / ヒントテキストは `{type:"strings"}` で受け取る `mermaidZoom.*` キーで上書き可能。リソース定義は [`Resources.resw`](../src/SkimDownForWindows/Strings/en-US/Resources.resw) の `MermaidZoom.*` 系。host 側で resw キー → JS キーへのマッピングは [`MainPage.BuildPreviewLocalizedStrings`](../src/SkimDownForWindows/MainPage.xaml.cs) にまとまっている。
 
 ## 関連
 

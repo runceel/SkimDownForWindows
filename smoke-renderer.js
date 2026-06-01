@@ -15,7 +15,7 @@ const ROOT = path.resolve(__dirname, "src/SkimDownForWindows/Assets/Web");
 // Build a synthetic HTML page with inline scripts so jsdom doesn't try to fetch.
 const html = fs.readFileSync(path.join(ROOT, "renderer.html"), "utf8");
 
-const dom = new JSDOM(`<!doctype html><html><body><main id="content"></main><div id="search-status" hidden></div></body></html>`, {
+const dom = new JSDOM(`<!doctype html><html><body><div id="skim-zoom-root"><main id="content"></main></div><div id="search-status" hidden></div></body></html>`, {
     url: "https://skimdown-app.example/renderer.html",
     runScripts: "outside-only",
     pretendToBeVisual: true,
@@ -174,7 +174,15 @@ async function main() {
     console.log("[10] Mermaid placeholder");
     h = await renderMd("```mermaid\nflowchart TD\nA-->B\n```\n");
     check("mermaid wrapper present", /class="skim-mermaid-wrap"/.test(h));
-    check("pre.mermaid with data-source", /<pre[^>]+class="mermaid"[^>]+data-source/.test(h));
+    // The wrap/scroll split: outer wrap hosts the absolutely-positioned
+    // zoom-hint badge, inner `.skim-mermaid-scroll` owns horizontal scroll.
+    check("mermaid scroll inner present", /class="skim-mermaid-scroll"/.test(h));
+    check("pre.mermaid present (data-source re-attached post-sanitize)",
+        /<pre[^>]*class="mermaid"[^>]*data-source/.test(h));
+    // After bindZoomToMermaidWraps() runs, each wrap should have the badge.
+    check("zoom hint badge appended", /class="skim-mermaid-zoom-hint"/.test(h));
+    check("wrap is marked role=button for click open",
+        /class="skim-mermaid-wrap"[^>]*role="button"/.test(h));
 
     // --- 10b. normalizeMermaidSvgSizes (Chromium CSS `zoom` workaround) ---
     //
@@ -381,6 +389,139 @@ async function main() {
     check("Ctrl+F inside <input> is not hijacked",
         !incoming.some(m => m && m.type === "shortcut") && !inInputEv.defaultPrevented);
     window.document.body.removeChild(input);
+
+    // --- 16. Mermaid zoom modal: setStrings + i18n fallback ---
+    //
+    // The Mermaid "click to enlarge" UI is renderer-side and localizable via
+    // a `{ type: "strings", strings: {...} }` host message. Missing keys
+    // fall back to the English defaults baked into renderer.js so a partial
+    // translation never breaks the UI.
+    console.log("[16] Mermaid zoom modal — i18n");
+    var internal = window.__skimDownInternal;
+    check("setStrings exposed on __skimDownInternal", typeof internal.setStrings === "function");
+    check("t() exposed on __skimDownInternal", typeof internal.t === "function");
+
+    // Default = English baked in.
+    check("t() returns default English when no strings set",
+        /enlarge/i.test(internal.t("mermaidZoom.openHint")),
+        "got: " + internal.t("mermaidZoom.openHint"));
+
+    // Send a partial localization. Unspecified keys must keep the default.
+    postToRenderer({ type: "strings", strings: { "mermaidZoom.openHint": "拡大表示" } });
+    await new Promise(r => setTimeout(r, 30));
+    check("setStrings overrides single key",
+        internal.t("mermaidZoom.openHint") === "拡大表示");
+    check("missing key falls back to English default",
+        /close/i.test(internal.t("mermaidZoom.close")),
+        "got: " + internal.t("mermaidZoom.close"));
+
+    // Re-render and confirm the hint text reflects the latest localization.
+    h = await renderMd("```mermaid\nflowchart TD\nA-->B\n```\n");
+    check("hint badge uses localized text after setStrings",
+        h.indexOf("拡大表示") !== -1,
+        "html snippet: " + h.substring(0, 400));
+
+    // --- 17. Mermaid zoom modal: open / close lifecycle ---
+    console.log("[17] Mermaid zoom modal — open/close");
+    h = await renderMd("```mermaid\nflowchart TD\nA-->B\n```\n");
+    check("zoom modal not open initially", !internal.isZoomModalOpen());
+
+    var wrap = window.document.querySelector(".skim-mermaid-wrap");
+    check("wrap exists for click simulation", !!wrap);
+
+    if (wrap) {
+        // Stand in for the mermaid-rendered SVG so the modal can clone it.
+        var scrollInner = wrap.querySelector(".skim-mermaid-scroll");
+        var fakeSvg = window.document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        fakeSvg.setAttribute("viewBox", "0 0 400 200");
+        fakeSvg.setAttribute("width", "400");
+        fakeSvg.setAttribute("height", "200");
+        var rect = window.document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("width", "100");
+        rect.setAttribute("height", "100");
+        fakeSvg.appendChild(rect);
+        if (scrollInner) {
+            // Replace the placeholder <pre> so a real SVG is present to clone.
+            scrollInner.innerHTML = "";
+            scrollInner.appendChild(fakeSvg);
+        }
+
+        internal.simulateMermaidWrapClick(wrap);
+        await new Promise(r => setTimeout(r, 30));
+        check("modal is open after simulated click", internal.isZoomModalOpen());
+        check("modal DOM was appended to body",
+            !!window.document.querySelector(".skim-zoom-modal"));
+        check("modal contains cloned SVG",
+            !!window.document.querySelector(".skim-zoom-content svg"));
+
+        // Closing via API works.
+        internal.closeZoomModal();
+        await new Promise(r => setTimeout(r, 30));
+        check("modal closes via closeZoomModal()", !internal.isZoomModalOpen());
+    }
+
+    // --- 18. Wheel zoom: while modal is open, document zoom must NOT change ---
+    //
+    // Global wheel handler intercepts Ctrl+wheel / trackpad pinch for the
+    // document-level CSS `zoom`. While the modal owns the gesture, the
+    // global handler must early-return so it doesn't fight the modal.
+    console.log("[18] Wheel zoom isolation while modal is open");
+    h = await renderMd("```mermaid\nflowchart TD\nA-->B\n```\n");
+    wrap = window.document.querySelector(".skim-mermaid-wrap");
+    var scrollInner2 = wrap && wrap.querySelector(".skim-mermaid-scroll");
+    if (scrollInner2) {
+        var fakeSvg2 = window.document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        fakeSvg2.setAttribute("viewBox", "0 0 400 200");
+        fakeSvg2.setAttribute("width", "400");
+        fakeSvg2.setAttribute("height", "200");
+        scrollInner2.innerHTML = "";
+        scrollInner2.appendChild(fakeSvg2);
+        internal.simulateMermaidWrapClick(wrap);
+        await new Promise(r => setTimeout(r, 30));
+    }
+
+    var zoomRoot = window.document.getElementById("skim-zoom-root");
+    var beforeZoom = zoomRoot ? zoomRoot.style.zoom : "";
+    if (internal.isZoomModalOpen()) {
+        // Fire a Ctrl+wheel as if the user spun the wheel over the modal.
+        // The renderer's `handleWheelZoom` runs in capture phase on window,
+        // so dispatching on the modal element with bubbles:true is enough.
+        var modalEl = window.document.querySelector(".skim-zoom-modal");
+        var modalWheel = new window.WheelEvent("wheel", {
+            ctrlKey: true,
+            deltaY: -100,
+            bubbles: true,
+            cancelable: true,
+        });
+        modalEl.dispatchEvent(modalWheel);
+        await new Promise(r => setTimeout(r, 30));
+        var afterZoom = zoomRoot ? zoomRoot.style.zoom : "";
+        check("global wheel handler does not alter #skim-zoom-root zoom while modal open",
+            beforeZoom === afterZoom,
+            "before=" + JSON.stringify(beforeZoom) + " after=" + JSON.stringify(afterZoom));
+        internal.closeZoomModal();
+    } else {
+        check("modal opened for wheel-isolation test", false, "modal failed to open");
+    }
+
+    // --- 19. Mermaid wrap with internal <a> must NOT open modal ---
+    //
+    // Mermaid generates `<a xlink:href="URL">` for `click NODE href "URL"`
+    // syntax. Clicking those should route to the host's external-link
+    // handler, not open the zoom modal.
+    console.log("[19] Mermaid wrap link click bypasses modal");
+    h = await renderMd("```mermaid\nflowchart TD\nA-->B\n```\n");
+    wrap = window.document.querySelector(".skim-mermaid-wrap");
+    if (wrap) {
+        var anchor = window.document.createElement("a");
+        anchor.setAttribute("href", "https://example.com/");
+        anchor.textContent = "Click me";
+        wrap.querySelector(".skim-mermaid-scroll").appendChild(anchor);
+        internal.simulateMermaidWrapClick(wrap, { target: anchor });
+        await new Promise(r => setTimeout(r, 30));
+        check("modal stays closed when clicking a Mermaid-internal link",
+            !internal.isZoomModalOpen());
+    }
 
     console.log("");
     if (failures === 0) {
