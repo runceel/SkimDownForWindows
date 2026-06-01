@@ -164,10 +164,22 @@
                           ToolTipService.ToolTip="Match case"
                           Checked="OnCaseToggleChanged"
                           Unchecked="OnCaseToggleChanged" />
-                <Button Content="&#xE0E2;" FontFamily="Segoe Fluent Icons" Click="OnFindPrevClick" ToolTipService.ToolTip="Previous (Shift+Enter)" />
-                <Button Content="&#xE0E3;" FontFamily="Segoe Fluent Icons" Click="OnFindNextClick" ToolTipService.ToolTip="Next (Enter)" />
+                <Button Content="&#xE0E2;"
+                        FontFamily="Segoe Fluent Icons"
+                        Click="OnFindPrevClick"
+                        ToolTipService.ToolTip="Previous (Shift+Enter)"
+                        AutomationProperties.Name="Previous result" />
+                <Button Content="&#xE0E3;"
+                        FontFamily="Segoe Fluent Icons"
+                        Click="OnFindNextClick"
+                        ToolTipService.ToolTip="Next (Enter)"
+                        AutomationProperties.Name="Next result" />
                 <TextBlock x:Name="SearchStatus" VerticalAlignment="Center" Opacity="0.7" />
-                <Button Content="&#xE10A;" FontFamily="Segoe Fluent Icons" Click="OnCloseSearchClick" ToolTipService.ToolTip="Close (Esc)" />
+                <Button Content="&#xE10A;"
+                        FontFamily="Segoe Fluent Icons"
+                        Click="OnCloseSearchClick"
+                        ToolTipService.ToolTip="Close (Esc)"
+                        AutomationProperties.Name="Close search" />
             </StackPanel>
         </Border>
 
@@ -196,7 +208,7 @@
                                    TextTrimming="CharacterEllipsis" />
                         <TextBlock x:Name="MarkdownCountText"
                                    Opacity="0.65"
-                                   FontSize="12" />
+                                   Style="{ThemeResource CaptionTextBlockStyle}" />
                     </StackPanel>
                 </Border>
                 <ScrollViewer Grid.Row="1" Padding="4">
@@ -254,11 +266,14 @@
                                Width="120" Height="120"
                                HorizontalAlignment="Center"
                                Opacity="0.95" />
-                        <TextBlock Text="SkimDown" Style="{ThemeResource TitleLargeTextBlockStyle}" HorizontalAlignment="Center" Opacity="0.8" />
-                        <TextBlock Text="Open a folder to start reading."
+                        <TextBlock x:Uid="EmptyStateTitle"
+                                   Style="{ThemeResource TitleLargeTextBlockStyle}"
+                                   HorizontalAlignment="Center"
+                                   Opacity="0.8" />
+                        <TextBlock x:Uid="EmptyStateDescription"
                                    HorizontalAlignment="Center"
                                    Opacity="0.7" />
-                        <Button Content="Open Folder…"
+                        <Button x:Uid="EmptyStateOpenFolderButton"
                                 HorizontalAlignment="Center"
                                 Click="OnOpenFolderClick"
                                 Style="{ThemeResource AccentButtonStyle}" />
@@ -271,11 +286,11 @@
                     <StackPanel HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 Spacing="12">
-                        <TextBlock Text="No Markdown files found"
+                        <TextBlock x:Uid="NoMarkdownTitle"
                                    Style="{ThemeResource SubtitleTextBlockStyle}"
                                    HorizontalAlignment="Center"
                                    Opacity="0.8" />
-                        <Button Content="Open Another Folder…"
+                        <Button x:Uid="NoMarkdownOpenAnotherFolderButton"
                                 HorizontalAlignment="Center"
                                 Click="OnOpenFolderClick" />
                     </StackPanel>
