@@ -152,6 +152,7 @@ public sealed class AppSettingsTests
             SidebarWidth = 320,
             SidebarVisible = false,
             SidebarPosition = SidebarPosition.Right,
+            ContentMaxWidth = ContentMaxWidth.ExtraWide,
             RecentFolders = new List<string> { @"C:\a", @"C:\b" },
             LastFolderPath = @"C:\a",
             FolderStates = new Dictionary<string, FolderState>
@@ -174,6 +175,7 @@ public sealed class AppSettingsTests
         Assert.AreEqual(320, round.SidebarWidth);
         Assert.IsFalse(round.SidebarVisible);
         Assert.AreEqual(SidebarPosition.Right, round.SidebarPosition);
+        Assert.AreEqual(ContentMaxWidth.ExtraWide, round.ContentMaxWidth);
         CollectionAssert.AreEqual(new[] { @"C:\a", @"C:\b" }, round.RecentFolders);
         Assert.AreEqual(@"C:\a", round.LastFolderPath);
 
@@ -195,6 +197,7 @@ public sealed class AppSettingsTests
         Assert.AreEqual(280d, s.SidebarWidth);
         Assert.IsTrue(s.SidebarVisible);
         Assert.AreEqual(SidebarPosition.Left, s.SidebarPosition);
+        Assert.AreEqual(ContentMaxWidth.Standard, s.ContentMaxWidth);
         Assert.IsEmpty(s.RecentFolders);
         Assert.IsNull(s.LastFolderPath);
         Assert.IsEmpty(s.FolderStates);
@@ -229,5 +232,27 @@ public sealed class AppSettingsTests
         s.NormalizeAfterLoad();
         Assert.AreEqual(AppTheme.Custom, s.Theme);
         Assert.AreEqual("monokai", s.CustomThemeId);
+    }
+
+    [TestMethod]
+    public void NormalizeAfterLoad_ClampsUnknownContentMaxWidth_ToStandard()
+    {
+        // 永続化された値が将来追加された enum 値で、現バージョンの定義範囲外だった場合
+        // (= ユーザーが新→旧バージョンにダウングレードしたケース) は安全側として Standard に戻す。
+        var s = new AppSettings { ContentMaxWidth = (ContentMaxWidth)999 };
+
+        s.NormalizeAfterLoad();
+
+        Assert.AreEqual(ContentMaxWidth.Standard, s.ContentMaxWidth);
+    }
+
+    [TestMethod]
+    public void NormalizeAfterLoad_PreservesValidContentMaxWidth()
+    {
+        var s = new AppSettings { ContentMaxWidth = ContentMaxWidth.Wide };
+
+        s.NormalizeAfterLoad();
+
+        Assert.AreEqual(ContentMaxWidth.Wide, s.ContentMaxWidth);
     }
 }

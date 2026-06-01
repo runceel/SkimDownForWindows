@@ -116,6 +116,7 @@ public sealed partial class MainPage : Page
 
             UpdateContentVisibility();
             UpdateThemeMenuChecks();
+            UpdateContentWidthMenuChecks();
             UpdateMoveSidebarLabel();
         }
     }
@@ -144,6 +145,7 @@ public sealed partial class MainPage : Page
         ApplySidebarVisualState();
 
         Preview.SetZoom(settings.ZoomFactor);
+        Preview.SetContentMaxWidth(ContentMaxWidthMap.ToCssValue(settings.ContentMaxWidth));
 
         // ページとウィンドウに永続テーマを適用
         ApplyThemeToShell(settings.Theme);
@@ -640,6 +642,8 @@ public sealed partial class MainPage : Page
             case "zoom-in":                 OnZoomInClick(this, args);                break;
             case "zoom-out":                OnZoomOutClick(this, args);               break;
             case "zoom-reset":              OnZoomResetClick(this, args);             break;
+            case "content-width-wider":     _ = ContentWidthStepWiderAsync();         break;
+            case "content-width-narrower":  _ = ContentWidthStepNarrowerAsync();      break;
             case "select-all":              OnSelectAllClick(this, args);             break;
             case "copy":                    OnCopyClick(this, args);                  break;
         }
@@ -647,6 +651,8 @@ public sealed partial class MainPage : Page
 
     private const int VK_OEM_PLUS  = 0xBB;
     private const int VK_OEM_MINUS = 0xBD;
+    private const int VK_OEM_4     = 0xDB; // `[`
+    private const int VK_OEM_6     = 0xDD; // `]`
 
     private async void OnPageKeyDown(object sender, KeyRoutedEventArgs e)
     {
@@ -672,6 +678,18 @@ public sealed partial class MainPage : Page
         else if (key == VK_OEM_MINUS)
         {
             await SetZoomAsync(Math.Max(0.5, ViewModel.Settings.Current.ZoomFactor - 0.1));
+            e.Handled = true;
+        }
+        else if (key == VK_OEM_6)
+        {
+            // Ctrl+] -> 1 段広く (US 配列。JIS では Ctrl+] が `}` を生むため別途 renderer 側でも文字キー検出する)。
+            await ContentWidthStepWiderAsync();
+            e.Handled = true;
+        }
+        else if (key == VK_OEM_4)
+        {
+            // Ctrl+[ -> 1 段狭く。
+            await ContentWidthStepNarrowerAsync();
             e.Handled = true;
         }
     }
@@ -958,6 +976,82 @@ public sealed partial class MainPage : Page
     private async void OnThemeSystemClick(object? sender, RoutedEventArgs e) => await SetThemeAsync(AppTheme.System, null);
     private async void OnThemeLightClick(object? sender, RoutedEventArgs e)  => await SetThemeAsync(AppTheme.Light, null);
     private async void OnThemeDarkClick(object? sender, RoutedEventArgs e)   => await SetThemeAsync(AppTheme.Dark, null);
+
+    // ----- Content max width -----
+
+    /// <summary>
+    /// メニュー / ショートカットから選択可能な段階を「狭い→広い」順に並べた配列。
+    /// Ctrl+] / Ctrl+[ の隣接段階遷移にも使う。
+    /// </summary>
+    private static readonly ContentMaxWidth[] ContentWidthSteps =
+    {
+        ContentMaxWidth.Standard,
+        ContentMaxWidth.Wide,
+        ContentMaxWidth.ExtraWide,
+        ContentMaxWidth.Full,
+    };
+
+    private async void OnContentWidthStandardClick(object? sender, RoutedEventArgs e)
+        => await SetContentMaxWidthAsync(ContentMaxWidth.Standard);
+
+    private async void OnContentWidthWideClick(object? sender, RoutedEventArgs e)
+        => await SetContentMaxWidthAsync(ContentMaxWidth.Wide);
+
+    private async void OnContentWidthExtraWideClick(object? sender, RoutedEventArgs e)
+        => await SetContentMaxWidthAsync(ContentMaxWidth.ExtraWide);
+
+    private async void OnContentWidthFullClick(object? sender, RoutedEventArgs e)
+        => await SetContentMaxWidthAsync(ContentMaxWidth.Full);
+
+    /// <summary>
+    /// 現段階より 1 段広い段階に切り替える。最広 (<see cref="ContentMaxWidth.Full"/>) では何もしない (循環せず端で clamp)。
+    /// </summary>
+    private async Task ContentWidthStepWiderAsync()
+    {
+        var current = ViewModel.Settings.Current.ContentMaxWidth;
+        var idx = Array.IndexOf(ContentWidthSteps, current);
+        if (idx < 0) idx = 0;
+        if (idx >= ContentWidthSteps.Length - 1) return;
+        await SetContentMaxWidthAsync(ContentWidthSteps[idx + 1]);
+    }
+
+    /// <summary>
+    /// 現段階より 1 段狭い段階に切り替える。最狭 (<see cref="ContentMaxWidth.Standard"/>) では何もしない。
+    /// </summary>
+    private async Task ContentWidthStepNarrowerAsync()
+    {
+        var current = ViewModel.Settings.Current.ContentMaxWidth;
+        var idx = Array.IndexOf(ContentWidthSteps, current);
+        if (idx < 0) idx = 0;
+        if (idx <= 0) return;
+        await SetContentMaxWidthAsync(ContentWidthSteps[idx - 1]);
+    }
+
+    private async Task SetContentMaxWidthAsync(ContentMaxWidth value)
+    {
+        // 別ウィンドウが ContentMaxWidth を変えると singleton な AppSettings.Current が即時更新されるが、
+        // このウィンドウの WebView2 はまだ古い値で描画されている可能性がある。
+        // そのため「値が既に等しい」場合でも Preview への適用とメニュー同期は必ず行い、
+        // ディスク書き込み (SaveAsync) だけを skip する。挙動の流儀は SetZoomAsync と同じ
+        // (apply は常に行い、永続化は無条件)。
+        var changed = ViewModel.Settings.Current.ContentMaxWidth != value;
+        ViewModel.Settings.Current.ContentMaxWidth = value;
+        Preview.SetContentMaxWidth(ContentMaxWidthMap.ToCssValue(value));
+        UpdateContentWidthMenuChecks();
+        if (changed)
+        {
+            await ViewModel.Settings.SaveAsync();
+        }
+    }
+
+    private void UpdateContentWidthMenuChecks()
+    {
+        var v = ViewModel.Settings.Current.ContentMaxWidth;
+        ContentWidthStandardMenu.IsChecked  = v == ContentMaxWidth.Standard;
+        ContentWidthWideMenu.IsChecked      = v == ContentMaxWidth.Wide;
+        ContentWidthExtraWideMenu.IsChecked = v == ContentMaxWidth.ExtraWide;
+        ContentWidthFullMenu.IsChecked      = v == ContentMaxWidth.Full;
+    }
 
     private async void OnOpenThemesFolderClick(object? sender, RoutedEventArgs e)
     {
