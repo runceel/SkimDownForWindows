@@ -523,6 +523,56 @@ async function main() {
             !internal.isZoomModalOpen());
     }
 
+    // --- 20. Mermaid font sync with body (upstream parity) ---
+    //
+    // The upstream macOS SkimDown feeds document.body's computed
+    // font-family / font-size into mermaid.initialize so diagram labels
+    // visually match the surrounding prose. We mirror that behavior in
+    // the Windows renderer. Real mermaid is not loaded in jsdom, so we
+    // stub window.mermaid with a recording initialize() and invoke
+    // initMermaid directly to inspect the arguments.
+    console.log("[20] Mermaid font sync with body");
+    var capturedInit = null;
+    var savedMermaid = window.mermaid;
+    window.mermaid = {
+        initialize: function (opts) { capturedInit = opts; },
+        run: function () { return Promise.resolve(); },
+    };
+    try {
+        internal.initMermaid("light");
+        var bodyStyle = window.getComputedStyle(window.document.body);
+        check("mermaid.initialize was called",
+            capturedInit !== null && typeof capturedInit === "object");
+        if (capturedInit) {
+            check("mermaid.initialize fontFamily is NOT 'inherit' (SVG-inside inherit is unreliable)",
+                capturedInit.fontFamily !== "inherit",
+                "got: " + JSON.stringify(capturedInit.fontFamily));
+            check("mermaid.initialize fontFamily equals body computed fontFamily",
+                capturedInit.fontFamily === bodyStyle.fontFamily,
+                "init=" + JSON.stringify(capturedInit.fontFamily) +
+                " body=" + JSON.stringify(bodyStyle.fontFamily));
+            var tv = capturedInit.themeVariables || {};
+            check("themeVariables.fontFamily equals body computed fontFamily",
+                tv.fontFamily === bodyStyle.fontFamily,
+                "tv=" + JSON.stringify(tv.fontFamily) +
+                " body=" + JSON.stringify(bodyStyle.fontFamily));
+            check("themeVariables.fontSize equals body computed fontSize",
+                tv.fontSize === bodyStyle.fontSize,
+                "tv=" + JSON.stringify(tv.fontSize) +
+                " body=" + JSON.stringify(bodyStyle.fontSize));
+            check("themeVariables.fontSize is set (non-empty) so Mermaid does not fall back to its built-in default",
+                typeof tv.fontSize === "string" && tv.fontSize.length > 0,
+                "got: " + JSON.stringify(tv.fontSize));
+        }
+    } finally {
+        // Restore so any later tests still see the previous (undefined) mermaid.
+        if (savedMermaid === undefined) {
+            delete window.mermaid;
+        } else {
+            window.mermaid = savedMermaid;
+        }
+    }
+
     console.log("");
     if (failures === 0) {
         console.log("✅ ALL RENDERER SMOKE CHECKS PASSED");

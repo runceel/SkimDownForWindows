@@ -446,7 +446,18 @@
         var soft = cssVar("--skim-soft-strong");
         var accent = cssVar("--skim-link");
         var border = cssVar("--skim-border");
-        var themeVariables = { fontFamily: "inherit" };
+        // Match Mermaid's font-family and font-size to the body so diagram
+        // labels appear the same size as the surrounding prose. SVG-inside
+        // `font-family: inherit` is not reliably resolved by Mermaid v11's
+        // generated `<svg>` (its inheritance chain is detached from <body>),
+        // so we feed the concrete computed values directly. CSS `zoom` on
+        // #skim-zoom-root scales the SVG visually without altering these
+        // computed values, so this stays in sync with the user zoom level.
+        // Mirrors upstream macOS SkimDown (07JP27/SkimDown) renderer.js.
+        var themeVariables = {
+            fontFamily: bodyStyle.fontFamily,
+            fontSize: bodyStyle.fontSize,
+        };
         if (bg) { themeVariables.background = bg; }
         if (soft) { themeVariables.primaryColor = soft; }
         if (fg) {
@@ -475,7 +486,7 @@
                 suppressErrorRendering: true,
                 maxTextSize: 50000,
                 maxEdges: 500,
-                fontFamily: "inherit",
+                fontFamily: bodyStyle.fontFamily,
                 themeVariables: themeVariables,
             });
             mermaidReady = true;
@@ -2190,6 +2201,7 @@
             },
             handleWheelZoom: handleWheelZoom,
             applyZoomLocal: applyZoomLocal,
+            initMermaid: initMermaid,
         };
     }
 })();
