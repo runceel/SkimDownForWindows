@@ -9,6 +9,7 @@
  *                     theme, themeType, themeIsDark, themeVars }
  *   { type: "theme",  theme, themeType, themeIsDark, themeVars } // theme: "system"|"light"|"dark"|"custom"
  *   { type: "zoom",   factor }           // 0.5..3.0
+ *   { type: "contentMaxWidth", value }   // CSS max-width: "760px"|"960px"|"1200px"|"none"
  *   { type: "search", query, caseSensitive }
  *   { type: "search/next" } / { type: "search/prev" } / { type: "search/clear" }
  *
@@ -1259,6 +1260,13 @@
         if (key === "+" || key === "=" || key === ";") return "zoom-in";
         if (key === "-") return "zoom-out";
         if (key === "0" && !ev.shiftKey) return "zoom-reset";
+        // Content max-width step (Ctrl+] / Ctrl+[).
+        // Use the produced character ("]" / "[") so JIS keyboards — which
+        // generate these via Shift on different physical keys — still hit
+        // here. Host-side OnPageKeyDown also has a VK_OEM_4/VK_OEM_6 path
+        // for the WinUI-focused case (sidebar tree, etc.).
+        if (key === "]") return "content-width-wider";
+        if (key === "[") return "content-width-narrower";
 
         var lk = key.toLowerCase();
 
@@ -1351,6 +1359,16 @@
                         break;
                     case "zoom":
                         setZoomFromHost(msg.factor);
+                        break;
+                    case "contentMaxWidth":
+                        // CSS の var(--skim-content-max) を body 上に inline で上書き。
+                        // value は host 側で "760px" / "960px" / "1200px" / "none" のいずれかに正規化済み。
+                        // 文字列以外が来た場合は防御で無視する。
+                        if (typeof msg.value === "string" && msg.value.length > 0) {
+                            try {
+                                document.body.style.setProperty("--skim-content-max", msg.value);
+                            } catch (e) { /* best-effort */ }
+                        }
                         break;
                     case "search":
                         applySearch(msg.query, !!msg.caseSensitive, true);

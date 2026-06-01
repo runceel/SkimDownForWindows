@@ -56,6 +56,7 @@ public sealed partial class MarkdownPreview : UserControl
     private IReadOnlyDictionary<string, string>? _pendingThemeVars;
     private bool _hasPendingThemeOnlyUpdate;
     private double? _pendingZoom;
+    private string? _pendingContentMaxWidth;
     private string? _currentFolderRoot;
 
     public MarkdownPreview()
@@ -312,6 +313,21 @@ public sealed partial class MarkdownPreview : UserControl
         }
     }
 
+    /// <summary>
+    /// 本文の <c>max-width</c> CSS 値 (例: <c>"760px"</c> / <c>"none"</c>) を renderer に送り、
+    /// <c>--skim-content-max</c> を inline で上書きさせる。
+    /// renderer 未 ready 時は pending に保持し、<see cref="FlushPendingAsync"/> でまとめて送る。
+    /// </summary>
+    public void SetContentMaxWidth(string cssValue)
+    {
+        if (string.IsNullOrEmpty(cssValue)) return;
+        _pendingContentMaxWidth = cssValue;
+        if (_webReady)
+        {
+            Post(new { type = "contentMaxWidth", value = cssValue });
+        }
+    }
+
     public void Search(string query, bool caseSensitive)
     {
         if (!_webReady) return;
@@ -380,6 +396,13 @@ public sealed partial class MarkdownPreview : UserControl
         {
             Post(new { type = "zoom", factor = pendingZoom });
             _pendingZoom = null;
+        }
+
+        // Content max-width も最初の描画前に流しておく (幅の reflow を避ける)。
+        if (_pendingContentMaxWidth is string pendingContentMax)
+        {
+            Post(new { type = "contentMaxWidth", value = pendingContentMax });
+            _pendingContentMaxWidth = null;
         }
 
         if (_pendingMarkdown is null)

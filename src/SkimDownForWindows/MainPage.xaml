@@ -109,6 +109,26 @@
                         </MenuFlyoutItem.KeyboardAccelerators>
                     </MenuFlyoutItem>
                 </MenuFlyoutSubItem>
+                <MenuFlyoutSubItem x:Name="ContentWidthSubmenu"
+                                   x:Uid="ContentWidthMenuItem">
+                    <ToggleMenuFlyoutItem x:Name="ContentWidthStandardMenu"
+                                          x:Uid="ContentWidthStandardMenuItem"
+                                          Click="OnContentWidthStandardClick" />
+                    <ToggleMenuFlyoutItem x:Name="ContentWidthWideMenu"
+                                          x:Uid="ContentWidthWideMenuItem"
+                                          Click="OnContentWidthWideClick" />
+                    <ToggleMenuFlyoutItem x:Name="ContentWidthExtraWideMenu"
+                                          x:Uid="ContentWidthExtraWideMenuItem"
+                                          Click="OnContentWidthExtraWideClick" />
+                    <ToggleMenuFlyoutItem x:Name="ContentWidthFullMenu"
+                                          x:Uid="ContentWidthFullMenuItem"
+                                          Click="OnContentWidthFullClick" />
+                    <!-- Ctrl+] / Ctrl+[ で隣接段階を切り替えるショートカットも併設するが、
+                         WinUI の KeyboardAccelerator は `[` / `]` 用の VirtualKey 名を持たない
+                         (VK_OEM_4 / VK_OEM_6 は数値のみ) ため、メニューには表示しない。
+                         入力ハンドリングは OnPageKeyDown (WinUI フォーカス時) と
+                         renderer.js の shortcutIdFromEvent (WebView2 フォーカス時) が担う。 -->
+                </MenuFlyoutSubItem>
                 <MenuFlyoutSubItem x:Name="ThemeSubmenu"
                                   x:Uid="ThemeMenuItem">
                     <ToggleMenuFlyoutItem x:Name="ThemeSystemMenu" x:Uid="ThemeSystemMenuItem" Click="OnThemeSystemClick" />
