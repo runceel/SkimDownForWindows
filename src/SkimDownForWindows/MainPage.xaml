@@ -23,63 +23,63 @@
 
         <!-- Menu bar -->
         <MenuBar Grid.Row="0">
-            <MenuBarItem Title="File">
-                <MenuFlyoutItem Text="Open Folder…" Click="OnOpenFolderClick">
+            <MenuBarItem x:Uid="FileMenuBarItem">
+                <MenuFlyoutItem x:Uid="OpenFolderMenuItem" Click="OnOpenFolderClick">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="O" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutSubItem x:Name="RecentFoldersMenu" Text="Open Recent" />
+                <MenuFlyoutSubItem x:Name="RecentFoldersMenu" x:Uid="OpenRecentMenuItem" />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Reveal in File Explorer"
+                <MenuFlyoutItem x:Uid="RevealInExplorerMenuItem"
                                 Command="{x:Bind ViewModel.RevealInFileExplorerCommand}" />
-                <MenuFlyoutItem Text="Copy File Path"
+                <MenuFlyoutItem x:Uid="CopyFilePathMenuItem"
                                 Command="{x:Bind ViewModel.CopyFilePathCommand}" />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Close Window" Click="OnCloseWindowClick">
+                <MenuFlyoutItem x:Uid="CloseWindowMenuItem" Click="OnCloseWindowClick">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="W" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
             </MenuBarItem>
 
-            <MenuBarItem Title="Edit">
-                <MenuFlyoutItem Text="Copy" Click="OnCopyClick">
+            <MenuBarItem x:Uid="EditMenuBarItem">
+                <MenuFlyoutItem x:Uid="CopyMenuItem" Click="OnCopyClick">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="C" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Select All" Click="OnSelectAllClick">
+                <MenuFlyoutItem x:Uid="SelectAllMenuItem" Click="OnSelectAllClick">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="A" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Find…" Click="OnFindClick">
+                <MenuFlyoutItem x:Uid="FindMenuItem" Click="OnFindClick">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="F" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Find Next" Click="OnFindNextClick">
+                <MenuFlyoutItem x:Uid="FindNextMenuItem" Click="OnFindNextClick">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="G" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Find Previous" Click="OnFindPrevClick">
+                <MenuFlyoutItem x:Uid="FindPreviousMenuItem" Click="OnFindPrevClick">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control,Shift" Key="G" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Use Selection for Find" Click="OnUseSelectionForFindClick">
+                <MenuFlyoutItem x:Uid="UseSelectionForFindMenuItem" Click="OnUseSelectionForFindClick">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="E" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
             </MenuBarItem>
 
-            <MenuBarItem Title="View">
+            <MenuBarItem x:Uid="ViewMenuBarItem">
                 <MenuFlyoutItem x:Name="ToggleSidebarMenuItem"
-                                Text="Toggle Sidebar"
+                                x:Uid="ToggleSidebarMenuItem"
                                 IsEnabled="{x:Bind IsNotSingleFileMode(ViewModel.IsSingleFileMode), Mode=OneWay}"
                                 Click="OnToggleSidebarClick">
                     <MenuFlyoutItem.KeyboardAccelerators>
@@ -87,60 +87,60 @@
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
                 <MenuFlyoutItem x:Name="MoveSidebarMenuItem"
-                                Text="Move Sidebar to Right"
+                                x:Uid="MoveSidebarMenuItem"
                                 IsEnabled="{x:Bind IsNotSingleFileMode(ViewModel.IsSingleFileMode), Mode=OneWay}"
                                 Click="OnMoveSidebarClick" />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutSubItem Text="Zoom">
-                    <MenuFlyoutItem Text="Zoom In" Click="OnZoomInClick">
+                <MenuFlyoutSubItem x:Uid="ZoomMenuItem">
+                    <MenuFlyoutItem x:Uid="ZoomInMenuItem" Click="OnZoomInClick">
                         <MenuFlyoutItem.KeyboardAccelerators>
                             <KeyboardAccelerator Modifiers="Control" Key="Add" />
                             <KeyboardAccelerator Modifiers="Control" Key="Number0" IsEnabled="False" />
                         </MenuFlyoutItem.KeyboardAccelerators>
                     </MenuFlyoutItem>
-                    <MenuFlyoutItem Text="Zoom Out" Click="OnZoomOutClick">
+                    <MenuFlyoutItem x:Uid="ZoomOutMenuItem" Click="OnZoomOutClick">
                         <MenuFlyoutItem.KeyboardAccelerators>
                             <KeyboardAccelerator Modifiers="Control" Key="Subtract" />
                         </MenuFlyoutItem.KeyboardAccelerators>
                     </MenuFlyoutItem>
-                    <MenuFlyoutItem Text="Actual Size" Click="OnZoomResetClick">
+                    <MenuFlyoutItem x:Uid="ActualSizeMenuItem" Click="OnZoomResetClick">
                         <MenuFlyoutItem.KeyboardAccelerators>
                             <KeyboardAccelerator Modifiers="Control" Key="Number0" />
                         </MenuFlyoutItem.KeyboardAccelerators>
                     </MenuFlyoutItem>
                 </MenuFlyoutSubItem>
                 <MenuFlyoutSubItem x:Name="ThemeSubmenu"
-                                  Text="Theme">
-                    <ToggleMenuFlyoutItem x:Name="ThemeSystemMenu" Text="System" Click="OnThemeSystemClick" />
-                    <ToggleMenuFlyoutItem x:Name="ThemeLightMenu"  Text="Light"  Click="OnThemeLightClick" />
-                    <ToggleMenuFlyoutItem x:Name="ThemeDarkMenu"   Text="Dark"   Click="OnThemeDarkClick" />
+                                  x:Uid="ThemeMenuItem">
+                    <ToggleMenuFlyoutItem x:Name="ThemeSystemMenu" x:Uid="ThemeSystemMenuItem" Click="OnThemeSystemClick" />
+                    <ToggleMenuFlyoutItem x:Name="ThemeLightMenu" x:Uid="ThemeLightMenuItem" Click="OnThemeLightClick" />
+                    <ToggleMenuFlyoutItem x:Name="ThemeDarkMenu" x:Uid="ThemeDarkMenuItem" Click="OnThemeDarkClick" />
                     <MenuFlyoutSeparator x:Name="ThemeBuiltInSeparator" />
                     <!-- Custom themes are inserted between ThemeBuiltInSeparator and ThemeActionSeparator at runtime. -->
                     <MenuFlyoutSeparator x:Name="ThemeActionSeparator" />
-                    <MenuFlyoutItem x:Name="OpenThemesFolderMenu" Text="Open Themes Folder" Click="OnOpenThemesFolderClick" />
-                    <MenuFlyoutItem x:Name="ReloadThemesMenu"     Text="Reload Themes"      Click="OnReloadThemesClick" />
+                    <MenuFlyoutItem x:Name="OpenThemesFolderMenu" x:Uid="OpenThemesFolderMenuItem" Click="OnOpenThemesFolderClick" />
+                    <MenuFlyoutItem x:Name="ReloadThemesMenu" x:Uid="ReloadThemesMenuItem" Click="OnReloadThemesClick" />
                 </MenuFlyoutSubItem>
             </MenuBarItem>
 
-            <MenuBarItem x:Name="WindowMenu" Title="Window">
-                <MenuFlyoutItem Text="New Window" Click="OnNewWindowClick">
+            <MenuBarItem x:Name="WindowMenu" x:Uid="WindowMenuBarItem">
+                <MenuFlyoutItem x:Uid="NewWindowMenuItem" Click="OnNewWindowClick">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="N" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Minimize" Click="OnMinimizeClick">
+                <MenuFlyoutItem x:Uid="MinimizeMenuItem" Click="OnMinimizeClick">
                     <MenuFlyoutItem.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="M" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Zoom" Click="OnWindowZoomClick" />
-                <MenuFlyoutItem Text="Bring All to Front" Click="OnBringAllToFrontClick" />
+                <MenuFlyoutItem x:Uid="ZoomWindowMenuItem" Click="OnWindowZoomClick" />
+                <MenuFlyoutItem x:Uid="BringAllToFrontMenuItem" Click="OnBringAllToFrontClick" />
                 <MenuFlyoutSeparator x:Name="WindowMenuListSeparator" />
                 <!-- Dynamic list of open windows is appended below the separator at runtime. -->
             </MenuBarItem>
 
-            <MenuBarItem Title="Help">
-                <MenuFlyoutItem Text="About SkimDown" Click="OnAboutClick" />
+            <MenuBarItem x:Uid="HelpMenuBarItem">
+                <MenuFlyoutItem x:Uid="AboutSkimDownMenuItem" Click="OnAboutClick" />
             </MenuBarItem>
         </MenuBar>
 
@@ -155,19 +155,36 @@
             <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <FontIcon Glyph="&#xE721;" FontSize="14" Opacity="0.6" />
                 <TextBox x:Name="SearchBox"
+                         x:Uid="SearchBox"
                          PlaceholderText="Find in document"
                          Width="320"
                          TextChanged="OnSearchTextChanged"
                          KeyDown="OnSearchKeyDown" />
                 <CheckBox x:Name="SearchCaseSensitive"
+                          x:Uid="SearchCaseSensitive"
                           Content="Aa"
                           ToolTipService.ToolTip="Match case"
                           Checked="OnCaseToggleChanged"
                           Unchecked="OnCaseToggleChanged" />
-                <Button Content="&#xE0E2;" FontFamily="Segoe Fluent Icons" Click="OnFindPrevClick" ToolTipService.ToolTip="Previous (Shift+Enter)" />
-                <Button Content="&#xE0E3;" FontFamily="Segoe Fluent Icons" Click="OnFindNextClick" ToolTipService.ToolTip="Next (Enter)" />
+                <Button x:Uid="SearchPreviousButton"
+                        Content="&#xE0E2;"
+                        FontFamily="Segoe Fluent Icons"
+                        Click="OnFindPrevClick"
+                        ToolTipService.ToolTip="Previous (Shift+Enter)"
+                        AutomationProperties.Name="Previous result" />
+                <Button x:Uid="SearchNextButton"
+                        Content="&#xE0E3;"
+                        FontFamily="Segoe Fluent Icons"
+                        Click="OnFindNextClick"
+                        ToolTipService.ToolTip="Next (Enter)"
+                        AutomationProperties.Name="Next result" />
                 <TextBlock x:Name="SearchStatus" VerticalAlignment="Center" Opacity="0.7" />
-                <Button Content="&#xE10A;" FontFamily="Segoe Fluent Icons" Click="OnCloseSearchClick" ToolTipService.ToolTip="Close (Esc)" />
+                <Button x:Uid="SearchCloseButton"
+                        Content="&#xE10A;"
+                        FontFamily="Segoe Fluent Icons"
+                        Click="OnCloseSearchClick"
+                        ToolTipService.ToolTip="Close (Esc)"
+                        AutomationProperties.Name="Close search" />
             </StackPanel>
         </Border>
 
@@ -196,7 +213,7 @@
                                    TextTrimming="CharacterEllipsis" />
                         <TextBlock x:Name="MarkdownCountText"
                                    Opacity="0.65"
-                                   FontSize="12" />
+                                   Style="{ThemeResource CaptionTextBlockStyle}" />
                     </StackPanel>
                 </Border>
                 <ScrollViewer Grid.Row="1" Padding="4">
@@ -254,11 +271,14 @@
                                Width="120" Height="120"
                                HorizontalAlignment="Center"
                                Opacity="0.95" />
-                        <TextBlock Text="SkimDown" Style="{ThemeResource TitleLargeTextBlockStyle}" HorizontalAlignment="Center" Opacity="0.8" />
-                        <TextBlock Text="Open a folder to start reading."
+                        <TextBlock x:Uid="EmptyStateTitle"
+                                   Style="{ThemeResource TitleLargeTextBlockStyle}"
+                                   HorizontalAlignment="Center"
+                                   Opacity="0.8" />
+                        <TextBlock x:Uid="EmptyStateDescription"
                                    HorizontalAlignment="Center"
                                    Opacity="0.7" />
-                        <Button Content="Open Folder…"
+                        <Button x:Uid="EmptyStateOpenFolderButton"
                                 HorizontalAlignment="Center"
                                 Click="OnOpenFolderClick"
                                 Style="{ThemeResource AccentButtonStyle}" />
@@ -271,11 +291,11 @@
                     <StackPanel HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 Spacing="12">
-                        <TextBlock Text="No Markdown files found"
+                        <TextBlock x:Uid="NoMarkdownTitle"
                                    Style="{ThemeResource SubtitleTextBlockStyle}"
                                    HorizontalAlignment="Center"
                                    Opacity="0.8" />
-                        <Button Content="Open Another Folder…"
+                        <Button x:Uid="NoMarkdownOpenAnotherFolderButton"
                                 HorizontalAlignment="Center"
                                 Click="OnOpenFolderClick" />
                     </StackPanel>

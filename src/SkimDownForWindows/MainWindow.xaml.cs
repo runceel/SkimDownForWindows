@@ -6,6 +6,7 @@ using SkimDownForWindows.Application.Abstractions;
 using SkimDownForWindows.Application.Models;
 using SkimDownForWindows.Application.ViewModels;
 using SkimDownForWindows.Domain;
+using Windows.ApplicationModel.Resources;
 using Windows.UI;
 
 namespace SkimDownForWindows;
@@ -19,6 +20,7 @@ namespace SkimDownForWindows;
 /// </summary>
 public sealed partial class MainWindow : Window
 {
+    private readonly ResourceLoader _strings = ResourceLoader.GetForViewIndependentUse();
     private readonly IServiceScope _scope;
     private MainPageViewModel? _viewModel;
 
@@ -27,6 +29,9 @@ public sealed partial class MainWindow : Window
     public MainWindow(InitialActivation? initialActivation, bool restoreLastFolder)
     {
         InitializeComponent();
+
+        Title = _strings.GetString("MainWindow/Title");
+        AppTitleBar.Title = _strings.GetString("AppTitleBar/Title");
 
         // App.Services はこのコンストラクタが呼ばれる時点で確実に初期化済み (App.OnLaunched 内で
         // ServiceProviderFactory.Build → WindowService.CreateWindow → このコンストラクタ の順)。
