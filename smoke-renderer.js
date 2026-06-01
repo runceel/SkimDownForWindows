@@ -523,6 +523,127 @@ async function main() {
             !internal.isZoomModalOpen());
     }
 
+    // --- 20. Mermaid font sync with body (upstream parity) ---
+    //
+    // The upstream macOS SkimDown feeds document.body's computed
+    // font-family / font-size into mermaid.initialize so diagram labels
+    // visually match the surrounding prose. We mirror that behavior in
+    // the Windows renderer. Real mermaid is not loaded in jsdom, so we
+    // stub window.mermaid with a recording initialize() and invoke
+    // initMermaid directly to inspect the arguments.
+    console.log("[20] Mermaid font sync with body");
+    var capturedInit = null;
+    var savedMermaid = window.mermaid;
+    window.mermaid = {
+        initialize: function (opts) { capturedInit = opts; },
+        run: function () { return Promise.resolve(); },
+    };
+    try {
+        internal.initMermaid("light");
+        var bodyStyle = window.getComputedStyle(window.document.body);
+        check("mermaid.initialize was called",
+            capturedInit !== null && typeof capturedInit === "object");
+        if (capturedInit) {
+            check("mermaid.initialize fontFamily is NOT 'inherit' (SVG-inside inherit is unreliable)",
+                capturedInit.fontFamily !== "inherit",
+                "got: " + JSON.stringify(capturedInit.fontFamily));
+            check("mermaid.initialize fontFamily equals body computed fontFamily",
+                capturedInit.fontFamily === bodyStyle.fontFamily,
+                "init=" + JSON.stringify(capturedInit.fontFamily) +
+                " body=" + JSON.stringify(bodyStyle.fontFamily));
+            var tv = capturedInit.themeVariables || {};
+            check("themeVariables.fontFamily equals body computed fontFamily",
+                tv.fontFamily === bodyStyle.fontFamily,
+                "tv=" + JSON.stringify(tv.fontFamily) +
+                " body=" + JSON.stringify(bodyStyle.fontFamily));
+            check("themeVariables.fontSize equals body computed fontSize",
+                tv.fontSize === bodyStyle.fontSize,
+                "tv=" + JSON.stringify(tv.fontSize) +
+                " body=" + JSON.stringify(bodyStyle.fontSize));
+            check("themeVariables.fontSize is set (non-empty) so Mermaid does not fall back to its built-in default",
+                typeof tv.fontSize === "string" && tv.fontSize.length > 0,
+                "got: " + JSON.stringify(tv.fontSize));
+        }
+    } finally {
+        // Restore so any later tests still see the previous (undefined) mermaid.
+        if (savedMermaid === undefined) {
+            delete window.mermaid;
+        } else {
+            window.mermaid = savedMermaid;
+        }
+    }
+
+    // --- 21. Mermaid SVG stays at intrinsic 1:1 size (no max-width: 100% cap) ---
+    //
+    // The font sync (section 20) is only effective if the rendered SVG also
+    // stays at its intrinsic 1:1 size. Capping with `max-width: 100%`
+    // proportionally shrinks the whole SVG — including in-diagram text
+    // driven by `themeVariables.fontSize = bodyStyle.fontSize` — whenever
+    // the wrap is narrower than the diagram's natural width. Upstream macOS
+    // SkimDown deliberately leaves Mermaid SVGs at intrinsic size and lets
+    // the surrounding card handle overflow (see upstream comment "renders
+    // at its intrinsic (1:1) size where in-diagram text matches body
+    // font-size"). The Windows port keeps `normalizeMermaidSvgSizes`
+    // turning percentage width into pixel width (needed so the document-
+    // level CSS `zoom` scales the SVG), but the CSS must NOT re-cap the
+    // SVG. Verify skimdown.css follows that policy and `.skim-mermaid-
+    // scroll` keeps `overflow-x: auto` to host horizontal scrolling.
+    console.log("[21] Mermaid SVG stays at intrinsic 1:1 size");
+    var cssPath = path.join(ROOT, "skimdown.css");
+    var cssText = fs.readFileSync(cssPath, "utf-8");
+    var mermaidSvgRule = cssText.match(/main\.markdown-body\s+\.skim-mermaid-wrap\s+svg\s*\{[^}]*\}/);
+    check(".skim-mermaid-wrap svg CSS rule exists in skimdown.css",
+        mermaidSvgRule !== null,
+        "could not locate `.skim-mermaid-wrap svg { ... }` selector");
+    if (mermaidSvgRule) {
+        var ruleBody = mermaidSvgRule[0];
+        check(".skim-mermaid-wrap svg does NOT set max-width: 100% (which would shrink in-diagram text)",
+            !/max-width\s*:\s*100\s*%/i.test(ruleBody),
+            "rule body: " + ruleBody);
+        check(".skim-mermaid-wrap svg uses display: block + margin auto so narrow diagrams center without text-align clipping",
+            /display\s*:\s*block/i.test(ruleBody) &&
+            /margin-(?:left|right|inline-(?:start|end))\s*:\s*auto/i.test(ruleBody),
+            "rule body: " + ruleBody);
+    }
+    var scrollRule = cssText.match(/main\.markdown-body\s+\.skim-mermaid-scroll\s*\{[^}]*\}/);
+    check(".skim-mermaid-scroll CSS rule exists",
+        scrollRule !== null,
+        "could not locate `.skim-mermaid-scroll { ... }` selector");
+    if (scrollRule) {
+        check(".skim-mermaid-scroll keeps `overflow-x: auto` to host horizontal scroll for wide diagrams",
+            /overflow-x\s*:\s*auto/i.test(scrollRule[0]),
+            "rule body: " + scrollRule[0]);
+    }
+
+    // [22] The scroll card (`.skim-mermaid-wrap`) itself must hug a narrow
+    // diagram (so the card isn't a giant full-width box with a thin SVG
+    // floating inside) and stay capped to the markdown body width for
+    // wide diagrams (so its inner `.skim-mermaid-scroll` can take over
+    // horizontal scrolling). The recipe is:
+    //   width: fit-content;          /* shrink to the SVG's natural size  */
+    //   max-width: 100%;             /* but never exceed the body width   */
+    //   margin: 1em auto;            /* center the card in the body       */
+    // Together with `.skim-mermaid-wrap svg { display:block; margin:auto }`
+    // this gives: narrow TD diagram → card hugs the SVG, centered in body;
+    // wide LR diagram → card spans body width, SVG scrolls inside.
+    console.log("[22] Mermaid scroll card hugs the diagram and centers in body");
+    var wrapRule = cssText.match(/main\.markdown-body\s+\.skim-mermaid-wrap\s*\{[^}]*\}/);
+    check(".skim-mermaid-wrap CSS rule exists in skimdown.css",
+        wrapRule !== null,
+        "could not locate `.skim-mermaid-wrap { ... }` selector");
+    if (wrapRule) {
+        var wrapBody = wrapRule[0];
+        check(".skim-mermaid-wrap uses `width: fit-content` so the card hugs a narrow SVG",
+            /width\s*:\s*fit-content/i.test(wrapBody),
+            "rule body: " + wrapBody);
+        check(".skim-mermaid-wrap caps itself to the body via `max-width: 100%` so wide SVGs use inner scroll instead of overflowing the card",
+            /max-width\s*:\s*100\s*%/i.test(wrapBody),
+            "rule body: " + wrapBody);
+        check(".skim-mermaid-wrap uses `margin: ... auto` so the card itself centers within the markdown body",
+            /margin\s*:\s*[^;]*\bauto\b/i.test(wrapBody),
+            "rule body: " + wrapBody);
+    }
+
     console.log("");
     if (failures === 0) {
         console.log("✅ ALL RENDERER SMOKE CHECKS PASSED");
