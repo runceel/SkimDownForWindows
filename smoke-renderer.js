@@ -176,6 +176,84 @@ async function main() {
     check("mermaid wrapper present", /class="skim-mermaid-wrap"/.test(h));
     check("pre.mermaid with data-source", /<pre[^>]+class="mermaid"[^>]+data-source/.test(h));
 
+    // --- 10b. normalizeMermaidSvgSizes (Chromium CSS `zoom` workaround) ---
+    //
+    // Mermaid v11 emits SVGs as `<svg width="100%" style="max-width: NNNpx"
+    // viewBox="X Y W H">`. Chromium's CSS `zoom` (used for the host's
+    // ZoomFactor) does not scale that combination, so the renderer rewrites
+    // each rendered SVG to use explicit pixel width/height attributes. We
+    // can't drive real mermaid inside jsdom (it needs browser-only APIs), so
+    // we exercise the pure-DOM helper directly via window.__skimDownInternal.
+    console.log("[10b] normalizeMermaidSvgSizes edge cases");
+    var skimInternal = window.__skimDownInternal;
+    check("normalizeMermaidSvgSizes exposed on window.__skimDownInternal",
+        skimInternal && typeof skimInternal.normalizeMermaidSvgSizes === "function");
+
+    if (skimInternal && typeof skimInternal.normalizeMermaidSvgSizes === "function") {
+        var normalize = skimInternal.normalizeMermaidSvgSizes;
+        var contentEl = window.document.getElementById("content");
+
+        function makeWrap(svgInnerHtml) {
+            contentEl.innerHTML =
+                '<div class="skim-mermaid-wrap">' +
+                  '<pre class="mermaid" data-processed="true">' +
+                    svgInnerHtml +
+                  '</pre>' +
+                '</div>';
+            return contentEl.querySelector(".skim-mermaid-wrap svg");
+        }
+
+        // Case 1: happy path — natural width from style, height from viewBox.
+        var svg1 = makeWrap('<svg width="100%" style="max-width: 800px;" viewBox="0 0 400 200"></svg>');
+        normalize(contentEl);
+        check("[normalize] width attribute set to natural width",
+            svg1.getAttribute("width") === "800",
+            "got: " + svg1.getAttribute("width"));
+        check("[normalize] height attribute = naturalWidth * (viewBoxH / viewBoxW)",
+            svg1.getAttribute("height") === "400",
+            "got: " + svg1.getAttribute("height"));
+        check("[normalize] inline max-width is cleared",
+            !/max-width/i.test(svg1.getAttribute("style") || ""),
+            "style: " + svg1.getAttribute("style"));
+        check("[normalize] data-skim-size-normalized marker set",
+            svg1.getAttribute("data-skim-size-normalized") === "true");
+
+        // Case 2: viewBox with negative min-x / min-y — must still be accepted.
+        var svg2 = makeWrap('<svg width="100%" style="max-width: 600px;" viewBox="-10 -20 300 150"></svg>');
+        normalize(contentEl);
+        check("[normalize] negative viewBox min-x/min-y is valid",
+            svg2.getAttribute("width") === "600" &&
+            svg2.getAttribute("height") === "300",
+            "got w=" + svg2.getAttribute("width") + " h=" + svg2.getAttribute("height"));
+
+        // Case 3: style.maxWidth missing — fall back to viewBox width.
+        var svg3 = makeWrap('<svg width="100%" viewBox="0 0 250 100"></svg>');
+        normalize(contentEl);
+        check("[normalize] falls back to viewBox width when style.maxWidth absent",
+            svg3.getAttribute("width") === "250" &&
+            svg3.getAttribute("height") === "100",
+            "got w=" + svg3.getAttribute("width") + " h=" + svg3.getAttribute("height"));
+
+        // Case 4: viewBox malformed AND style.maxWidth missing — skip silently.
+        var svg4 = makeWrap('<svg width="100%" viewBox="0 0 not-a-number"></svg>');
+        normalize(contentEl);
+        check("[normalize] skips when both natural-width sources are unusable",
+            svg4.getAttribute("width") === "100%" &&
+            !svg4.hasAttribute("data-skim-size-normalized"),
+            "w=" + svg4.getAttribute("width") + " marked=" + svg4.getAttribute("data-skim-size-normalized"));
+
+        // Case 5: already normalized — don't re-process / overwrite.
+        var svg5 = makeWrap('<svg width="123" height="45" viewBox="0 0 999 999" data-skim-size-normalized="true"></svg>');
+        normalize(contentEl);
+        check("[normalize] respects existing data-skim-size-normalized marker",
+            svg5.getAttribute("width") === "123" &&
+            svg5.getAttribute("height") === "45",
+            "got w=" + svg5.getAttribute("width") + " h=" + svg5.getAttribute("height"));
+
+        // Reset contentEl for downstream tests that re-render markdown.
+        contentEl.innerHTML = "";
+    }
+
     // --- 11. Search ---
     console.log("[11] Search");
     await renderMd("# Hello\n\nfind this word in the text.\n");
