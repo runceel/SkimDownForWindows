@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
@@ -23,9 +25,47 @@ public static class Program
     /// <summary>このアプリの single-instance キー。プロセス間で 1 つの "main" を共有する。</summary>
     private const string MainInstanceKey = "SkimDownForWindowsMain";
 
+    /// <summary>
+    /// 子プロセスへの再帰起動を 1 回に抑制するためのマーカー環境変数。
+    /// 親プロセスがセットし、子プロセスは値を見て即座に消す。
+    /// </summary>
+    private const string DetachedRelaunchMarker = "SKIMDOWNFORWINDOWS_DETACHED_RELAUNCH";
+
     [STAThread]
     private static int Main(string[] args)
     {
+        // packaged WinUI app では console host (pwsh / cmd / WindowsTerminal 等) から alias
+        // (`skimdown <path>`) で起動された場合、起動元のターミナルは子プロセスの終了まで
+        // プロンプトを解放しない。本アプリは GUI subsystem (PE subsystem = 2) だが、それでも
+        // 解放されないのは launcher (alias reparse point) 経由の CreateProcess が同期 spawn
+        // として扱われ、shell が `WaitForSingleObject` で完了を待つため。
+        //
+        // 親ターミナルを即座に解放するため、ここで自分自身を再起動して即終了する。
+        // - 親 (us): console host 起動を検出したら、同じ引数で子プロセスを spawn して return 0
+        // - 子: マーカー env var を消した上で通常フロー (WinRT 初期化 + single-instance) へ
+        //
+        // 子プロセスの std handles は anonymous pipe (RedirectStandard* = true) として
+        // 作り直されるため、親 (us) 終了後に PowerShell は子の I/O を待たない。
+        //
+        // 検出は親プロセス名 (pwsh / cmd / WindowsTerminal / conhost / OpenConsole / powershell / wt)
+        // で行う。GetConsoleWindow() は packaged app の broker spawn では常に 0 を返すため使えない。
+        var isDetachedRelaunch = string.Equals(
+            Environment.GetEnvironmentVariable(DetachedRelaunchMarker), "1", StringComparison.Ordinal);
+        if (isDetachedRelaunch)
+        {
+            // 子プロセスはマーカーを消して、孫プロセス起動や自身の再起動機能を将来追加した場合に
+            // 意図せず detach 判定がスキップされないようにする。
+            Environment.SetEnvironmentVariable(DetachedRelaunchMarker, null);
+        }
+        else if (IsLaunchedFromConsoleHost())
+        {
+            if (TryRelaunchDetached(args))
+            {
+                return 0;
+            }
+            // 再起動に失敗した場合は通常フローへフォールバック (機能は維持される)
+        }
+
         // WinUI / WinRT の COM ラッパーをグローバルに初期化する。これは generated Main
         // でも最初に呼ばれる初期化で、欠落すると WinRT 型の marshal に失敗する。
         WinRT.ComWrappersSupport.InitializeComWrappers();
@@ -64,5 +104,113 @@ public static class Program
             _ = new App();
         });
         return 0;
+    }
+
+    /// <summary>
+    /// 親プロセスがコンソールホスト (pwsh / cmd / WindowsTerminal / conhost 等) かを判定する。
+    /// packaged WinUI app では <c>GetConsoleWindow()</c> が常に 0 を返すため、親プロセス名で判定する。
+    /// </summary>
+    private static bool IsLaunchedFromConsoleHost()
+    {
+        try
+        {
+            var parentPid = GetParentProcessId();
+            if (parentPid <= 0) return false;
+            using var parent = Process.GetProcessById(parentPid);
+            var name = parent.ProcessName; // 拡張子なし、大文字小文字保持
+            // 主要な console host / shell プロセス
+            return name.Equals("pwsh", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("powershell", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("cmd", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("conhost", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("WindowsTerminal", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("wt", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("OpenConsole", StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 現在のプロセスの親プロセス ID を取得する。
+    /// <c>NtQueryInformationProcess</c> で <c>PROCESS_BASIC_INFORMATION</c> を読む。
+    /// </summary>
+    private static int GetParentProcessId()
+    {
+        var pbi = default(NativeMethods.PROCESS_BASIC_INFORMATION);
+        var status = NativeMethods.NtQueryInformationProcess(
+            Process.GetCurrentProcess().Handle,
+            0, // ProcessBasicInformation
+            ref pbi,
+            Marshal.SizeOf<NativeMethods.PROCESS_BASIC_INFORMATION>(),
+            out _);
+        return status == 0 ? pbi.InheritedFromUniqueProcessId.ToInt32() : -1;
+    }
+
+    /// <summary>
+    /// 同じ引数で自分自身を子プロセスとして spawn する。
+    /// 子の std handles は anonymous pipe に差し替えるため、PowerShell の標準入出力を継承しない。
+    /// 子に <see cref="DetachedRelaunchMarker"/> env var を渡し、無限再帰を防ぐ。
+    /// </summary>
+    /// <returns>spawn に成功して親が即時終了すべき場合 true、フォールバックすべき場合 false。</returns>
+    private static bool TryRelaunchDetached(string[] args)
+    {
+        try
+        {
+            var exePath = Environment.ProcessPath;
+            if (string.IsNullOrEmpty(exePath))
+            {
+                return false;
+            }
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = exePath,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardInput = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            foreach (var a in args)
+            {
+                psi.ArgumentList.Add(a);
+            }
+            // EnvironmentVariables は親 env のコピーで初期化されるので、ここでは marker の追加だけ行う。
+            psi.EnvironmentVariables[DetachedRelaunchMarker] = "1";
+
+            // Process オブジェクトの Dispose は managed handle の解放のみで、子プロセスは kill しない。
+            using var child = Process.Start(psi);
+            return child is not null;
+        }
+        catch
+        {
+            // 起動失敗 (exe path 解決失敗 / 権限不足等)。通常フローへフォールバックする。
+            return false;
+        }
+    }
+
+    private static class NativeMethods
+    {
+        [DllImport("ntdll.dll")]
+        public static extern int NtQueryInformationProcess(
+            IntPtr processHandle,
+            int processInformationClass,
+            ref PROCESS_BASIC_INFORMATION processInformation,
+            int processInformationLength,
+            out int returnLength);
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct PROCESS_BASIC_INFORMATION
+        {
+            public IntPtr Reserved1;
+            public IntPtr PebBaseAddress;
+            public IntPtr Reserved2_0;
+            public IntPtr Reserved2_1;
+            public IntPtr UniqueProcessId;
+            public IntPtr InheritedFromUniqueProcessId;
+        }
     }
 }
