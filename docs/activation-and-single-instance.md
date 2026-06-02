@@ -43,14 +43,35 @@ WinUI 3 のデフォルトは XAML ジェネレーターが `Main` を自動生�
 
 `Main` の処理:
 
-1. `WinRT.ComWrappersSupport.InitializeComWrappers()` — WinRT 型 marshal の初期化 (generated Main と同じ)
-2. `AppInstance.GetCurrent()` / `AppInstance.FindOrRegisterForKey("SkimDownForWindowsMain")`
+1. 親プロセスがコンソールホスト (`pwsh` / `cmd` / `WindowsTerminal` 等) なら、自分自身を子プロセスとして spawn して `return 0` (CLI 起動時に親ターミナルを即時解放するため。詳細は下の「親ターミナルの解放」)
+2. `WinRT.ComWrappersSupport.InitializeComWrappers()` — WinRT 型 marshal の初期化 (generated Main と同じ)
+3. `AppInstance.GetCurrent()` / `AppInstance.FindOrRegisterForKey("SkimDownForWindowsMain")`
    - キーが未登録ならカレントプロセスが **主インスタンス** として登録される
    - 既に主インスタンスがあれば、それが `mainInstance` として返る (`mainInstance.IsCurrent` で判別)
-3. 二次インスタンスの場合: `mainInstance.RedirectActivationToAsync(activatedArgs)` で activation を主プロセスに転送して `return 0` (UI を作らずに終了)
-4. 主インスタンスの場合: `thisInstance.Activated += App.OnRedirectedActivation` を `Application.Start` の **前** に subscribe してから `Application.Start(p => { ... new App(); })` を呼ぶ
+4. 二次インスタンスの場合: `mainInstance.RedirectActivationToAsync(activatedArgs)` で activation を主プロセスに転送して `return 0` (UI を作らずに終了)
+5. 主インスタンスの場合: `thisInstance.Activated += App.OnRedirectedActivation` を `Application.Start` の **前** に subscribe してから `Application.Start(p => { ... new App(); })` を呼ぶ
 
 `Application.Start` のラムダ内で `DispatcherQueueSynchronizationContext` をセットし、`new App()` を呼ぶ (generated Main と同等)。
+
+### 親ターミナルの解放 (CLI 起動時の self-relaunch)
+
+`windows.appExecutionAlias` 経由で `skimdown <path>` が PowerShell / cmd から起動されると、起動元のシェルは spawn した SkimDown プロセスを `WaitForSingleObject` で待ち続ける。これは GUI subsystem (PE subsystem = 2) の SkimDown 自体がコンソール出力を持たなくても、`FreeConsole` で子プロセスのコンソールを detach しても止まらない (シェルはプロセスハンドルで wait しているため)。
+
+このため `Program.Main` の **先頭** で次の手順を踏む:
+
+1. 親プロセスがコンソールホスト (`pwsh` / `powershell` / `cmd` / `conhost` / `WindowsTerminal` / `wt` / `OpenConsole`) なら、`Environment.ProcessPath` で自分自身を `ProcessStartInfo` (`UseShellExecute = false`, `CreateNoWindow = true`, `RedirectStandardInput/Output/Error = true`) として再起動する。同じ引数を `ArgumentList` で渡す
+2. 子プロセスの環境には marker env var `SKIMDOWNFORWINDOWS_DETACHED_RELAUNCH=1` をセットして無限再帰を防ぐ
+3. 親プロセスは `return 0` で即終了する。これにより起動元シェルの `WaitForSingleObject` が完了し、PowerShell のプロンプトが直ちに戻る
+4. 子プロセス側は `Main` の冒頭で marker を検出し、`Environment.SetEnvironmentVariable(...)` で消した上で通常フロー (WinRT 初期化 → single-instance redirect → `Application.Start`) に入る
+
+子プロセスの std handles は anonymous pipe に差し替えられるため、PowerShell の標準入出力を直接掴まない (親終了で pipe は自然に閉じる)。
+
+親プロセス名による判定は次の理由による:
+- packaged WinUI app (broker spawn) では `GetConsoleWindow()` が常に 0 を返すため、コンソールへの attach 有無では判定できない
+- `windows.appExecutionAlias` は 0 バイトの reparse point ファイル (`%LOCALAPPDATA%\Microsoft\WindowsApps\skimdown.exe`) で、kernel filter が解決して `SkimDownForWindows.exe` を直接起動する。起動元シェルからは別プロセスを介さず親 PID = シェル PID になる
+- 親 PID は `NtQueryInformationProcess` の `PROCESS_BASIC_INFORMATION.InheritedFromUniqueProcessId` から取得する
+
+親プロセス名が上記リストに該当しない場合 (Explorer ダブルクリック / Start Menu / file activation / `winapp run` のような dev 経路) は self-relaunch せず通常フローに入る。
 
 ## 主プロセス側の受信 ([`App.OnRedirectedActivation`](../src/SkimDownForWindows/App.xaml.cs))
 
