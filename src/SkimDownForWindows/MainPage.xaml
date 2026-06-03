@@ -176,35 +176,26 @@
                 <FontIcon Glyph="&#xE721;" FontSize="14" Opacity="0.6" />
                 <TextBox x:Name="SearchBox"
                          x:Uid="SearchBox"
-                         PlaceholderText="Find in document"
                          Width="320"
                          TextChanged="OnSearchTextChanged"
                          KeyDown="OnSearchKeyDown" />
                 <CheckBox x:Name="SearchCaseSensitive"
                           x:Uid="SearchCaseSensitive"
-                          Content="Aa"
-                          ToolTipService.ToolTip="Match case"
                           Checked="OnCaseToggleChanged"
                           Unchecked="OnCaseToggleChanged" />
                 <Button x:Uid="SearchPreviousButton"
                         Content="&#xE0E2;"
                         FontFamily="Segoe Fluent Icons"
-                        Click="OnFindPrevClick"
-                        ToolTipService.ToolTip="Previous (Shift+Enter)"
-                        AutomationProperties.Name="Previous result" />
+                        Click="OnFindPrevClick" />
                 <Button x:Uid="SearchNextButton"
                         Content="&#xE0E3;"
                         FontFamily="Segoe Fluent Icons"
-                        Click="OnFindNextClick"
-                        ToolTipService.ToolTip="Next (Enter)"
-                        AutomationProperties.Name="Next result" />
+                        Click="OnFindNextClick" />
                 <TextBlock x:Name="SearchStatus" VerticalAlignment="Center" Opacity="0.7" />
                 <Button x:Uid="SearchCloseButton"
                         Content="&#xE10A;"
                         FontFamily="Segoe Fluent Icons"
-                        Click="OnCloseSearchClick"
-                        ToolTipService.ToolTip="Close (Esc)"
-                        AutomationProperties.Name="Close search" />
+                        Click="OnCloseSearchClick" />
             </StackPanel>
         </Border>
 
@@ -324,4 +315,3 @@
         </Grid>
     </Grid>
 </Page>
-

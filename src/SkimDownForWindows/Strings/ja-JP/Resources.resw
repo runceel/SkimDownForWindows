@@ -13,49 +13,49 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="AboutDialog.Title" xml:space="preserve">
-    <value>About SkimDown</value>
+    <value>SkimDown について</value>
   </data>
   <data name="AboutDialog.CloseButtonText" xml:space="preserve">
-    <value>Close</value>
+    <value>閉じる</value>
   </data>
   <data name="DescriptionText.Text" xml:space="preserve">
-    <value>A quiet, read-only Markdown folder reader.</value>
+    <value>静かに Markdown フォルダーを読むだけの読み取り専用ビューアー。</value>
   </data>
   <data name="WindowsRepoLink.Content" xml:space="preserve">
-    <value>Windows port repository on GitHub</value>
+    <value>GitHub 上の Windows 版リポジトリ</value>
   </data>
   <data name="DocsLink.Content" xml:space="preserve">
-    <value>Documentation (skimdown.07jp27.net)</value>
+    <value>ドキュメント (skimdown.07jp27.net)</value>
   </data>
   <data name="UpstreamRepoLink.Content" xml:space="preserve">
-    <value>Original macOS project on GitHub</value>
+    <value>GitHub 上の元 macOS プロジェクト</value>
   </data>
   <data name="LicensePrefix.Text" xml:space="preserve">
-    <value>Released under the</value>
+    <value>ライセンス: </value>
   </data>
   <data name="LicenseLabel.Text" xml:space="preserve">
     <value>GNU General Public License v3.0</value>
   </data>
   <data name="LicenseSuffix.Text" xml:space="preserve">
-    <value>.</value>
+    <value>。</value>
   </data>
   <data name="AboutDialog.Version" xml:space="preserve">
-    <value>Version {0}</value>
+    <value>バージョン {0}</value>
   </data>
   <data name="EmptyStateTitle.Text" xml:space="preserve">
     <value>SkimDown</value>
   </data>
   <data name="EmptyStateDescription.Text" xml:space="preserve">
-    <value>Open a folder to start reading.</value>
+    <value>フォルダーを開いて読み始めてください。</value>
   </data>
   <data name="EmptyStateOpenFolderButton.Content" xml:space="preserve">
-    <value>Open Folder…</value>
+    <value>フォルダーを開く…</value>
   </data>
   <data name="NoMarkdownTitle.Text" xml:space="preserve">
-    <value>No Markdown files found</value>
+    <value>Markdown ファイルが見つかりません</value>
   </data>
   <data name="NoMarkdownOpenAnotherFolderButton.Content" xml:space="preserve">
-    <value>Open Another Folder…</value>
+    <value>別のフォルダーを開く…</value>
   </data>
   <data name="MainWindow.Title" xml:space="preserve">
     <value>SkimDown</value>
@@ -64,192 +64,192 @@
     <value>SkimDown</value>
   </data>
   <data name="FileMenuBarItem.Title" xml:space="preserve">
-    <value>File</value>
+    <value>ファイル</value>
   </data>
   <data name="OpenFolderMenuItem.Text" xml:space="preserve">
-    <value>Open Folder…</value>
+    <value>フォルダーを開く…</value>
   </data>
   <data name="OpenRecentMenuItem.Text" xml:space="preserve">
-    <value>Open Recent</value>
+    <value>最近使ったフォルダー</value>
   </data>
   <data name="RevealInExplorerMenuItem.Text" xml:space="preserve">
-    <value>Reveal in File Explorer</value>
+    <value>エクスプローラーで表示</value>
   </data>
   <data name="CopyFilePathMenuItem.Text" xml:space="preserve">
-    <value>Copy File Path</value>
+    <value>ファイル パスをコピー</value>
   </data>
   <data name="CloseWindowMenuItem.Text" xml:space="preserve">
-    <value>Close Window</value>
+    <value>ウィンドウを閉じる</value>
   </data>
   <data name="EditMenuBarItem.Title" xml:space="preserve">
-    <value>Edit</value>
+    <value>編集</value>
   </data>
   <data name="CopyMenuItem.Text" xml:space="preserve">
-    <value>Copy</value>
+    <value>コピー</value>
   </data>
   <data name="SelectAllMenuItem.Text" xml:space="preserve">
-    <value>Select All</value>
+    <value>すべて選択</value>
   </data>
   <data name="FindMenuItem.Text" xml:space="preserve">
-    <value>Find…</value>
+    <value>検索…</value>
   </data>
   <data name="FindNextMenuItem.Text" xml:space="preserve">
-    <value>Find Next</value>
+    <value>次を検索</value>
   </data>
   <data name="FindPreviousMenuItem.Text" xml:space="preserve">
-    <value>Find Previous</value>
+    <value>前を検索</value>
   </data>
   <data name="UseSelectionForFindMenuItem.Text" xml:space="preserve">
-    <value>Use Selection for Find</value>
+    <value>選択範囲を検索</value>
   </data>
   <data name="ViewMenuBarItem.Title" xml:space="preserve">
-    <value>View</value>
+    <value>表示</value>
   </data>
   <data name="ToggleSidebarMenuItem.Text" xml:space="preserve">
-    <value>Toggle Sidebar</value>
+    <value>サイドバーを切り替え</value>
   </data>
   <data name="MoveSidebarMenuItem.Text" xml:space="preserve">
-    <value>Move Sidebar to Right</value>
+    <value>サイドバーを右へ移動</value>
   </data>
   <data name="ZoomMenuItem.Text" xml:space="preserve">
-    <value>Zoom</value>
+    <value>ズーム</value>
   </data>
   <data name="ZoomInMenuItem.Text" xml:space="preserve">
-    <value>Zoom In</value>
+    <value>拡大</value>
   </data>
   <data name="ZoomOutMenuItem.Text" xml:space="preserve">
-    <value>Zoom Out</value>
+    <value>縮小</value>
   </data>
   <data name="ActualSizeMenuItem.Text" xml:space="preserve">
-    <value>Actual Size</value>
+    <value>実際のサイズ</value>
   </data>
   <data name="ContentWidthMenuItem.Text" xml:space="preserve">
-    <value>Content Width</value>
+    <value>コンテンツ幅</value>
   </data>
   <data name="ContentWidthStandardMenuItem.Text" xml:space="preserve">
-    <value>Standard (760 px)</value>
+    <value>標準 (760 px)</value>
   </data>
   <data name="ContentWidthWideMenuItem.Text" xml:space="preserve">
-    <value>Wide (960 px)</value>
+    <value>広め (960 px)</value>
   </data>
   <data name="ContentWidthExtraWideMenuItem.Text" xml:space="preserve">
-    <value>Extra Wide (1200 px)</value>
+    <value>さらに広め (1200 px)</value>
   </data>
   <data name="ContentWidthFullMenuItem.Text" xml:space="preserve">
-    <value>Full Width</value>
+    <value>全幅</value>
   </data>
   <data name="ThemeMenuItem.Text" xml:space="preserve">
-    <value>Theme</value>
+    <value>テーマ</value>
   </data>
   <data name="ThemeSystemMenuItem.Text" xml:space="preserve">
-    <value>System</value>
+    <value>システム</value>
   </data>
   <data name="ThemeLightMenuItem.Text" xml:space="preserve">
-    <value>Light</value>
+    <value>ライト</value>
   </data>
   <data name="ThemeDarkMenuItem.Text" xml:space="preserve">
-    <value>Dark</value>
+    <value>ダーク</value>
   </data>
   <data name="OpenThemesFolderMenuItem.Text" xml:space="preserve">
-    <value>Open Themes Folder</value>
+    <value>テーマ フォルダーを開く</value>
   </data>
   <data name="ReloadThemesMenuItem.Text" xml:space="preserve">
-    <value>Reload Themes</value>
+    <value>テーマを再読み込み</value>
   </data>
   <data name="WindowMenuBarItem.Title" xml:space="preserve">
-    <value>Window</value>
+    <value>ウィンドウ</value>
   </data>
   <data name="NewWindowMenuItem.Text" xml:space="preserve">
-    <value>New Window</value>
+    <value>新しいウィンドウ</value>
   </data>
   <data name="MinimizeMenuItem.Text" xml:space="preserve">
-    <value>Minimize</value>
+    <value>最小化</value>
   </data>
   <data name="ZoomWindowMenuItem.Text" xml:space="preserve">
-    <value>Zoom</value>
+    <value>ズーム</value>
   </data>
   <data name="BringAllToFrontMenuItem.Text" xml:space="preserve">
-    <value>Bring All to Front</value>
+    <value>すべてを最前面に表示</value>
   </data>
   <data name="HelpMenuBarItem.Title" xml:space="preserve">
-    <value>Help</value>
+    <value>ヘルプ</value>
   </data>
   <data name="AboutSkimDownMenuItem.Text" xml:space="preserve">
-    <value>About SkimDown</value>
+    <value>SkimDown について</value>
   </data>
   <data name="SearchBox.PlaceholderText" xml:space="preserve">
-    <value>Find in document</value>
+    <value>文書内を検索</value>
   </data>
   <data name="SearchCaseSensitive.Content" xml:space="preserve">
     <value>Aa</value>
   </data>
   <data name="SearchCaseSensitive.ToolTipService.ToolTip" xml:space="preserve">
-    <value>Match case</value>
+    <value>大文字と小文字を区別</value>
   </data>
   <data name="SearchPreviousButton.ToolTipService.ToolTip" xml:space="preserve">
-    <value>Previous (Shift+Enter)</value>
+    <value>前へ (Shift+Enter)</value>
   </data>
   <data name="SearchPreviousButton.AutomationProperties.Name" xml:space="preserve">
-    <value>Previous result</value>
+    <value>前の結果</value>
   </data>
   <data name="SearchNextButton.ToolTipService.ToolTip" xml:space="preserve">
-    <value>Next (Enter)</value>
+    <value>次へ (Enter)</value>
   </data>
   <data name="SearchNextButton.AutomationProperties.Name" xml:space="preserve">
-    <value>Next result</value>
+    <value>次の結果</value>
   </data>
   <data name="SearchCloseButton.ToolTipService.ToolTip" xml:space="preserve">
-    <value>Close (Esc)</value>
+    <value>閉じる (Esc)</value>
   </data>
   <data name="SearchCloseButton.AutomationProperties.Name" xml:space="preserve">
-    <value>Close search</value>
+    <value>検索を閉じる</value>
   </data>
   <data name="MarkdownCount.OneFile" xml:space="preserve">
-    <value>1 markdown file</value>
+    <value>Markdown ファイル 1 件</value>
   </data>
   <data name="MarkdownCount.ManyFiles" xml:space="preserve">
-    <value>{0} markdown files</value>
+    <value>Markdown ファイル {0} 件</value>
   </data>
   <data name="RecentFolders.Empty" xml:space="preserve">
-    <value>(no recent folders)</value>
+    <value>（最近使ったフォルダーはありません）</value>
   </data>
   <data name="RecentFolders.Clear" xml:space="preserve">
-    <value>Clear Recent</value>
+    <value>最近使ったフォルダーを消去</value>
   </data>
   <data name="DragDrop.OpenInNewWindow" xml:space="preserve">
-    <value>Open in new SkimDown window</value>
+    <value>新しい SkimDown ウィンドウで開く</value>
   </data>
   <data name="DragDrop.OpenInSkimDown" xml:space="preserve">
-    <value>Open in SkimDown</value>
+    <value>SkimDown で開く</value>
   </data>
   <data name="Search.NoResults" xml:space="preserve">
-    <value>No results</value>
+    <value>結果なし</value>
   </data>
   <data name="Sidebar.MoveToRight" xml:space="preserve">
-    <value>Move Sidebar to Right</value>
+    <value>サイドバーを右へ移動</value>
   </data>
   <data name="Sidebar.MoveToLeft" xml:space="preserve">
-    <value>Move Sidebar to Left</value>
+    <value>サイドバーを左へ移動</value>
   </data>
   <data name="MermaidZoom.OpenHint" xml:space="preserve">
-    <value>⤢ Click to enlarge</value>
+    <value>⤢ クリックで拡大</value>
   </data>
   <data name="MermaidZoom.DialogLabel" xml:space="preserve">
-    <value>Mermaid diagram zoomed view</value>
+    <value>Mermaid 図の拡大表示</value>
   </data>
   <data name="MermaidZoom.ZoomIn" xml:space="preserve">
-    <value>Zoom in</value>
+    <value>拡大</value>
   </data>
   <data name="MermaidZoom.ZoomOut" xml:space="preserve">
-    <value>Zoom out</value>
+    <value>縮小</value>
   </data>
   <data name="MermaidZoom.Reset" xml:space="preserve">
-    <value>Reset</value>
+    <value>リセット</value>
   </data>
   <data name="MermaidZoom.Close" xml:space="preserve">
-    <value>Close</value>
+    <value>閉じる</value>
   </data>
   <data name="MermaidZoom.Hint" xml:space="preserve">
-    <value>Wheel: zoom · Drag: pan · Esc: close</value>
+    <value>ホイール: ズーム · ドラッグ: 移動 · Esc: 閉じる</value>
   </data>
 </root>

@@ -21,7 +21,7 @@ SkimDown for Windows は、初期は UI 文字列を XAML / コードビハイ�
 - **Infrastructure プロジェクトは `Microsoft.WindowsAppSDK` を参照しない** (ADR-0002) ため、リソースローダーを Infrastructure に置く選択肢は取れない
 - アプリは WinUI 3 + Windows App SDK 2.0.1 + MSIX (Microsoft Store / sideload) で配布するため、**MRT (Modern Resource Technology) と PRI (Package Resource Index) が既定で使える**
 - ViewModel (`MainPageViewModel`) が UI 文字列を直接保持していない (Format パラメーターのみ受け取り、Page 側で `string.Format(_strings.GetString(...), value)`) — このパターンが既に確立している
-- 現状ロケールは英語 (`en-US`) のみで、近い将来別言語を追加する具体的予定は無いが、いつでも追加できる土台は欲しい
+- 現状ロケールは英語 (`en-US`) と日本語 (`ja-JP`) で、いつでも追加できる土台は欲しい
 
 ## 決定
 
@@ -29,7 +29,7 @@ SkimDown for Windows は、初期は UI 文字列を XAML / コードビハイ�
 
 **Modern Resource Technology (MRT) + resw + `Windows.ApplicationModel.Resources.ResourceLoader`** を採用する。
 
-- リソースは `src/SkimDownForWindows/Strings/<locale>/Resources.resw` に置く (現状 `en-US` のみ)
+- リソースは `src/SkimDownForWindows/Strings/<locale>/Resources.resw` に置く (現状 `en-US` と `ja-JP`)
 - `Package.appxmanifest` は `<Resource Language="x-generate" />` を維持し、サポートロケールは `Strings/<locale>/` フォルダー一覧から MSIX ビルド時に自動生成する
 - XAML 内の文字列は **`x:Uid` バインド** を第一選択にする (例: `<MenuFlyoutItem x:Uid="OpenFolderMenuItem" />` → `OpenFolderMenuItem.Text` を resw から自動解決)
 - XAML で表現できない動的文字列 (count フォーマット / 状態遷移ラベル / Recent Folders 動的メニュー / DragDrop オーバーレイ等) は **コードビハインドから `ResourceLoader.GetForViewIndependentUse().GetString("Foo/Bar")`** で取得する

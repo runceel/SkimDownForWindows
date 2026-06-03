@@ -27,6 +27,7 @@
 
         <!-- Description -->
         <TextBlock x:Name="DescriptionText"
+                   x:Uid="DescriptionText"
                    HorizontalAlignment="Center"
                    TextAlignment="Center"
                    TextWrapping="Wrap"

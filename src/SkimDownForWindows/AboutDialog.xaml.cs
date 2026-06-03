@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
 using SkimDownForWindows.Application.Abstractions;
+using Windows.ApplicationModel.Resources;
 
 namespace SkimDownForWindows;
 
@@ -16,6 +17,7 @@ namespace SkimDownForWindows;
 /// </remarks>
 public sealed partial class AboutDialog : ContentDialog
 {
+    private readonly ResourceLoader _strings = ResourceLoader.GetForViewIndependentUse();
     private readonly IExternalUriLauncher _launcher;
 
     public AboutDialog(IAppInfoService appInfo, IExternalUriLauncher launcher)
@@ -28,8 +30,7 @@ public sealed partial class AboutDialog : ContentDialog
         InitializeComponent();
 
         DisplayNameText.Text = appInfo.DisplayName;
-        VersionText.Text = $"Version {appInfo.Version}";
-        DescriptionText.Text = appInfo.Description;
+        VersionText.Text = string.Format(_strings.GetString("AboutDialog/Version"), appInfo.Version);
         CopyrightText.Text = appInfo.Copyright;
     }
 

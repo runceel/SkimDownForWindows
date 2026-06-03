@@ -20,7 +20,7 @@ public sealed class PackageAppInfoService : IAppInfoService
 
     // 非パッケージ実行時 / 取得失敗時のフォールバック値。
     private const string FallbackDisplayName = "SkimDown";
-    private const string FallbackDescription = "A quiet, read-only Markdown folder reader.";
+    private const string FallbackDescription = "";
     private const string FallbackCopyright = "© okazuki";
 
     public string DisplayName { get; }

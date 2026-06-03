@@ -7,12 +7,15 @@ SkimDown for Windows の UI 文字列は **Modern Resource Technology (MRT)** �
 ```
 src/SkimDownForWindows/
 ├── Strings/
-│   └── en-US/
-│       └── Resources.resw     ← 全 UI 文字列 (約 50 件)
+│   ├── en-US/
+│   │   └── Resources.resw     ← 全 UI 文字列 (約 50 件)
+│   └── ja-JP/
+│       └── Resources.resw     ← 日本語 UI 文字列
 ├── MainPage.xaml              ← x:Uid で resw を参照
 ├── MainPage.xaml.cs           ← ResourceLoader で動的文字列を取得
 ├── MainWindow.xaml.cs         ← ResourceLoader で Title を取得
 ├── AboutDialog.xaml           ← x:Uid のみ
+├── AboutDialog.xaml.cs        ← ResourceLoader で Version を取得
 └── Package.appxmanifest       ← <Resource Language="x-generate" />
 ```
 
@@ -21,13 +24,13 @@ src/SkimDownForWindows/
 | 種類 | 場所 |
 |---|---|
 | 文字列リソース (locale 別) | `src/SkimDownForWindows/Strings/<locale>/Resources.resw` |
-| `ResourceLoader` 利用 | `src/SkimDownForWindows/MainPage.xaml.cs`, `src/SkimDownForWindows/MainWindow.xaml.cs` |
+| `ResourceLoader` 利用 | `src/SkimDownForWindows/AboutDialog.xaml.cs`, `src/SkimDownForWindows/MainPage.xaml.cs`, `src/SkimDownForWindows/MainWindow.xaml.cs` |
 | `x:Uid` 参照 | `src/SkimDownForWindows/MainPage.xaml`, `src/SkimDownForWindows/MainWindow.xaml`, `src/SkimDownForWindows/AboutDialog.xaml` |
 | サポートロケール宣言 | `src/SkimDownForWindows/Package.appxmanifest` の `<Resources>` 要素 |
 
 ## サポート対象ロケール
 
-現状は **`en-US` の 1 ロケールのみ**。
+現状は **`en-US` と `ja-JP` の 2 ロケール**。
 
 `Package.appxmanifest` は `<Resource Language="x-generate" />` を指定し、MSIX ビルド時に `Strings/<locale>/` フォルダー一覧から PRI (Package Resource Index) を自動生成する。新しいロケール (例: `ja-JP`) を追加した場合は、`Strings/ja-JP/Resources.resw` を作るだけでビルドが認識する。`<DefaultLanguage>` は明示せず、MRT 既定のフォールバック挙動 (現状 `en-US`) に任せている。
 
