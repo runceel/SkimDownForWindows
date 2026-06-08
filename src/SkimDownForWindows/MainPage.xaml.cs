@@ -241,6 +241,9 @@ public sealed partial class MainPage : Page
                 ApplySidebarVisualState();
                 UpdateMoveSidebarLabel();
                 break;
+            case nameof(MainPageViewModel.IsSidebarTemporarilyCollapsed):
+                ApplySidebarVisualState();
+                break;
         }
     }
 
@@ -256,7 +259,7 @@ public sealed partial class MainPage : Page
     private void ApplySidebarVisualState()
     {
         var settings = ViewModel.Settings.Current;
-        if (ViewModel.IsSingleFileMode)
+        if (ViewModel.IsSingleFileMode || ViewModel.IsSidebarTemporarilyCollapsed)
         {
             Sidebar.Visibility = Visibility.Collapsed;
             SetActiveSidebarWidth(new GridLength(0));
@@ -442,6 +445,72 @@ public sealed partial class MainPage : Page
     // ----- Menu / button handlers -----
 
     private async void OnOpenFolderClick(object? sender, RoutedEventArgs e) => await PromptForFolderAsync();
+
+    private async void OnOpenSettingsClick(object? sender, RoutedEventArgs e)
+    {
+        if (_colorSchemes is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var dialog = new SettingsDialog(ViewModel.Settings.Current, _colorSchemes.Schemes)
+            {
+                XamlRoot = XamlRoot,
+            };
+
+            var result = await dialog.ShowAsync();
+            if (result != ContentDialogResult.Primary)
+            {
+                return;
+            }
+
+            await ApplySettingsFromDialogAsync(dialog);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError("Settings dialog failed", ex);
+        }
+    }
+
+    private async Task ApplySettingsFromDialogAsync(SettingsDialog dialog)
+    {
+        var settings = ViewModel.Settings.Current;
+
+        settings.OpenContainingFolderOnSingleFileActivation = dialog.OpenContainingFolderOnSingleFileActivation;
+        settings.SearchCaseSensitive = dialog.SearchCaseSensitive;
+        settings.ZoomFactor = dialog.ZoomFactor;
+        Preview.SetZoom(dialog.ZoomFactor);
+
+        if (_colorSchemes is not null)
+        {
+            var normalized = _colorSchemes.Normalize(new ThemeSelection(dialog.Theme, dialog.CustomThemeId));
+            settings.Theme = normalized.Theme;
+            settings.CustomThemeId = normalized.CustomThemeId;
+            ApplyThemeToShell(normalized.Theme);
+            PushThemeToPreview();
+            UpdateThemeMenuChecks();
+        }
+
+        settings.ContentMaxWidth = dialog.ContentMaxWidth;
+        Preview.SetContentMaxWidth(ContentMaxWidthMap.ToCssValue(dialog.ContentMaxWidth));
+        UpdateContentWidthMenuChecks();
+
+        settings.SidebarPosition = dialog.SidebarPosition;
+        settings.SidebarVisible = dialog.SidebarVisible;
+        ViewModel.IsSidebarTemporarilyCollapsed = false;
+        ApplySidebarPosition(dialog.SidebarPosition);
+        ApplySidebarVisualState();
+        UpdateMoveSidebarLabel();
+
+        await ViewModel.Settings.SaveAsync();
+
+        if (SearchBar.Visibility == Visibility.Visible)
+        {
+            Preview.Search(SearchBox.Text, settings.SearchCaseSensitive);
+        }
+    }
 
     private async Task PromptForFolderAsync()
     {
@@ -789,6 +858,16 @@ public sealed partial class MainPage : Page
     {
         // Single-file mode 中はサイドバー切替を無効化 (上流仕様に合わせて永続設定を触らない)。
         if (ViewModel.IsSingleFileMode) return;
+
+        if (ViewModel.IsSidebarTemporarilyCollapsed)
+        {
+            ViewModel.IsSidebarTemporarilyCollapsed = false;
+            Sidebar.Visibility = Visibility.Visible;
+            SetActiveSidebarWidth(new GridLength(Math.Max(180, ViewModel.Settings.Current.SidebarWidth)));
+            ViewModel.Settings.Current.SidebarVisible = true;
+            await ViewModel.Settings.SaveAsync();
+            return;
+        }
 
         var visible = Sidebar.Visibility == Visibility.Visible;
         if (visible)

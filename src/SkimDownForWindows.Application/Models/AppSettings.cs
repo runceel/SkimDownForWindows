@@ -43,6 +43,13 @@ public sealed class AppSettings
     /// </summary>
     public ContentMaxWidth ContentMaxWidth { get; set; } = ContentMaxWidth.Full;
 
+    /// <summary>
+    /// <c>true</c> のとき、<see cref="Models.OpenSingleFileActivation"/> を受けた起動で
+    /// single-file mode の代わりに「対象 Markdown の親フォルダーを開く」挙動に切り替える。
+    /// 既定値 (<c>false</c>) は従来どおり lightweight な single-file mode。
+    /// </summary>
+    public bool OpenContainingFolderOnSingleFileActivation { get; set; } = false;
+
     /// <summary>直近に開いたフォルダーのパス、最新が先頭。最大 <see cref="MaxRecentFolders"/> 件。</summary>
     public List<string> RecentFolders { get; set; } = new();
 

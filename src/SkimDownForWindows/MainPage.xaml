@@ -90,6 +90,8 @@
                                 x:Uid="MoveSidebarMenuItem"
                                 IsEnabled="{x:Bind IsNotSingleFileMode(ViewModel.IsSingleFileMode), Mode=OneWay}"
                                 Click="OnMoveSidebarClick" />
+                <MenuFlyoutItem x:Uid="OpenSettingsMenuItem"
+                                Click="OnOpenSettingsClick" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutSubItem x:Uid="ZoomMenuItem">
                     <MenuFlyoutItem x:Uid="ZoomInMenuItem" Click="OnZoomInClick">
@@ -324,4 +326,3 @@
         </Grid>
     </Grid>
 </Page>
-

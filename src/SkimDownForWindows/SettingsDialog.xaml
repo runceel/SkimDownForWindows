@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentDialog
+    x:Class="SkimDownForWindows.SettingsDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    x:Uid="SettingsDialog"
+    DefaultButton="Primary"
+    PrimaryButtonClick="OnPrimaryButtonClick"
+    mc:Ignorable="d">
+
+    <ScrollViewer MaxHeight="640">
+        <StackPanel Spacing="16">
+            <TextBlock x:Uid="SettingsDialogGeneralSectionHeader"
+                       Style="{ThemeResource SubtitleTextBlockStyle}" />
+
+            <Grid ColumnSpacing="12" RowSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0"
+                           Grid.Column="0"
+                           x:Uid="SettingsDialogSingleFileFolderModeLabel"
+                           VerticalAlignment="Center" />
+                <ToggleSwitch x:Name="SingleFileFolderModeToggle"
+                              Grid.Row="0"
+                              Grid.Column="1"
+                              x:Uid="SettingsDialogSingleFileFolderModeToggle"
+                              VerticalAlignment="Center" />
+
+                <TextBlock Grid.Row="1"
+                           Grid.Column="0"
+                           x:Uid="SettingsDialogSearchCaseLabel"
+                           VerticalAlignment="Center" />
+                <ToggleSwitch x:Name="SearchCaseToggle"
+                              Grid.Row="1"
+                              Grid.Column="1"
+                              x:Uid="SettingsDialogSearchCaseToggle"
+                              VerticalAlignment="Center" />
+
+                <TextBlock Grid.Row="2"
+                           Grid.Column="0"
+                           x:Uid="SettingsDialogZoomLabel"
+                           VerticalAlignment="Center" />
+                <NumberBox x:Name="ZoomNumberBox"
+                           Grid.Row="2"
+                           Grid.Column="1"
+                           Minimum="0.5"
+                           Maximum="3.0"
+                           SmallChange="0.1"
+                           SpinButtonPlacementMode="Compact"
+                           Width="140"
+                           HorizontalAlignment="Right" />
+            </Grid>
+
+            <TextBlock x:Uid="SettingsDialogAppearanceSectionHeader"
+                       Style="{ThemeResource SubtitleTextBlockStyle}" />
+
+            <Grid ColumnSpacing="12" RowSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0"
+                           Grid.Column="0"
+                           x:Uid="SettingsDialogThemeLabel"
+                           VerticalAlignment="Center" />
+                <ComboBox x:Name="ThemeComboBox"
+                          Grid.Row="0"
+                          Grid.Column="1"
+                          Width="220"
+                          HorizontalAlignment="Right" />
+
+                <TextBlock Grid.Row="1"
+                           Grid.Column="0"
+                           x:Uid="SettingsDialogContentWidthLabel"
+                           VerticalAlignment="Center" />
+                <ComboBox x:Name="ContentWidthComboBox"
+                          Grid.Row="1"
+                          Grid.Column="1"
+                          Width="220"
+                          HorizontalAlignment="Right">
+                    <ComboBoxItem x:Uid="SettingsDialogContentWidthStandardItem" Tag="Standard" />
+                    <ComboBoxItem x:Uid="SettingsDialogContentWidthWideItem" Tag="Wide" />
+                    <ComboBoxItem x:Uid="SettingsDialogContentWidthExtraWideItem" Tag="ExtraWide" />
+                    <ComboBoxItem x:Uid="SettingsDialogContentWidthFullItem" Tag="Full" />
+                </ComboBox>
+
+                <TextBlock Grid.Row="2"
+                           Grid.Column="0"
+                           x:Uid="SettingsDialogSidebarPositionLabel"
+                           VerticalAlignment="Center" />
+                <ComboBox x:Name="SidebarPositionComboBox"
+                          Grid.Row="2"
+                          Grid.Column="1"
+                          Width="220"
+                          HorizontalAlignment="Right">
+                    <ComboBoxItem x:Uid="SettingsDialogSidebarPositionLeftItem" Tag="Left" />
+                    <ComboBoxItem x:Uid="SettingsDialogSidebarPositionRightItem" Tag="Right" />
+                </ComboBox>
+
+                <TextBlock Grid.Row="3"
+                           Grid.Column="0"
+                           x:Uid="SettingsDialogSidebarVisibleLabel"
+                           VerticalAlignment="Center" />
+                <ToggleSwitch x:Name="SidebarVisibleToggle"
+                              Grid.Row="3"
+                              Grid.Column="1"
+                              x:Uid="SettingsDialogSidebarVisibleToggle"
+                              VerticalAlignment="Center" />
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</ContentDialog>
