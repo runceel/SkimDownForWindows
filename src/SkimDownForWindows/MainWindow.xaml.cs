@@ -28,6 +28,7 @@ public sealed partial class MainWindow : Window
     private readonly IServiceScope _scope;
     private MainPageViewModel? _viewModel;
     private RectInt32? _pendingRestoreBounds;
+    private RectInt32? _boundsForDeferredCorrection;
     private bool _pendingMaximize;
     private bool _restorePending;
     private RectInt32? _lastRestoredBounds;
@@ -154,6 +155,35 @@ public sealed partial class MainWindow : Window
 
         if (_pendingRestoreBounds is RectInt32 bounds)
         {
+            ApplyBoundsWithDpiCorrection(bounds);
+
+            // WM_DPICHANGED が非同期で届き、後からサイズが再スケールされるケースに備え、
+            // 次の tick でサイズが要求値と一致しているか確認し、ずれていれば再適用する。
+            // (最大化する場合はサイズが最大化矩形になるため、この遅延補正は行わない。)
+            if (!_pendingMaximize)
+            {
+                _boundsForDeferredCorrection = bounds;
+                DispatcherQueue.TryEnqueue(CorrectRestoreBoundsIfNeeded);
+            }
+        }
+
+        if (_pendingMaximize && AppWindow.Presenter is OverlappedPresenter op)
+        {
+            try { op.Maximize(); }
+            catch { /* best-effort: presenter may reject maximize in rare states */ }
+        }
+    }
+
+    /// <summary>
+    /// <see cref="AppWindow.MoveAndResize(RectInt32)"/> を適用する。別 DPI のモニターへ移動すると
+    /// <c>WM_DPICHANGED</c> によってサイズが DPI 比で再スケールされ、要求どおりの物理サイズに
+    /// ならないことがある。移動後 (= 目的モニターの DPI コンテキスト) で再適用することで、
+    /// 保存された物理サイズを忠実に復元する。
+    /// </summary>
+    private void ApplyBoundsWithDpiCorrection(RectInt32 bounds)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
             try
             {
                 AppWindow.MoveAndResize(bounds);
@@ -163,12 +193,25 @@ public sealed partial class MainWindow : Window
                 AppWindow.Resize(new SizeInt32(bounds.Width, bounds.Height));
                 AppWindow.Move(new PointInt32(bounds.X, bounds.Y));
             }
+
+            if (AppWindow.Size.Width == bounds.Width && AppWindow.Size.Height == bounds.Height)
+            {
+                break;
+            }
+        }
+    }
+
+    private void CorrectRestoreBoundsIfNeeded()
+    {
+        if (_boundsForDeferredCorrection is not RectInt32 bounds)
+        {
+            return;
         }
 
-        if (_pendingMaximize && AppWindow.Presenter is OverlappedPresenter op)
+        _boundsForDeferredCorrection = null;
+        if (AppWindow.Size.Width != bounds.Width || AppWindow.Size.Height != bounds.Height)
         {
-            try { op.Maximize(); }
-            catch { /* best-effort: presenter may reject maximize in rare states */ }
+            ApplyBoundsWithDpiCorrection(bounds);
         }
     }
 
