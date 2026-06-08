@@ -28,8 +28,8 @@ sequenceDiagram
     App->>CLI: scope を作って Classify(target, cwd)
     CLI-->>App: OpenFolderActivation / OpenSingleFileActivation / null
     alt single-file
-        App->>WS: OpenSingleFile(path) / OpenSingleFileInNewWindow(...)
-        WS->>W: 既存の空 / single-file mode に流す or 新規ウィンドウ
+        App->>WS: OpenSingleFileInNewWindow(path)
+        WS->>W: 常に新規ウィンドウ
     else folder
         App->>WS: OpenFolderInNewWindow(folder)
         WS->>W: 必ず新規ウィンドウ
@@ -148,7 +148,7 @@ public sealed record OpenSingleFileActivation(string FilePath) : InitialActivati
 |---|---|---|
 | `CreateWindow(initialFolderPath?, restoreLastFolder)` | 一般的なウィンドウ作成 (空ウィンドウ / folder mode 指定起動 / last folder 復元) | しない (常に新規) |
 | `OpenFolderInNewWindow(folderPath)` | フォルダーを新規ウィンドウで開く (例: フォルダー drop で既にフォルダーを開いているウィンドウへ drop された時) | しない |
-| `OpenSingleFile(filePath)` | single-file mode で開く (1 個目) | **再利用候補あり** (`IsEmptyOrSingleFile == true` のウィンドウがあればそこに流す) |
+| `OpenSingleFile(filePath)` | single-file mode で開く (内部 API) | **再利用候補あり** (`IsEmptyOrSingleFile == true` のウィンドウがあればそこに流す) |
 | `OpenSingleFileInNewWindow(filePath)` | single-file mode で必ず新規ウィンドウで開く | しない |
 | `OpenSingleFilesInWindows(filePaths)` | 複数ファイル: 1 個目は再利用、残りは新規 | 1 個目のみ |
 | `ActivateWindow(handle)` | 前面に出す (`MoveInZOrderAtTop + Activate`) | — |
@@ -157,14 +157,14 @@ public sealed record OpenSingleFileActivation(string FilePath) : InitialActivati
 
 ## 起動時 vs Redirect 時の挙動差
 
-`App.OpenFirstWindowFromActivation` (起動時) と `App.DispatchActivationTargets` (redirect 受信時) はほぼ同じだが、redirect 時のみ「1 個目の single-file は既存ウィンドウを再利用する」モード (`allowReuseExisting: true`) で動く。
+`App.OpenFirstWindowFromActivation` (起動時) は初回ウィンドウを作る専用フロー、`App.DispatchActivationTargets` (redirect 受信時) は既存プロセスに届いた対象を順次処理するフローとして分かれている。redirect 時の single-file は、file activation / launch activation のどちらでも新規ウィンドウで開く。
 
 | シーン | 1 個目の振る舞い | 2 個目以降の振る舞い |
 |---|---|---|
 | プロセス起動時 (targets 空) | `CreateWindow(null, restoreLastFolder: true)` で last folder を復元 | — |
 | プロセス起動時 (1 件以上、最初が single-file) | `OpenSingleFileInNewWindow` (起動直後にウィンドウを必ず新規で作る) | 各 target ごとに `OpenSingleFileInNewWindow` / `OpenFolderInNewWindow` |
 | プロセス起動時 (最初が folder) | `CreateWindow(initialFolderPath: ofa.FolderPath, restoreLastFolder: false)` | 同上 |
-| Redirect 受信時 (single-file) | `OpenSingleFile` (空 / single-file の既存ウィンドウがあれば再利用) | 必ず新規 |
+| Redirect 受信時 (single-file) | `OpenSingleFileInNewWindow` (常に新規) | 必ず新規 |
 | Redirect 受信時 (folder) | `OpenFolderInNewWindow` (常に新規) | 必ず新規 |
 
 ## File Type Association ([`Package.appxmanifest`](../src/SkimDownForWindows/Package.appxmanifest))

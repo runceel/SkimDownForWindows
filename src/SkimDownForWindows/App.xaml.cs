@@ -141,7 +141,7 @@ public partial class App : WinUIApplication
         try
         {
             var targets = ExtractActivationTargets(e);
-            DispatchActivationTargets(targets, allowReuseExisting: true);
+            DispatchActivationTargets(targets);
         }
         catch (Exception ex)
         {
@@ -223,10 +223,9 @@ public partial class App : WinUIApplication
     }
 
     /// <summary>
-    /// Redirect 受信時用: targets を全部処理。
-    /// 1 個目だけ「空 / single-file ウィンドウ再利用」を許す。残りは常に新規ウィンドウ。
+    /// Redirect 受信時用: targets を全部処理し、各 target を常に新規ウィンドウで開く。
     /// </summary>
-    private static void DispatchActivationTargets(IReadOnlyList<string> targets, bool allowReuseExisting)
+    private static void DispatchActivationTargets(IReadOnlyList<string> targets)
     {
         if (targets.Count == 0) return;
 
@@ -246,34 +245,15 @@ public partial class App : WinUIApplication
 
         if (classifiedList.Count == 0) return;
 
-        var first = true;
         foreach (var act in classifiedList)
         {
-            if (first && allowReuseExisting)
+            if (act is OpenSingleFileActivation osfa)
             {
-                first = false;
-                if (act is OpenSingleFileActivation osfa)
-                {
-                    var h = windowService.OpenSingleFile(osfa.FilePath);
-                    h.Activate();
-                }
-                else if (act is OpenFolderActivation ofa)
-                {
-                    // フォルダーは folder mode ウィンドウを必ず新規で開く (上流仕様に合わせ)
-                    var h = windowService.OpenFolderInNewWindow(ofa.FolderPath);
-                    h.Activate();
-                }
+                windowService.OpenSingleFileInNewWindow(osfa.FilePath);
             }
-            else
+            else if (act is OpenFolderActivation ofa)
             {
-                if (act is OpenSingleFileActivation osfa)
-                {
-                    windowService.OpenSingleFileInNewWindow(osfa.FilePath);
-                }
-                else if (act is OpenFolderActivation ofa)
-                {
-                    windowService.OpenFolderInNewWindow(ofa.FolderPath);
-                }
+                windowService.OpenFolderInNewWindow(ofa.FolderPath);
             }
         }
     }
