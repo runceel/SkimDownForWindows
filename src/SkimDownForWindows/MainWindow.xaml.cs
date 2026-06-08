@@ -1,12 +1,14 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using SkimDownForWindows.Application.Abstractions;
 using SkimDownForWindows.Application.Models;
 using SkimDownForWindows.Application.ViewModels;
 using SkimDownForWindows.Domain;
 using Windows.ApplicationModel.Resources;
+using Windows.Graphics;
 using Windows.UI;
 
 namespace SkimDownForWindows;
@@ -20,9 +22,12 @@ namespace SkimDownForWindows;
 /// </summary>
 public sealed partial class MainWindow : Window
 {
+    private static bool s_restoreAttemptedInThisProcess;
+
     private readonly ResourceLoader _strings = ResourceLoader.GetForViewIndependentUse();
     private readonly IServiceScope _scope;
     private MainPageViewModel? _viewModel;
+    private RectInt32? _pendingRestoreBounds;
 
     public MainWindow() : this(initialActivation: null, restoreLastFolder: true) { }
 
@@ -41,12 +46,18 @@ public sealed partial class MainWindow : Window
         SetTitleBar(AppTitleBar);
 
         AppWindow.SetIcon("Assets/AppIcon.ico");
+        PrepareWindowBoundsRestoreIfEnabled();
+        Activated += OnActivated;
 
         Closed += OnClosed;
 
         // ウィンドウ固有のランタイム引数とスコープを Page に渡す
         var startArgs = new MainPageStartArgs(this, _scope.ServiceProvider, initialActivation, restoreLastFolder);
         RootFrame.Navigate(typeof(MainPage), startArgs);
+
+        // 起動直後のレイアウト初期化が標準位置を再適用するケースに備え、
+        // message loop へ 1 tick 遅延で復元を再試行する。
+        DispatcherQueue.TryEnqueue(TryApplyPendingRestoreBounds);
     }
 
     /// <summary>
@@ -85,8 +96,127 @@ public sealed partial class MainWindow : Window
 
     private void OnClosed(object sender, WindowEventArgs args)
     {
+        Activated -= OnActivated;
+        PersistWindowBoundsIfEnabled();
         try { _scope.Dispose(); }
         catch { /* best-effort: scope dispose may fail if VM dispose throws */ }
+    }
+
+    private void OnActivated(object sender, WindowActivatedEventArgs args)
+    {
+        TryApplyPendingRestoreBounds();
+    }
+
+    private void TryApplyPendingRestoreBounds()
+    {
+        if (_pendingRestoreBounds is not RectInt32 bounds)
+        {
+            return;
+        }
+
+        _pendingRestoreBounds = null;
+        try
+        {
+            AppWindow.MoveAndResize(bounds);
+        }
+        catch
+        {
+            AppWindow.Resize(new SizeInt32(bounds.Width, bounds.Height));
+            AppWindow.Move(new PointInt32(bounds.X, bounds.Y));
+        }
+    }
+
+    private void PrepareWindowBoundsRestoreIfEnabled()
+    {
+        var settingsRepository = App.Services.GetService<ISettingsRepository>();
+        if (settingsRepository is null)
+        {
+            return;
+        }
+
+        var settings = settingsRepository.Current;
+        if (!settings.RememberWindowPosition)
+        {
+            return;
+        }
+
+        // プロセス内で最初に生成されるウィンドウにのみ復元を適用する。
+        if (s_restoreAttemptedInThisProcess)
+        {
+            return;
+        }
+        s_restoreAttemptedInThisProcess = true;
+
+        var hasStoredPosition = settings.LastWindowPositionX is not null && settings.LastWindowPositionY is not null;
+        var hasStoredSize = settings.LastWindowWidth is > 0 && settings.LastWindowHeight is > 0;
+        if (!hasStoredPosition && !hasStoredSize)
+        {
+            return;
+        }
+
+        var currentPosition = AppWindow.Position;
+        var currentSize = AppWindow.Size;
+        var requestedPosition = hasStoredPosition
+            ? new PointInt32(settings.LastWindowPositionX!.Value, settings.LastWindowPositionY!.Value)
+            : currentPosition;
+        var requestedSize = hasStoredSize
+            ? new SizeInt32(settings.LastWindowWidth!.Value, settings.LastWindowHeight!.Value)
+            : currentSize;
+
+        _pendingRestoreBounds = ClampBoundsToNearestDisplayAreaWorkArea(requestedPosition, requestedSize);
+    }
+
+    private static RectInt32 ClampBoundsToNearestDisplayAreaWorkArea(
+        PointInt32 requestedPosition,
+        SizeInt32 requestedSize)
+    {
+        var area = DisplayArea.GetFromPoint(requestedPosition, DisplayAreaFallback.Nearest).WorkArea;
+        if (area.Width <= 0 || area.Height <= 0)
+        {
+            return new RectInt32(requestedPosition.X, requestedPosition.Y, requestedSize.Width, requestedSize.Height);
+        }
+
+        var clampedWidth = Math.Clamp(requestedSize.Width, 1, area.Width);
+        var clampedHeight = Math.Clamp(requestedSize.Height, 1, area.Height);
+        var maxX = area.X + area.Width - clampedWidth;
+        var maxY = area.Y + area.Height - clampedHeight;
+        var clampedX = Math.Clamp(requestedPosition.X, area.X, maxX);
+        var clampedY = Math.Clamp(requestedPosition.Y, area.Y, maxY);
+        return new RectInt32(clampedX, clampedY, clampedWidth, clampedHeight);
+    }
+
+    private void PersistWindowBoundsIfEnabled()
+    {
+        var settingsRepository = App.Services.GetService<ISettingsRepository>();
+        if (settingsRepository is null)
+        {
+            return;
+        }
+
+        var settings = settingsRepository.Current;
+        if (!settings.RememberWindowPosition)
+        {
+            return;
+        }
+
+        // 「終了時」の位置として最後に閉じるウィンドウだけを採用する。
+        var windowService = App.Services.GetService<IWindowService>();
+        if (windowService is not null && windowService.Count > 1)
+        {
+            return;
+        }
+        if (AppWindow.Presenter is OverlappedPresenter op &&
+            op.State != OverlappedPresenterState.Restored)
+        {
+            return;
+        }
+
+        var position = AppWindow.Position;
+        var size = AppWindow.Size;
+        settings.LastWindowPositionX = position.X;
+        settings.LastWindowPositionY = position.Y;
+        settings.LastWindowWidth = size.Width;
+        settings.LastWindowHeight = size.Height;
     }
 
     /// <summary>

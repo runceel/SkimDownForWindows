@@ -50,6 +50,24 @@ public sealed class AppSettings
     /// </summary>
     public bool OpenContainingFolderOnSingleFileActivation { get; set; } = false;
 
+    /// <summary>
+    /// <c>true</c> のとき、終了時のメインウィンドウ位置とサイズを保存し、次回起動時に復元する。
+    /// 既定値 (<c>false</c>) は保存・復元を行わない。
+    /// </summary>
+    public bool RememberWindowPosition { get; set; } = false;
+
+    /// <summary>前回終了時のメインウィンドウ X 座標。未保存時は <c>null</c>。</summary>
+    public int? LastWindowPositionX { get; set; }
+
+    /// <summary>前回終了時のメインウィンドウ Y 座標。未保存時は <c>null</c>。</summary>
+    public int? LastWindowPositionY { get; set; }
+
+    /// <summary>前回終了時のメインウィンドウ幅。未保存時は <c>null</c>。</summary>
+    public int? LastWindowWidth { get; set; }
+
+    /// <summary>前回終了時のメインウィンドウ高さ。未保存時は <c>null</c>。</summary>
+    public int? LastWindowHeight { get; set; }
+
     /// <summary>直近に開いたフォルダーのパス、最新が先頭。最大 <see cref="MaxRecentFolders"/> 件。</summary>
     public List<string> RecentFolders { get; set; } = new();
 

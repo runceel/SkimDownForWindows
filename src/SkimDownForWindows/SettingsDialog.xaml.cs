@@ -19,6 +19,7 @@ public sealed partial class SettingsDialog : ContentDialog
     public bool SearchCaseSensitive { get; private set; }
     public double ZoomFactor { get; private set; }
     public bool OpenContainingFolderOnSingleFileActivation { get; private set; }
+    public bool RememberWindowPosition { get; private set; }
 
     public SettingsDialog(AppSettings current, IReadOnlyList<ColorScheme> customThemes)
     {
@@ -30,6 +31,7 @@ public sealed partial class SettingsDialog : ContentDialog
 
         SingleFileFolderModeToggle.IsOn = current.OpenContainingFolderOnSingleFileActivation;
         SearchCaseToggle.IsOn = current.SearchCaseSensitive;
+        RememberWindowPositionToggle.IsOn = current.RememberWindowPosition;
         SidebarVisibleToggle.IsOn = current.SidebarVisible;
         ZoomNumberBox.Value = Math.Clamp(current.ZoomFactor, 0.5, 3.0);
 
@@ -41,6 +43,7 @@ public sealed partial class SettingsDialog : ContentDialog
         SearchCaseSensitive = current.SearchCaseSensitive;
         ZoomFactor = Math.Clamp(current.ZoomFactor, 0.5, 3.0);
         OpenContainingFolderOnSingleFileActivation = current.OpenContainingFolderOnSingleFileActivation;
+        RememberWindowPosition = current.RememberWindowPosition;
     }
 
     private void BuildThemeOptions(AppSettings current, IReadOnlyList<ColorScheme> customThemes)
@@ -136,6 +139,7 @@ public sealed partial class SettingsDialog : ContentDialog
             0.5,
             3.0);
         OpenContainingFolderOnSingleFileActivation = SingleFileFolderModeToggle.IsOn;
+        RememberWindowPosition = RememberWindowPositionToggle.IsOn;
     }
 
     private sealed record ThemeOption(AppTheme Theme, string? CustomThemeId);

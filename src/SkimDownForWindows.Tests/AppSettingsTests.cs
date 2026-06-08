@@ -154,6 +154,11 @@ public sealed class AppSettingsTests
             SidebarPosition = SidebarPosition.Right,
             ContentMaxWidth = ContentMaxWidth.ExtraWide,
             OpenContainingFolderOnSingleFileActivation = true,
+            RememberWindowPosition = true,
+            LastWindowPositionX = 240,
+            LastWindowPositionY = 180,
+            LastWindowWidth = 1440,
+            LastWindowHeight = 920,
             RecentFolders = new List<string> { @"C:\a", @"C:\b" },
             LastFolderPath = @"C:\a",
             FolderStates = new Dictionary<string, FolderState>
@@ -178,6 +183,11 @@ public sealed class AppSettingsTests
         Assert.AreEqual(SidebarPosition.Right, round.SidebarPosition);
         Assert.AreEqual(ContentMaxWidth.ExtraWide, round.ContentMaxWidth);
         Assert.IsTrue(round.OpenContainingFolderOnSingleFileActivation);
+        Assert.IsTrue(round.RememberWindowPosition);
+        Assert.AreEqual(240, round.LastWindowPositionX);
+        Assert.AreEqual(180, round.LastWindowPositionY);
+        Assert.AreEqual(1440, round.LastWindowWidth);
+        Assert.AreEqual(920, round.LastWindowHeight);
         CollectionAssert.AreEqual(new[] { @"C:\a", @"C:\b" }, round.RecentFolders);
         Assert.AreEqual(@"C:\a", round.LastFolderPath);
 
@@ -201,6 +211,11 @@ public sealed class AppSettingsTests
         Assert.AreEqual(SidebarPosition.Left, s.SidebarPosition);
         Assert.AreEqual(ContentMaxWidth.Full, s.ContentMaxWidth);
         Assert.IsFalse(s.OpenContainingFolderOnSingleFileActivation);
+        Assert.IsFalse(s.RememberWindowPosition);
+        Assert.IsNull(s.LastWindowPositionX);
+        Assert.IsNull(s.LastWindowPositionY);
+        Assert.IsNull(s.LastWindowWidth);
+        Assert.IsNull(s.LastWindowHeight);
         Assert.IsEmpty(s.RecentFolders);
         Assert.IsNull(s.LastFolderPath);
         Assert.IsEmpty(s.FolderStates);
