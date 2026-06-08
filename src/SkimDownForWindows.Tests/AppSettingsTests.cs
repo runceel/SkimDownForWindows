@@ -159,6 +159,7 @@ public sealed class AppSettingsTests
             LastWindowPositionY = 180,
             LastWindowWidth = 1440,
             LastWindowHeight = 920,
+            LastWindowMaximized = true,
             RecentFolders = new List<string> { @"C:\a", @"C:\b" },
             LastFolderPath = @"C:\a",
             FolderStates = new Dictionary<string, FolderState>
@@ -188,6 +189,7 @@ public sealed class AppSettingsTests
         Assert.AreEqual(180, round.LastWindowPositionY);
         Assert.AreEqual(1440, round.LastWindowWidth);
         Assert.AreEqual(920, round.LastWindowHeight);
+        Assert.IsTrue(round.LastWindowMaximized);
         CollectionAssert.AreEqual(new[] { @"C:\a", @"C:\b" }, round.RecentFolders);
         Assert.AreEqual(@"C:\a", round.LastFolderPath);
 
@@ -216,6 +218,7 @@ public sealed class AppSettingsTests
         Assert.IsNull(s.LastWindowPositionY);
         Assert.IsNull(s.LastWindowWidth);
         Assert.IsNull(s.LastWindowHeight);
+        Assert.IsFalse(s.LastWindowMaximized);
         Assert.IsEmpty(s.RecentFolders);
         Assert.IsNull(s.LastFolderPath);
         Assert.IsEmpty(s.FolderStates);

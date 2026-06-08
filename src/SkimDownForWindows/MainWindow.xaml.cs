@@ -28,6 +28,10 @@ public sealed partial class MainWindow : Window
     private readonly IServiceScope _scope;
     private MainPageViewModel? _viewModel;
     private RectInt32? _pendingRestoreBounds;
+    private bool _pendingMaximize;
+    private bool _restorePending;
+    private RectInt32? _lastRestoredBounds;
+    private bool _lastWasMaximized;
 
     public MainWindow() : this(initialActivation: null, restoreLastFolder: true) { }
 
@@ -48,6 +52,7 @@ public sealed partial class MainWindow : Window
         AppWindow.SetIcon("Assets/AppIcon.ico");
         PrepareWindowBoundsRestoreIfEnabled();
         Activated += OnActivated;
+        AppWindow.Changed += OnAppWindowChanged;
 
         Closed += OnClosed;
 
@@ -97,6 +102,7 @@ public sealed partial class MainWindow : Window
     private void OnClosed(object sender, WindowEventArgs args)
     {
         Activated -= OnActivated;
+        AppWindow.Changed -= OnAppWindowChanged;
         PersistWindowBoundsIfEnabled();
         try { _scope.Dispose(); }
         catch { /* best-effort: scope dispose may fail if VM dispose throws */ }
@@ -107,22 +113,62 @@ public sealed partial class MainWindow : Window
         TryApplyPendingRestoreBounds();
     }
 
-    private void TryApplyPendingRestoreBounds()
+    /// <summary>
+    /// ウィンドウが通常表示 (Restored) のときの位置・サイズと、最後の最大化状態を追跡する。
+    /// 最大化中は位置・サイズが最大化矩形になるため、「最大化前の通常サイズ」を別途覚えておき
+    /// 終了時の保存に使う。
+    /// </summary>
+    private void OnAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
     {
-        if (_pendingRestoreBounds is not RectInt32 bounds)
+        if (sender.Presenter is not OverlappedPresenter op)
         {
             return;
         }
 
-        _pendingRestoreBounds = null;
-        try
+        switch (op.State)
         {
-            AppWindow.MoveAndResize(bounds);
+            case OverlappedPresenterState.Restored:
+                _lastWasMaximized = false;
+                var position = sender.Position;
+                var size = sender.Size;
+                if (size.Width > 0 && size.Height > 0)
+                {
+                    _lastRestoredBounds = new RectInt32(position.X, position.Y, size.Width, size.Height);
+                }
+                break;
+            case OverlappedPresenterState.Maximized:
+                _lastWasMaximized = true;
+                break;
+            // Minimized: 直前の通常サイズ・最大化状態を保持する
         }
-        catch
+    }
+
+    private void TryApplyPendingRestoreBounds()
+    {
+        if (!_restorePending)
         {
-            AppWindow.Resize(new SizeInt32(bounds.Width, bounds.Height));
-            AppWindow.Move(new PointInt32(bounds.X, bounds.Y));
+            return;
+        }
+
+        _restorePending = false;
+
+        if (_pendingRestoreBounds is RectInt32 bounds)
+        {
+            try
+            {
+                AppWindow.MoveAndResize(bounds);
+            }
+            catch
+            {
+                AppWindow.Resize(new SizeInt32(bounds.Width, bounds.Height));
+                AppWindow.Move(new PointInt32(bounds.X, bounds.Y));
+            }
+        }
+
+        if (_pendingMaximize && AppWindow.Presenter is OverlappedPresenter op)
+        {
+            try { op.Maximize(); }
+            catch { /* best-effort: presenter may reject maximize in rare states */ }
         }
     }
 
@@ -149,21 +195,27 @@ public sealed partial class MainWindow : Window
 
         var hasStoredPosition = settings.LastWindowPositionX is not null && settings.LastWindowPositionY is not null;
         var hasStoredSize = settings.LastWindowWidth is > 0 && settings.LastWindowHeight is > 0;
-        if (!hasStoredPosition && !hasStoredSize)
+        if (!hasStoredPosition && !hasStoredSize && !settings.LastWindowMaximized)
         {
             return;
         }
 
-        var currentPosition = AppWindow.Position;
-        var currentSize = AppWindow.Size;
-        var requestedPosition = hasStoredPosition
-            ? new PointInt32(settings.LastWindowPositionX!.Value, settings.LastWindowPositionY!.Value)
-            : currentPosition;
-        var requestedSize = hasStoredSize
-            ? new SizeInt32(settings.LastWindowWidth!.Value, settings.LastWindowHeight!.Value)
-            : currentSize;
+        if (hasStoredPosition || hasStoredSize)
+        {
+            var currentPosition = AppWindow.Position;
+            var currentSize = AppWindow.Size;
+            var requestedPosition = hasStoredPosition
+                ? new PointInt32(settings.LastWindowPositionX!.Value, settings.LastWindowPositionY!.Value)
+                : currentPosition;
+            var requestedSize = hasStoredSize
+                ? new SizeInt32(settings.LastWindowWidth!.Value, settings.LastWindowHeight!.Value)
+                : currentSize;
 
-        _pendingRestoreBounds = ClampBoundsToNearestDisplayAreaWorkArea(requestedPosition, requestedSize);
+            _pendingRestoreBounds = ClampBoundsToNearestDisplayAreaWorkArea(requestedPosition, requestedSize);
+        }
+
+        _pendingMaximize = settings.LastWindowMaximized;
+        _restorePending = true;
     }
 
     private static RectInt32 ClampBoundsToNearestDisplayAreaWorkArea(
@@ -199,24 +251,31 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        // 「終了時」の位置として最後に閉じるウィンドウだけを採用する。
+        // 「終了時」の状態として最後に閉じるウィンドウだけを採用する。
         var windowService = App.Services.GetService<IWindowService>();
         if (windowService is not null && windowService.Count > 1)
         {
             return;
         }
-        if (AppWindow.Presenter is OverlappedPresenter op &&
-            op.State != OverlappedPresenterState.Restored)
+
+        // 現在 (または最後に) 通常表示だった時の位置・サイズを保存する。
+        // 最大化・最小化中は AppWindow.Position/Size が通常サイズを表さないため、
+        // OnAppWindowChanged が追跡した最後の通常サイズ (_lastRestoredBounds) を使う。
+        var presenter = AppWindow.Presenter as OverlappedPresenter;
+        var isRestored = presenter is null || presenter.State == OverlappedPresenterState.Restored;
+        RectInt32? normalBounds = isRestored
+            ? new RectInt32(AppWindow.Position.X, AppWindow.Position.Y, AppWindow.Size.Width, AppWindow.Size.Height)
+            : _lastRestoredBounds;
+
+        if (normalBounds is RectInt32 bounds && bounds.Width > 0 && bounds.Height > 0)
         {
-            return;
+            settings.LastWindowPositionX = bounds.X;
+            settings.LastWindowPositionY = bounds.Y;
+            settings.LastWindowWidth = bounds.Width;
+            settings.LastWindowHeight = bounds.Height;
         }
 
-        var position = AppWindow.Position;
-        var size = AppWindow.Size;
-        settings.LastWindowPositionX = position.X;
-        settings.LastWindowPositionY = position.Y;
-        settings.LastWindowWidth = size.Width;
-        settings.LastWindowHeight = size.Height;
+        settings.LastWindowMaximized = isRestored ? false : _lastWasMaximized;
     }
 
     /// <summary>

@@ -68,6 +68,9 @@ public sealed class AppSettings
     /// <summary>前回終了時のメインウィンドウ高さ。未保存時は <c>null</c>。</summary>
     public int? LastWindowHeight { get; set; }
 
+    /// <summary>前回終了時にメインウィンドウが最大化されていたら <c>true</c>。復元時は通常サイズへ戻したうえで最大化する。</summary>
+    public bool LastWindowMaximized { get; set; }
+
     /// <summary>直近に開いたフォルダーのパス、最新が先頭。最大 <see cref="MaxRecentFolders"/> 件。</summary>
     public List<string> RecentFolders { get; set; } = new();
 
