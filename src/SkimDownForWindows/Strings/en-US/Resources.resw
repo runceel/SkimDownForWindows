@@ -105,6 +105,9 @@
   <data name="MoveSidebarMenuItem.Text" xml:space="preserve">
     <value>Move Sidebar to Right</value>
   </data>
+  <data name="OpenSettingsMenuItem.Text" xml:space="preserve">
+    <value>Settings…</value>
+  </data>
   <data name="ZoomMenuItem.Text" xml:space="preserve">
     <value>Zoom</value>
   </data>
@@ -224,6 +227,60 @@
   </data>
   <data name="Sidebar.MoveToLeft" xml:space="preserve">
     <value>Move Sidebar to Left</value>
+  </data>
+  <data name="SettingsDialog.Title" xml:space="preserve">
+    <value>Settings</value>
+  </data>
+  <data name="SettingsDialog.PrimaryButtonText" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="SettingsDialog.CloseButtonText" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="SettingsDialogGeneralSectionHeader.Text" xml:space="preserve">
+    <value>General</value>
+  </data>
+  <data name="SettingsDialogAppearanceSectionHeader.Text" xml:space="preserve">
+    <value>Appearance</value>
+  </data>
+  <data name="SettingsDialogSingleFileFolderModeLabel.Text" xml:space="preserve">
+    <value>Open containing folder when opening a single Markdown file</value>
+  </data>
+  <data name="SettingsDialogSearchCaseLabel.Text" xml:space="preserve">
+    <value>Match case in Find by default</value>
+  </data>
+  <data name="SettingsDialogZoomLabel.Text" xml:space="preserve">
+    <value>Default zoom</value>
+  </data>
+  <data name="SettingsDialogThemeLabel.Text" xml:space="preserve">
+    <value>Theme</value>
+  </data>
+  <data name="SettingsDialogContentWidthLabel.Text" xml:space="preserve">
+    <value>Content width</value>
+  </data>
+  <data name="SettingsDialogSidebarPositionLabel.Text" xml:space="preserve">
+    <value>Sidebar position</value>
+  </data>
+  <data name="SettingsDialogSidebarVisibleLabel.Text" xml:space="preserve">
+    <value>Show sidebar by default in folder mode</value>
+  </data>
+  <data name="SettingsDialogContentWidthStandardItem.Content" xml:space="preserve">
+    <value>Standard (760 px)</value>
+  </data>
+  <data name="SettingsDialogContentWidthWideItem.Content" xml:space="preserve">
+    <value>Wide (960 px)</value>
+  </data>
+  <data name="SettingsDialogContentWidthExtraWideItem.Content" xml:space="preserve">
+    <value>Extra Wide (1200 px)</value>
+  </data>
+  <data name="SettingsDialogContentWidthFullItem.Content" xml:space="preserve">
+    <value>Full Width</value>
+  </data>
+  <data name="SettingsDialogSidebarPositionLeftItem.Content" xml:space="preserve">
+    <value>Left</value>
+  </data>
+  <data name="SettingsDialogSidebarPositionRightItem.Content" xml:space="preserve">
+    <value>Right</value>
   </data>
   <data name="MermaidZoom.OpenHint" xml:space="preserve">
     <value>⤢ Click to enlarge</value>

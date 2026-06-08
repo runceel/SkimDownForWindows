@@ -16,6 +16,7 @@ SkimDown for Windows は、グローバル設定 (テーマ・サイドバー幅
 | `SidebarVisible` | `bool` | `true` | グローバル (folder mode 用) |
 | `SidebarPosition` | `SidebarPosition` | `Left` | グローバル |
 | `ContentMaxWidth` | `ContentMaxWidth` | `Full` | グローバル。Markdown プレビュー本文の最大幅段階 (Standard=760px / Wide=960px / ExtraWide=1200px / Full=無制限)。CSS の `max-width` として効くため、ウィンドウが指定段階より狭ければ本文はウィンドウ幅にフィットし、広ければ指定段階で頭打ちになる |
+| `OpenContainingFolderOnSingleFileActivation` | `bool` | `false` | グローバル。`OpenSingleFileActivation` を軽量 single-file mode で開く (`false`) か、親フォルダーを開いて対象ファイルを選択する (`true`) かを切り替える |
 | `RecentFolders` | `List<string>` | `[]` | 最新が先頭。最大 `MaxRecentFolders = 16` 件 |
 | `LastFolderPath` | `string?` | `null` | 起動時の復元キー |
 | `FolderStates` | `Dictionary<string, FolderState>` | `{}` | キーは正規化済みフォルダー絶対パス |
@@ -100,6 +101,7 @@ SkimDown for Windows は、グローバル設定 (テーマ・サイドバー幅
   "theme": "custom",
   "customThemeId": "my-dark",
   "zoomFactor": 1.25,
+  "openContainingFolderOnSingleFileActivation": false,
   "sidebarWidth": 320,
   "sidebarVisible": true,
   "sidebarPosition": "Left",
@@ -114,7 +116,16 @@ SkimDown for Windows は、グローバル設定 (テーマ・サイドバー幅
 }
 ```
 
-## Single-file mode で更新しないキー
+## Single-file activation の 2 モード
+
+`OpenContainingFolderOnSingleFileActivation` により、`.md` 起動の扱いは次の 2 つに分岐する。
+
+| 設定値 | 挙動 |
+|---|---|
+| `false` (既定) | 従来どおり single-file mode (`RootItems` は空、サイドバーは強制非表示、対象ファイルだけ読む軽量パス) |
+| `true` | 対象 Markdown の親フォルダーを folder mode で開き、対象ファイルを選択して表示する。初期表示ではサイドバーを一時的に折り畳むが、永続 `SidebarVisible` は書き換えない |
+
+## single-file mode (`OpenContainingFolderOnSingleFileActivation=false`) で更新しないキー
 
 Explorer から `.md` ダブルクリック / `skimdown README.md` 等で起動した single-file mode のウィンドウは、**永続化キーを一切書き換えない**。これにより:
 

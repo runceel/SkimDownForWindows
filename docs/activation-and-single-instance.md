@@ -140,7 +140,7 @@ public sealed record OpenFolderActivation(string FolderPath) : InitialActivation
 public sealed record OpenSingleFileActivation(string FilePath) : InitialActivation;
 ```
 
-`CommandLineLauncher` / `MainPageStartArgs` / `IWindowService` / `MainWindow` の共通言語として、folder mode と single-file mode の二択を型レベルで表す。`MainPage.OnNavigatedTo` がこのレコードを見て VM の `OpenFolderAsync` / `OpenSingleFileAsync` のどちらを呼ぶかを決める。
+`CommandLineLauncher` / `MainPageStartArgs` / `IWindowService` / `MainWindow` の共通言語として、folder mode と single-file activation の二択を型レベルで表す。`MainPage.OnNavigatedTo` がこのレコードを見て VM の `OpenFolderAsync` / `OpenSingleFileAsync` のどちらを呼ぶかを決める。`OpenSingleFileAsync` は `AppSettings.OpenContainingFolderOnSingleFileActivation` が `true` の場合、内部で「親フォルダーを開いて対象ファイルを選択する」挙動に切り替わる。
 
 ## ウィンドウ生成パス ([`IWindowService`](../src/SkimDownForWindows.Application/Abstractions/IWindowService.cs) / [`WindowService`](../src/SkimDownForWindows/Composition/WindowService.cs))
 

@@ -880,6 +880,44 @@ public sealed class MainPageViewModelTests
     }
 
     [TestMethod]
+    public async Task OpenSingleFileAsync_WithFolderModeSetting_OpensContainingFolderAndCollapsesSidebarTemporarily()
+    {
+        Touch("docs/README.md", "# r");
+        Touch("docs/guide.md", "# g");
+        _settings.Current.OpenContainingFolderOnSingleFileActivation = true;
+        var vm = CreateViewModel();
+        var filePath = Path.Combine(AbsoluteRoot(), "docs", "README.md");
+
+        await vm.OpenSingleFileAsync(filePath);
+
+        Assert.IsFalse(vm.IsSingleFileMode);
+        Assert.IsTrue(vm.IsSidebarTemporarilyCollapsed);
+        Assert.IsNotEmpty(vm.RootItems);
+        Assert.IsNotNull(vm.SelectedItem);
+        Assert.AreEqual("README.md", vm.SelectedItem!.Name);
+        Assert.IsTrue(
+            Path.GetFullPath(vm.OpenedFolderPath!)
+                .Equals(Path.GetFullPath(Path.Combine(AbsoluteRoot(), "docs")), StringComparison.OrdinalIgnoreCase));
+        Assert.IsNotEmpty(_settings.Current.RecentFolders);
+    }
+
+    [TestMethod]
+    public async Task OpenFolderAsync_AfterFolderModeSingleFile_ClearsTemporarySidebarCollapse()
+    {
+        Touch("docs/README.md", "# r");
+        Touch("README.md", "# root");
+        _settings.Current.OpenContainingFolderOnSingleFileActivation = true;
+        var vm = CreateViewModel();
+
+        await vm.OpenSingleFileAsync(Path.Combine(AbsoluteRoot(), "docs", "README.md"));
+        Assert.IsTrue(vm.IsSidebarTemporarilyCollapsed);
+
+        await vm.OpenFolderAsync(AbsoluteRoot());
+
+        Assert.IsFalse(vm.IsSidebarTemporarilyCollapsed);
+    }
+
+    [TestMethod]
     public async Task OpenSingleFileAsync_DoesNotTouchSidebarVisibleSetting()
     {
         Touch("README.md");

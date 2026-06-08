@@ -96,6 +96,14 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial bool IsSingleFileMode { get; set; }
 
+    /// <summary>
+    /// 「single-file 起動を親フォルダー表示に変換する」設定が有効な時に、
+    /// 初期表示としてサイドバーを一時的に折り畳むための runtime フラグ。
+    /// 永続設定 <see cref="AppSettings.SidebarVisible"/> とは独立して扱う。
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsSidebarTemporarilyCollapsed { get; set; }
+
     /// <summary>新しい Markdown 内容をプレビューに反映させたい時に発火する。</summary>
     public event Action<LoadRequest>? PreviewLoadRequested;
 
@@ -189,6 +197,7 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         // Single-file mode から folder mode への切り替え。code-behind 側で
         // IsSingleFileMode の変化を見てサイドバー visual state を復元する。
         IsSingleFileMode = false;
+        IsSidebarTemporarilyCollapsed = false;
         _singleFilePath = null;
 
         OpenedFolderPath = canonical;
@@ -241,6 +250,20 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
     /// </summary>
     public async Task OpenSingleFileAsync(string filePath)
     {
+        if (_settings.Current.OpenContainingFolderOnSingleFileActivation)
+        {
+            var openedAsFolder = await TryOpenSingleFileAsContainingFolderAsync(filePath);
+            if (openedAsFolder)
+            {
+                return;
+            }
+        }
+
+        await OpenSingleFileLightweightAsync(filePath);
+    }
+
+    private async Task OpenSingleFileLightweightAsync(string filePath)
+    {
         if (string.IsNullOrEmpty(filePath) || !_fileSystem.FileExists(filePath))
         {
             return;
@@ -259,6 +282,7 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         var canonicalParent = PathHelpers.Canonicalize(parent);
 
         IsSingleFileMode = true;
+        IsSidebarTemporarilyCollapsed = false;
         _singleFilePath = canonicalFile;
 
         // OpenedFolderPath はリソース解決 (相対 link や画像) のための base としてだけ使う。
@@ -285,6 +309,30 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         await ReloadSingleFileAsync();
 
         _watcher.Watch(canonicalParent);
+    }
+
+    private async Task<bool> TryOpenSingleFileAsContainingFolderAsync(string filePath)
+    {
+        if (string.IsNullOrEmpty(filePath) || !_fileSystem.FileExists(filePath))
+        {
+            return false;
+        }
+        if (!PathHelpers.IsMarkdownFile(filePath))
+        {
+            return false;
+        }
+
+        var canonicalFile = PathHelpers.Canonicalize(filePath);
+        var parent = Path.GetDirectoryName(canonicalFile);
+        if (string.IsNullOrEmpty(parent) || !_fileSystem.DirectoryExists(parent))
+        {
+            return false;
+        }
+
+        await OpenFolderAsync(parent);
+        await SelectAndLoadAsync(canonicalFile);
+        IsSidebarTemporarilyCollapsed = true;
+        return true;
     }
 
     /// <summary>

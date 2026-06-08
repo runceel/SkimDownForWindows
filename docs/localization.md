@@ -8,10 +8,11 @@ SkimDown for Windows の UI 文字列は **Modern Resource Technology (MRT)** �
 src/SkimDownForWindows/
 ├── Strings/
 │   └── en-US/
-│       └── Resources.resw     ← 全 UI 文字列 (約 50 件)
+│       └── Resources.resw     ← 全 UI 文字列
 ├── MainPage.xaml              ← x:Uid で resw を参照
 ├── MainPage.xaml.cs           ← ResourceLoader で動的文字列を取得
 ├── MainWindow.xaml.cs         ← ResourceLoader で Title を取得
+├── SettingsDialog.xaml        ← x:Uid で resw を参照
 ├── AboutDialog.xaml           ← x:Uid のみ
 └── Package.appxmanifest       ← <Resource Language="x-generate" />
 ```
@@ -22,7 +23,7 @@ src/SkimDownForWindows/
 |---|---|
 | 文字列リソース (locale 別) | `src/SkimDownForWindows/Strings/<locale>/Resources.resw` |
 | `ResourceLoader` 利用 | `src/SkimDownForWindows/MainPage.xaml.cs`, `src/SkimDownForWindows/MainWindow.xaml.cs` |
-| `x:Uid` 参照 | `src/SkimDownForWindows/MainPage.xaml`, `src/SkimDownForWindows/MainWindow.xaml`, `src/SkimDownForWindows/AboutDialog.xaml` |
+| `x:Uid` 参照 | `src/SkimDownForWindows/MainPage.xaml`, `src/SkimDownForWindows/MainWindow.xaml`, `src/SkimDownForWindows/SettingsDialog.xaml`, `src/SkimDownForWindows/AboutDialog.xaml` |
 | サポートロケール宣言 | `src/SkimDownForWindows/Package.appxmanifest` の `<Resources>` 要素 |
 
 ## サポート対象ロケール
