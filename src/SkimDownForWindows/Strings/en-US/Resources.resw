@@ -249,6 +249,9 @@
   <data name="SettingsDialogSearchCaseLabel.Text" xml:space="preserve">
     <value>Match case in Find by default</value>
   </data>
+  <data name="SettingsDialogRememberWindowPositionLabel.Text" xml:space="preserve">
+    <value>Restore previous window position and size on startup</value>
+  </data>
   <data name="SettingsDialogZoomLabel.Text" xml:space="preserve">
     <value>Default zoom</value>
   </data>

@@ -480,6 +480,7 @@ public sealed partial class MainPage : Page
 
         settings.OpenContainingFolderOnSingleFileActivation = dialog.OpenContainingFolderOnSingleFileActivation;
         settings.SearchCaseSensitive = dialog.SearchCaseSensitive;
+        settings.RememberWindowPosition = dialog.RememberWindowPosition;
         settings.ZoomFactor = dialog.ZoomFactor;
         Preview.SetZoom(dialog.ZoomFactor);
 

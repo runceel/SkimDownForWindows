@@ -17,6 +17,12 @@ SkimDown for Windows は、グローバル設定 (テーマ・サイドバー幅
 | `SidebarPosition` | `SidebarPosition` | `Left` | グローバル |
 | `ContentMaxWidth` | `ContentMaxWidth` | `Full` | グローバル。Markdown プレビュー本文の最大幅段階 (Standard=760px / Wide=960px / ExtraWide=1200px / Full=無制限)。CSS の `max-width` として効くため、ウィンドウが指定段階より狭ければ本文はウィンドウ幅にフィットし、広ければ指定段階で頭打ちになる |
 | `OpenContainingFolderOnSingleFileActivation` | `bool` | `false` | グローバル。`OpenSingleFileActivation` を軽量 single-file mode で開く (`false`) か、親フォルダーを開いて対象ファイルを選択する (`true`) かを切り替える |
+| `RememberWindowPosition` | `bool` | `false` | グローバル。`true` のとき終了時のメインウィンドウ位置・サイズ・最大化状態を保存し、次回起動の最初のウィンドウ作成時に復元する |
+| `LastWindowPositionX` | `int?` | `null` | グローバル。前回終了時のメインウィンドウ X 座標 (最大化時は最大化前の通常位置) |
+| `LastWindowPositionY` | `int?` | `null` | グローバル。前回終了時のメインウィンドウ Y 座標 (最大化時は最大化前の通常位置) |
+| `LastWindowWidth` | `int?` | `null` | グローバル。前回終了時のメインウィンドウ幅 (最大化時は最大化前の通常幅) |
+| `LastWindowHeight` | `int?` | `null` | グローバル。前回終了時のメインウィンドウ高さ (最大化時は最大化前の通常高さ) |
+| `LastWindowMaximized` | `bool` | `false` | グローバル。前回終了時に最大化されていたら `true`。復元時は通常サイズへ戻したうえで最大化する |
 | `RecentFolders` | `List<string>` | `[]` | 最新が先頭。最大 `MaxRecentFolders = 16` 件 |
 | `LastFolderPath` | `string?` | `null` | 起動時の復元キー |
 | `FolderStates` | `Dictionary<string, FolderState>` | `{}` | キーは正規化済みフォルダー絶対パス |
@@ -102,6 +108,12 @@ SkimDown for Windows は、グローバル設定 (テーマ・サイドバー幅
   "customThemeId": "my-dark",
   "zoomFactor": 1.25,
   "openContainingFolderOnSingleFileActivation": false,
+  "rememberWindowPosition": true,
+  "lastWindowPositionX": 240,
+  "lastWindowPositionY": 180,
+  "lastWindowWidth": 1440,
+  "lastWindowHeight": 920,
+  "lastWindowMaximized": false,
   "sidebarWidth": 320,
   "sidebarVisible": true,
   "sidebarPosition": "Left",

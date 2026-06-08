@@ -286,8 +286,14 @@ GitHub Flavored Markdown 寄りの表示を基本にする。
 - カスタムテーマ ID (`CustomThemeId`、`Theme = Custom` の時のみ有効)
 - ズーム倍率 (`ZoomFactor`、0.5–3.0 にクランプ)
 - 本文検索の Match case (`SearchCaseSensitive`)
+- 前回終了時のウィンドウ位置の復元設定 (`RememberWindowPosition`、既定は `false`)
+- 前回終了時のウィンドウ位置 (`LastWindowPositionX` / `LastWindowPositionY`)
+- 前回終了時のウィンドウサイズ (`LastWindowWidth` / `LastWindowHeight`)
+- 前回終了時のウィンドウ最大化状態 (`LastWindowMaximized`)
 
 専用 Settings 画面は MVP では作らず、メニュー操作や状態変更を自動保存する。
+
+`RememberWindowPosition = true` のとき、終了時に最後に閉じたウィンドウの位置とサイズを保存し、次回起動時に最初のウィンドウへ適用する。終了時に最大化されていた場合は通常サイズ (最大化前の位置・サイズ) と最大化状態を保存し、次回起動時は通常サイズへ戻したうえで最大化して復元する。保存された位置・サイズが現在の表示構成で作業領域外になる場合は、最寄りディスプレイの作業領域内にクランプして復元する。
 
 Single-file mode 中は `RecentFolders` / `LastFolderPath` / `FolderStates` / `SidebarVisible` を **一切更新しない**。永続設定は folder mode 用の真実として保持される。
 

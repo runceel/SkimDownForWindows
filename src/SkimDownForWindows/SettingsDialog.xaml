@@ -24,6 +24,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0"
@@ -48,10 +49,20 @@
 
                 <TextBlock Grid.Row="2"
                            Grid.Column="0"
+                           x:Uid="SettingsDialogRememberWindowPositionLabel"
+                           VerticalAlignment="Center" />
+                <ToggleSwitch x:Name="RememberWindowPositionToggle"
+                              Grid.Row="2"
+                              Grid.Column="1"
+                              x:Uid="SettingsDialogRememberWindowPositionToggle"
+                              VerticalAlignment="Center" />
+
+                <TextBlock Grid.Row="3"
+                           Grid.Column="0"
                            x:Uid="SettingsDialogZoomLabel"
                            VerticalAlignment="Center" />
                 <NumberBox x:Name="ZoomNumberBox"
-                           Grid.Row="2"
+                           Grid.Row="3"
                            Grid.Column="1"
                            Minimum="0.5"
                            Maximum="3.0"
