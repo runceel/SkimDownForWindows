@@ -25,8 +25,8 @@ The title bar shows the file name, e.g. `first-steps.md — SkimDown`.
   preview live.
 - **Relative Markdown links** (for example `[next](./next.md)`) open in a **new** single‑file
   window.
-- Your folder history is left clean: **recent folders, last folder, and per‑folder expansion
-  state are not updated**. Double‑clicking files in Explorer won't pollute your folder history.
+- Your folder history is left unchanged: **recent folders, last folder, and per‑folder expansion
+  state are not updated**. Double‑clicking files in Explorer does not affect your folder history.
 - Your saved sidebar visibility is preserved. Open a folder later with **File → Open Folder…** and
   the sidebar returns exactly as you had it configured.
 

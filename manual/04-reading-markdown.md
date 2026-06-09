@@ -18,7 +18,7 @@ Fenced code blocks are syntax‑highlighted, with the language shown in the corn
 
 ## Tables and task lists
 
-GitHub‑flavored tables and task lists (checkboxes) render cleanly, and emoji shortcodes are turned
+GitHub‑flavored tables and task lists (checkboxes) are rendered, and emoji shortcodes are turned
 into emoji.
 
 ![A rendered table and a task list with checkboxes](images/tables-tasks.png)
