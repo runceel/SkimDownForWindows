@@ -21,7 +21,7 @@ folder‑first, sorted case‑insensitively. Files inside subfolders (like `Gett
 `Guides`, and `Reference` above) are grouped under their folders.
 
 Hidden files and noise directories are filtered out automatically — folders such as `.git`,
-`node_modules`, `.build`, and `DerivedData` never clutter the tree.
+`node_modules`, `.build`, and `DerivedData` are never shown in the tree.
 
 ### Navigating
 
@@ -30,7 +30,7 @@ Hidden files and noise directories are filtered out automatically — folders su
 - Press **Ctrl+B** to hide or show the sidebar entirely (**View → Toggle Sidebar**).
 
 SkimDown **remembers your expansion state per folder**, as well as the last file you had selected,
-so reopening a folder brings you right back to where you were.
+so reopening a folder restores your previous state.
 
 ## View modes
 
