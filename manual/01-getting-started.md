@@ -7,8 +7,10 @@ open anything.
 
 SkimDown is a packaged Windows app. Install it one of two ways:
 
-- **Microsoft Store** — search for **SkimDown** and choose **Get / Install**. This is the
-  recommended route and keeps the app updated automatically.
+- **Microsoft Store** — install directly from the Store page:
+  [**SkimDown on the Microsoft Store**](https://apps.microsoft.com/detail/9nhtzmm0xmmf) (or search
+  for **SkimDown** in the Store app) and choose **Get / Install**. This is the recommended route and
+  keeps the app updated automatically.
 - **Sideload (`.msixbundle`)** — if you were given a signed sideload package, install the
   certificate once and then add the package:
 
