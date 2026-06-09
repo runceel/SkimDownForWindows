@@ -176,6 +176,7 @@ public sealed partial class MainPage : Page
 
         BuildRecentFoldersMenu();
         UpdateMarkdownCount();
+        SyncViewModeToggles();
         UpdateWindowTitle();
         UpdateContentVisibility();
         RebuildWindowMenu();
@@ -243,6 +244,9 @@ public sealed partial class MainPage : Page
                 break;
             case nameof(MainPageViewModel.IsSidebarTemporarilyCollapsed):
                 ApplySidebarVisualState();
+                break;
+            case nameof(MainPageViewModel.SidebarViewMode):
+                SyncViewModeToggles();
                 break;
         }
     }
@@ -548,6 +552,32 @@ public sealed partial class MainPage : Page
         {
             _ = ViewModel.SelectAndLoadAsync(item.FullPath);
         }
+    }
+
+    // ----- Sidebar view-mode toggle (Tree / Recently modified) -----
+
+    private void OnSidebarViewTreeClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.SetSidebarViewModeCommand.Execute(SidebarViewMode.Tree);
+        SyncViewModeToggles();
+    }
+
+    private void OnSidebarViewRecentClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.SetSidebarViewModeCommand.Execute(SidebarViewMode.RecentlyModified);
+        SyncViewModeToggles();
+    }
+
+    /// <summary>
+    /// 2 つの ToggleButton をラジオ的に同期する (常にどちらか一方だけが checked)。
+    /// すでに有効なボタンを再クリックして一旦 uncheck されても、ここで正しい状態へ戻す。
+    /// </summary>
+    private void SyncViewModeToggles()
+    {
+        if (ViewModel is null) return;
+        var isTree = ViewModel.SidebarViewMode == SidebarViewMode.Tree;
+        ViewModeTreeButton.IsChecked = isTree;
+        ViewModeRecentButton.IsChecked = !isTree;
     }
 
     // ----- Drag/drop folder onto window -----

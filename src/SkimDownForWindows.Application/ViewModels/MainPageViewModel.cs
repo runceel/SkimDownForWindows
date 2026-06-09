@@ -35,6 +35,7 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
     private readonly ColorSchemeRegistry _colorSchemes;
     private readonly MarkdownScanner _scanner;
     private readonly MarkdownTreeBuilder _treeBuilder;
+    private readonly RecentMarkdownListBuilder _recentListBuilder;
     private readonly InitialSelectionPicker _picker;
 
     private bool _disposed;
@@ -76,6 +77,15 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     public partial MarkdownTreeItem? SelectedItem { get; set; }
+
+    /// <summary>
+    /// サイドバー (ファイル一覧) の表示モード。<see cref="SidebarViewMode.Tree"/> はフォルダー階層ツリー、
+    /// <see cref="SidebarViewMode.RecentlyModified"/> は更新日順のフラット一覧。
+    /// 初期値はコンストラクターで <see cref="AppSettings.SidebarViewMode"/> から復元する。
+    /// 変更は <see cref="SetSidebarViewModeAsync"/> 経由で行い、設定の永続化と再構築を伴う。
+    /// </summary>
+    [ObservableProperty]
+    public partial SidebarViewMode SidebarViewMode { get; set; }
 
     [ObservableProperty]
     public partial string WindowTitle { get; set; } = "SkimDown";
@@ -121,6 +131,7 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         ColorSchemeRegistry colorSchemes,
         MarkdownScanner scanner,
         MarkdownTreeBuilder treeBuilder,
+        RecentMarkdownListBuilder recentListBuilder,
         InitialSelectionPicker picker,
         LinkResolver linkResolver)
     {
@@ -134,8 +145,11 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         _colorSchemes = colorSchemes;
         _scanner = scanner;
         _treeBuilder = treeBuilder;
+        _recentListBuilder = recentListBuilder;
         _picker = picker;
         LinkResolver = linkResolver;
+
+        SidebarViewMode = settings.Current.SidebarViewMode;
 
         _watcher.TreeMayHaveChanged += OnTreeMayHaveChanged;
         _watcher.FileContentChanged += OnFileContentChanged;
@@ -205,8 +219,7 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         HasFolder = true;
         WindowTitle = $"{OpenedFolderName} — SkimDown";
 
-        var files = _scanner.Scan(canonical);
-        var root = _treeBuilder.Build(canonical, files);
+        var root = BuildRoot(canonical);
         // 別フォルダーへ切り替える場合、古い folder の MarkdownTreeItem 参照が
         // 新しい RootItems と無関係な孤立インスタンスになる。先に SelectedItem を
         // null にしておくことで、TreeView 側の選択同期が古い参照を相手取らずに済む。
@@ -218,7 +231,7 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         var state = _settings.Current.GetOrCreateFolderState(canonical);
         ApplyExpansionState(state.ExpandedFolders);
 
-        var pick = _picker.Pick(root, state.LastSelectedRelativePath);
+        var pick = PickInitialSelection(root, state.LastSelectedRelativePath);
         if (pick is not null && HasAnyMarkdown)
         {
             await SelectAndLoadAsync(pick);
@@ -506,8 +519,7 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         var expansion = CollectExpandedFolders();
         var currentSelectionRel = SelectedItem?.RelativePath;
 
-        var files = _scanner.Scan(OpenedFolderPath);
-        var root = _treeBuilder.Build(OpenedFolderPath, files);
+        var root = BuildRoot(OpenedFolderPath);
         ReplaceRoot(root);
         MarkdownCount = root.MarkdownCount;
         HasAnyMarkdown = MarkdownCount > 0;
@@ -530,15 +542,115 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         }
 
         var state = _settings.Current.GetOrCreateFolderState(OpenedFolderPath);
-        state.ExpandedFolders = CollectExpandedFolders();
+        // 更新日順モードでは展開状態が無い (CollectExpandedFolders は空を返す) ため、
+        // ここで保存すると Tree モードで保存済みの展開状態を消してしまう。Tree モードのときだけ保存する。
+        if (SidebarViewMode == SidebarViewMode.Tree)
+        {
+            state.ExpandedFolders = CollectExpandedFolders();
+        }
         await _settings.SaveAsync();
     }
 
     public async Task PersistExpansionAsync()
     {
         if (string.IsNullOrEmpty(OpenedFolderPath)) return;
+        // Tree モードのときだけ展開状態を保存する (更新日順モードでは空で上書きしない)。
+        if (SidebarViewMode != SidebarViewMode.Tree) return;
         var state = _settings.Current.GetOrCreateFolderState(OpenedFolderPath);
         state.ExpandedFolders = CollectExpandedFolders();
+        await _settings.SaveAsync();
+    }
+
+    /// <summary>
+    /// 現在の <see cref="SidebarViewMode"/> に応じて、フォルダーをスキャンしてツリー root を構築する。
+    /// Tree なら <see cref="MarkdownTreeBuilder"/>、RecentlyModified なら
+    /// <see cref="RecentMarkdownListBuilder"/> を使う。どちらも Children と MarkdownCount を持つ root を返す。
+    /// </summary>
+    private MarkdownTreeItem BuildRoot(string folder)
+    {
+        var files = _scanner.Scan(folder);
+        return SidebarViewMode == SidebarViewMode.RecentlyModified
+            ? _recentListBuilder.Build(folder, files)
+            : _treeBuilder.Build(folder, files);
+    }
+
+    /// <summary>
+    /// フォルダーを開いた直後の初期選択を、モードに応じて決める。
+    /// Tree は <see cref="InitialSelectionPicker"/> (前回 → README → 先頭)。
+    /// RecentlyModified は README を優先せず「前回 → 先頭 (= 最新)」とする。
+    /// </summary>
+    private string? PickInitialSelection(MarkdownTreeItem root, string? lastSelectedRelativePath)
+    {
+        if (SidebarViewMode != SidebarViewMode.RecentlyModified)
+        {
+            return _picker.Pick(root, lastSelectedRelativePath);
+        }
+
+        if (!string.IsNullOrEmpty(lastSelectedRelativePath))
+        {
+            var match = root.Children.FirstOrDefault(c =>
+                !c.IsFolder
+                && string.Equals(c.RelativePath, lastSelectedRelativePath, StringComparison.OrdinalIgnoreCase));
+            if (match is not null)
+            {
+                return match.FullPath;
+            }
+        }
+
+        return root.Children.FirstOrDefault(c => !c.IsFolder)?.FullPath;
+    }
+
+    /// <summary>
+    /// サイドバーの表示モードを切り替える。設定を永続化し、folder mode 中なら一覧を作り直して
+    /// 現在選択中のファイルを (相対パスで) 引き継ぐ。single-file mode では設定だけ更新する。
+    ///
+    /// 再構築 (<see cref="BuildRoot"/> + <see cref="ReplaceRoot"/>) は await を挟まず同期的に適用するため、
+    /// watcher 由来の <see cref="OnTreeMayHaveChanged"/> と競合しても古い結果で上書きされない
+    /// (各経路が最新のモード/フォルダーで原子的に適用される)。
+    /// </summary>
+    [RelayCommand]
+    private async Task SetSidebarViewModeAsync(SidebarViewMode mode)
+    {
+        if (SidebarViewMode == mode)
+        {
+            return;
+        }
+
+        // Tree から離れる場合、現在の展開状態を退避しておき、後で Tree に戻したときに復元できるようにする。
+        if (SidebarViewMode == SidebarViewMode.Tree
+            && !IsSingleFileMode
+            && !string.IsNullOrEmpty(OpenedFolderPath))
+        {
+            _settings.Current.GetOrCreateFolderState(OpenedFolderPath).ExpandedFolders = CollectExpandedFolders();
+        }
+
+        SidebarViewMode = mode;
+        _settings.Current.SidebarViewMode = mode;
+
+        if (!IsSingleFileMode && HasFolder && !string.IsNullOrEmpty(OpenedFolderPath))
+        {
+            var selectionRel = SelectedItem?.RelativePath;
+
+            var root = BuildRoot(OpenedFolderPath);
+            ReplaceRoot(root);
+            MarkdownCount = root.MarkdownCount;
+            HasAnyMarkdown = MarkdownCount > 0;
+
+            if (mode == SidebarViewMode.Tree)
+            {
+                ApplyExpansionState(_settings.Current.GetOrCreateFolderState(OpenedFolderPath).ExpandedFolders);
+            }
+
+            if (!string.IsNullOrEmpty(selectionRel))
+            {
+                var match = FindFileItemByRelativePath(selectionRel);
+                // モード切替では対象ファイル集合は不変なので通常 match は見つかる。
+                // 新しいインスタンスへ選択を貼り替えることで、code-behind の視覚的選択同期が機能する。
+                ExpandAncestors(match);
+                SelectedItem = match;
+            }
+        }
+
         await _settings.SaveAsync();
     }
 

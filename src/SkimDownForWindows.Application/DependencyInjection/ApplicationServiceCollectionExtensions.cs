@@ -21,6 +21,7 @@ public static class ApplicationServiceCollectionExtensions
     {
         services.AddScoped<MarkdownScanner>();
         services.AddScoped<MarkdownTreeBuilder>();
+        services.AddScoped<RecentMarkdownListBuilder>();
         services.AddScoped<InitialSelectionPicker>();
         services.AddScoped<LinkResolver>();
         services.AddScoped<CommandLineLauncher>();

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -29,4 +30,11 @@ public interface IFileSystem
     /// 例外時は <c>false</c> を返す (アクセス不能でも上位は走査を続行させる)。
     /// </summary>
     bool IsHiddenOrSystem(string path);
+
+    /// <summary>
+    /// 指定ファイルの最終更新日時 (UTC) を返す。更新日順の一覧表示で使う。
+    /// 取得できない場合 (存在しない / アクセス不能) は <see cref="DateTimeOffset.MinValue"/> を返し、
+    /// 例外は出さない (上位のソートでは末尾に沈む)。
+    /// </summary>
+    DateTimeOffset GetLastWriteTimeUtc(string path);
 }

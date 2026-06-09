@@ -1,3 +1,4 @@
+using System;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -22,6 +23,18 @@ public partial class MarkdownTreeItem : ObservableObject
 
     /// <summary>このノード以下にある Markdown ファイル数 (フォルダー見出し表示用)。</summary>
     public int MarkdownCount { get; set; }
+
+    /// <summary>
+    /// 更新日順の一覧モードで表示する最終更新日時 (UTC)。ツリーモードの leaf では <c>null</c>。
+    /// <c>null</c> かどうかで一覧の詳細行 (日時 + フォルダー相対パス) の表示有無を切り替える。
+    /// </summary>
+    public DateTimeOffset? LastModified { get; set; }
+
+    /// <summary>
+    /// 更新日順の一覧モードで表示する「親フォルダーのフォルダールートからの相対パス」(forward-slash)。
+    /// ルート直下のファイルや、ツリーモードでは空文字。
+    /// </summary>
+    public string RelativeFolder { get; set; } = string.Empty;
 
     /// <summary>行アイコン用 Segoe Fluent Icons グリフ。</summary>
     public string Glyph => IsFolder ? "\uE8B7" : "\uE8A5";

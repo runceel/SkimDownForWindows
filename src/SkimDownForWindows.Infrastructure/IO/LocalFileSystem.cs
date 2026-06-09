@@ -65,4 +65,17 @@ public sealed class LocalFileSystem : IFileSystem
             return false;
         }
     }
+
+    public DateTimeOffset GetLastWriteTimeUtc(string path)
+    {
+        if (string.IsNullOrEmpty(path) || !File.Exists(path)) return DateTimeOffset.MinValue;
+        try
+        {
+            return new DateTimeOffset(File.GetLastWriteTimeUtc(path), TimeSpan.Zero);
+        }
+        catch
+        {
+            return DateTimeOffset.MinValue;
+        }
+    }
 }

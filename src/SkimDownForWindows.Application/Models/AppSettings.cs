@@ -37,6 +37,13 @@ public sealed class AppSettings
     public SidebarPosition SidebarPosition { get; set; } = SidebarPosition.Left;
 
     /// <summary>
+    /// サイドバー (ファイル一覧) の表示モード。既定は <see cref="SidebarViewMode.Tree"/> (フォルダー階層ツリー)。
+    /// <see cref="SidebarViewMode.RecentlyModified"/> で全 Markdown を更新日時の新しい順に並べたフラット一覧になる。
+    /// アプリ全体で 1 つの設定として共有する (フォルダーごとではない)。
+    /// </summary>
+    public SidebarViewMode SidebarViewMode { get; set; } = SidebarViewMode.Tree;
+
+    /// <summary>
     /// Markdown プレビュー本文の最大幅段階。既定は <see cref="ContentMaxWidth.Full"/> (上限なし)。
     /// CSS の <c>max-width</c> として効くため、ウィンドウがこの値より狭ければ本文はウィンドウ幅に
     /// フィットし、広ければ指定段階で頭打ちになる。
@@ -85,6 +92,7 @@ public sealed class AppSettings
     /// <list type="bullet">
     ///   <item><c>Theme=Custom &amp;&amp; CustomThemeId が空</c> を <see cref="AppTheme.System"/> に戻す。</item>
     ///   <item><c>ContentMaxWidth</c> が enum 定義外の値 (将来バージョンからのダウングレード等) なら <see cref="ContentMaxWidth.Standard"/> に戻す。</item>
+    ///   <item><c>SidebarViewMode</c> が enum 定義外の値なら <see cref="SidebarViewMode.Tree"/> に戻す。</item>
     /// </list>
     /// 登録テーマからの正規化 (該当 ID が見つからない時の戻し) は <c>ColorSchemeRegistry</c> 側で行う。
     /// </summary>
@@ -101,6 +109,10 @@ public sealed class AppSettings
         if (!Enum.IsDefined(ContentMaxWidth))
         {
             ContentMaxWidth = ContentMaxWidth.Standard;
+        }
+        if (!Enum.IsDefined(SidebarViewMode))
+        {
+            SidebarViewMode = SidebarViewMode.Tree;
         }
     }
 

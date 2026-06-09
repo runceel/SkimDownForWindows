@@ -15,6 +15,7 @@ flowchart TB
         VM["MainPageViewModel<br/>(Scoped)"]
         SC["MarkdownScanner<br/>(Scoped)"]
         TB["MarkdownTreeBuilder<br/>(Scoped)"]
+        RB["RecentMarkdownListBuilder<br/>(Scoped)"]
         PK["InitialSelectionPicker<br/>(Scoped)"]
         LR["LinkResolver<br/>(Scoped)"]
         WT["IFolderWatcher<br/>(Scoped)"]
@@ -34,7 +35,9 @@ flowchart TB
     UF -->|OpenSingleFileAsync| VM
     VM -->|Scan| SC
     SC --> FS
-    VM -->|Build| TB
+    VM -->|Build (tree)| TB
+    VM -->|Build (recent)| RB
+    RB --> FS
     VM -->|Pick| PK
     VM -->|ReadAsync| MR
     VM -->|PreviewLoadRequested<br/>(LoadRequest)| Preview
@@ -69,14 +72,48 @@ flowchart TB
 
 `MarkdownTreeItem` は `ObservableObject` で、UI 側 (`TreeView`) は `Children` / `IsExpanded` をバインドする。
 
+## サイドバー表示モード (`SidebarViewMode`)
+
+サイドバーのファイル一覧は 2 つの表示モードを持つ。モードは [`MainPageViewModel.SidebarViewMode`](../src/SkimDownForWindows.Application/ViewModels/MainPageViewModel.cs) が保持し、[`AppSettings.SidebarViewMode`](../src/SkimDownForWindows.Application/Models/AppSettings.cs) でグローバルに永続化される ([settings-and-state.md](settings-and-state.md) 参照)。
+
+| `SidebarViewMode` | ビルダー | 構造 | 並び順 |
+|---|---|---|---|
+| `Tree` (既定) | `MarkdownTreeBuilder` | フォルダー階層ツリー | フォルダー優先 → 名前昇順 |
+| `RecentlyModified` | `RecentMarkdownListBuilder` | 全 Markdown のフラット 1 段リスト (leaf のみ) | 更新日時の新しい順 |
+
+`MainPageViewModel.BuildRoot(folder)` が現在のモードに応じてどちらかのビルダーを呼び、どちらも `Children` と `MarkdownCount` を持つ root `MarkdownTreeItem` を返すため、後段 (`ReplaceRoot` / 選択同期) の流れは共通になる。両モードとも単一の `TreeView` を再利用する (フラット側は leaf を root 直下に並べるだけ)。
+
+モード切り替えは [`MainPageViewModel.SetSidebarViewModeAsync(mode)`](../src/SkimDownForWindows.Application/ViewModels/MainPageViewModel.cs) (`SetSidebarViewModeCommand`) で行う:
+
+- `Tree` から離れる前に現在の展開状態を `FolderState.ExpandedFolders` に退避する (`RecentlyModified` 中は展開状態を保存しない)。
+- 再構築 (`BuildRoot` + `ReplaceRoot`) は `await` を挟まず同期適用するため、watcher 由来の `OnTreeMayHaveChanged` と競合しても古い結果で上書きされない。
+- 現在選択中ファイルの相対パスを引き継ぎ、再構築後の新インスタンス上で再選択する。
+- `AppSettings.SidebarViewMode` を更新して `ISettingsRepository.SaveAsync` する。
+
+### 更新日順の一覧 (`RecentMarkdownListBuilder`)
+
+[`RecentMarkdownListBuilder.Build(rootFolderPath, files)`](../src/SkimDownForWindows.Application/Markdown/RecentMarkdownListBuilder.cs) は次のルールでフラット root を組み立てる:
+
+- フォルダー階層は作らず、配下の全 Markdown を root 直下の leaf として並べる
+- 各 leaf の最終更新日時は [`IFileSystem.GetLastWriteTimeUtc`](../src/SkimDownForWindows.Application/Abstractions/IFileSystem.cs) で取得し、`MarkdownTreeItem.LastModified` に設定する (取得失敗時は `DateTimeOffset.MinValue`)
+- 並び順は決定的: 更新日時の新しい順 (降順) → 名前昇順 → 相対パス昇順 (いずれも大文字小文字を区別しない)
+- 各 leaf の `MarkdownTreeItem.RelativeFolder` に親フォルダーの相対パス (forward-slash) を入れる。ルート直下のファイルは空文字
+- ルートノードの `MarkdownCount` に総 Markdown 数を入れる
+
+UI 側は `LastModified` と `RelativeFolder` を一覧行の 2 行目 (日時 + フォルダー) に表示し、`LastModified` が `null` の場合 (= `Tree` モードの leaf) は 2 行目を出さない。
+
 ## 初期選択 (`InitialSelectionPicker`)
 
-フォルダーを開いた直後に表示するファイルは [`InitialSelectionPicker.Pick`](../src/SkimDownForWindows.Application/Markdown/InitialSelectionPicker.cs) が決定する。優先順:
+フォルダーを開いた直後に表示するファイルは [`MainPageViewModel.PickInitialSelection`](../src/SkimDownForWindows.Application/ViewModels/MainPageViewModel.cs) がモードに応じて決定する。
+
+`Tree` モードは [`InitialSelectionPicker.Pick`](../src/SkimDownForWindows.Application/Markdown/InitialSelectionPicker.cs) に委譲する。優先順:
 
 1. 前回そのフォルダーで開いていた Markdown (`FolderState.LastSelectedRelativePath` で指定。実在チェック付き)
 2. ルート直下の `README.md` または `README.markdown` (大文字小文字を区別しない)
 3. ツリー深さ優先で見つかる最初の Markdown
 4. 該当無し → empty 状態 (`HasAnyMarkdown=false`)
+
+`RecentlyModified` モードは README を優先せず、「前回選択 (相対パス一致) → 先頭 (= 最新ファイル)」の順で決める。
 
 ## 読込・描画リクエスト
 
@@ -150,4 +187,4 @@ Presentation 層 (`MainPage.xaml.cs`) は `PreviewLoadRequested` を購読して
 - SPEC: [`design/SPEC.md`](../design/SPEC.md) の「ファイル検出」「ツリー」「初期選択」「変更検知」「単一ファイルを開く」セクション
 - skill: [`unit-test/SKILL.md`](../.github/skills/unit-test/SKILL.md) (`MarkdownScanner` 等のテストパターン)
 - 隣接ドキュメント: [`webview2-preview.md`](webview2-preview.md), [`settings-and-state.md`](settings-and-state.md), [`activation-and-single-instance.md`](activation-and-single-instance.md)
-- コード: [`MarkdownScanner.cs`](../src/SkimDownForWindows.Application/Markdown/MarkdownScanner.cs), [`MarkdownTreeBuilder.cs`](../src/SkimDownForWindows.Application/Markdown/MarkdownTreeBuilder.cs), [`InitialSelectionPicker.cs`](../src/SkimDownForWindows.Application/Markdown/InitialSelectionPicker.cs), [`LinkResolver.cs`](../src/SkimDownForWindows.Application/Markdown/LinkResolver.cs), [`FileSystemFolderWatcher.cs`](../src/SkimDownForWindows.Infrastructure/IO/FileSystemFolderWatcher.cs), [`MainPageViewModel.cs`](../src/SkimDownForWindows.Application/ViewModels/MainPageViewModel.cs)
+- コード: [`MarkdownScanner.cs`](../src/SkimDownForWindows.Application/Markdown/MarkdownScanner.cs), [`MarkdownTreeBuilder.cs`](../src/SkimDownForWindows.Application/Markdown/MarkdownTreeBuilder.cs), [`RecentMarkdownListBuilder.cs`](../src/SkimDownForWindows.Application/Markdown/RecentMarkdownListBuilder.cs), [`InitialSelectionPicker.cs`](../src/SkimDownForWindows.Application/Markdown/InitialSelectionPicker.cs), [`LinkResolver.cs`](../src/SkimDownForWindows.Application/Markdown/LinkResolver.cs), [`FileSystemFolderWatcher.cs`](../src/SkimDownForWindows.Infrastructure/IO/FileSystemFolderWatcher.cs), [`MainPageViewModel.cs`](../src/SkimDownForWindows.Application/ViewModels/MainPageViewModel.cs)

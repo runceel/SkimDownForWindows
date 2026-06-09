@@ -28,8 +28,8 @@ SkimDown **never edits your files.** It only reads and renders the Markdown it f
 1. [Getting started](01-getting-started.md) — install, first launch, and the welcome screen.
 2. [Opening content](02-opening-content.md) — folders, recent list, drag‑and‑drop, the command
    line, and multiple windows.
-3. [The folder view & navigation](03-folder-view-and-navigation.md) — window anatomy and the
-   sidebar tree.
+3. [The folder view & navigation](03-folder-view-and-navigation.md) — window anatomy, the
+   sidebar tree, and switching between tree and date‑sorted views.
 4. [Reading Markdown](04-reading-markdown.md) — code, tables, task lists, alerts, math, and
    diagrams.
 5. [Single‑file mode](05-single-file-mode.md) — opening one `.md` file on its own.
@@ -45,6 +45,7 @@ SkimDown **never edits your files.** It only reads and renders the Markdown it f
 - **Open a folder** with **File → Open Folder…** (**Ctrl+O**), drag‑and‑drop, or `skimdown .`
   from any terminal.
 - **Pick a file** in the sidebar to render it.
+- **Switch the sidebar** between a folder tree and a date‑sorted flat list with the header toggle.
 - **Find text** in the current file with **Ctrl+F**.
 - **Switch theme** (System / Light / Dark) from **View → Theme**.
 - Everything stays **on your machine** — no telemetry, no Markdown leaves your PC.

@@ -276,4 +276,45 @@ public sealed class AppSettingsTests
 
         Assert.AreEqual(ContentMaxWidth.Wide, s.ContentMaxWidth);
     }
+
+    [TestMethod]
+    public void Defaults_SidebarViewMode_IsTree()
+    {
+        var s = new AppSettings();
+
+        Assert.AreEqual(SidebarViewMode.Tree, s.SidebarViewMode);
+    }
+
+    [TestMethod]
+    public void JsonRoundTrip_PreservesSidebarViewMode()
+    {
+        var original = new AppSettings { SidebarViewMode = SidebarViewMode.RecentlyModified };
+
+        var json = JsonSerializer.Serialize(original);
+        var round = JsonSerializer.Deserialize<AppSettings>(json);
+
+        Assert.IsNotNull(round);
+        Assert.AreEqual(SidebarViewMode.RecentlyModified, round!.SidebarViewMode);
+    }
+
+    [TestMethod]
+    public void NormalizeAfterLoad_ResetsUnknownSidebarViewMode_ToTree()
+    {
+        // 将来追加された enum 値で保存後にダウングレードしたケースは安全側として Tree に戻す。
+        var s = new AppSettings { SidebarViewMode = (SidebarViewMode)999 };
+
+        s.NormalizeAfterLoad();
+
+        Assert.AreEqual(SidebarViewMode.Tree, s.SidebarViewMode);
+    }
+
+    [TestMethod]
+    public void NormalizeAfterLoad_PreservesValidSidebarViewMode()
+    {
+        var s = new AppSettings { SidebarViewMode = SidebarViewMode.RecentlyModified };
+
+        s.NormalizeAfterLoad();
+
+        Assert.AreEqual(SidebarViewMode.RecentlyModified, s.SidebarViewMode);
+    }
 }
