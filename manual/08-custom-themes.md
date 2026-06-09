@@ -73,5 +73,5 @@ Color values must be a safe CSS form: `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `
 
 Open **View → Theme** to see the built‑ins, your registered custom themes, and the **Open Themes
 Folder** / **Reload Themes** actions. The active theme is checked. If the JSON file behind a
-selected custom theme is deleted, SkimDown quietly falls back to **System** the next time it starts
+selected custom theme is deleted, SkimDown falls back to **System** the next time it starts
 or when you choose **Reload Themes**.

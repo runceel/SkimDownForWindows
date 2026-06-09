@@ -28,7 +28,7 @@ app from any terminal (see [Opening content](02-opening-content.md)).
 ## First launch — the welcome screen
 
 When SkimDown starts without a folder, it shows the welcome screen. The sidebar reads
-**0 markdown files**, and the preview area invites you to begin.
+**0 markdown files**, and the preview area shows how to get started.
 
 ![The welcome screen with the SkimDown logo and an Open Folder button](images/empty-state.png)
 
