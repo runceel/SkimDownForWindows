@@ -38,7 +38,7 @@ resw 上のキー (`name` 属性) は用途別に 2 つの形式が混在する�
 
 | 用途 | resw キー形式 | 例 | 消費側 |
 |---|---|---|---|
-| `x:Uid` バインド | `<UidName>.<PropertyName>` | `AboutDialog.Title`, `OpenFolderMenuItem.Text`, `SearchPreviousButton.AutomationProperties.Name` | XAML (`x:Uid="AboutDialog"` で `AboutDialog.*` 系プロパティを自動解決) |
+| `x:Uid` バインド | `<UidName>.<PropertyName>` | `AboutDialog.Title`, `OpenFolderMenuItem.Text`, `SearchPreviousButton.AutomationProperties.Name`, `ViewModeTreeButton.ToolTipService.ToolTip`, `ViewModeRecentButton.AutomationProperties.Name` | XAML (`x:Uid="AboutDialog"` で `AboutDialog.*` 系プロパティを自動解決) |
 | `ResourceLoader.GetString` 直呼び | `<Category>.<Key>` | `MarkdownCount.OneFile`, `Sidebar.MoveToRight`, `RecentFolders.Empty` | code-behind (`_strings.GetString("MarkdownCount/OneFile")` のように `.` → `/`) |
 
 両者は resw 上では同じ `<data name="...">` で表現され、ロケール追加時はどちらも同じ翻訳プロセスに乗る。

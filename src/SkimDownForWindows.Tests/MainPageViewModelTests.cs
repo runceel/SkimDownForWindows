@@ -65,6 +65,7 @@ public sealed class MainPageViewModelTests
     {
         var scanner = new MarkdownScanner(_fs);
         var treeBuilder = new MarkdownTreeBuilder();
+        var recentListBuilder = new RecentMarkdownListBuilder(_fs);
         var picker = new InitialSelectionPicker();
         var linkResolver = new LinkResolver();
         return new MainPageViewModel(
@@ -78,6 +79,7 @@ public sealed class MainPageViewModelTests
             _colorSchemes,
             scanner,
             treeBuilder,
+            recentListBuilder,
             picker,
             linkResolver);
     }
@@ -87,6 +89,14 @@ public sealed class MainPageViewModelTests
         var full = Path.Combine(_root, relativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(full)!);
         File.WriteAllText(full, content);
+    }
+
+    private void TouchWithTime(string relativePath, DateTime lastWriteUtc, string content = "x")
+    {
+        var full = Path.Combine(_root, relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(full)!);
+        File.WriteAllText(full, content);
+        File.SetLastWriteTimeUtc(full, DateTime.SpecifyKind(lastWriteUtc, DateTimeKind.Utc));
     }
 
     private string AbsoluteRoot() => Path.GetFullPath(_root).TrimEnd(Path.DirectorySeparatorChar);
@@ -930,5 +940,98 @@ public sealed class MainPageViewModelTests
         // Single-file mode は visual override で hide するが、persisted 設定は触らない。
         Assert.IsTrue(_settings.Current.SidebarVisible,
             "永続 SidebarVisible は folder mode 用の真実として保持される。");
+    }
+
+    // ----- SidebarViewMode (更新日順の一覧) -------------------------------
+
+    [TestMethod]
+    public void Constructor_ReadsInitialSidebarViewMode_FromSettings()
+    {
+        _settings.Current.SidebarViewMode = SidebarViewMode.RecentlyModified;
+
+        var vm = CreateViewModel();
+
+        Assert.AreEqual(SidebarViewMode.RecentlyModified, vm.SidebarViewMode);
+    }
+
+    [TestMethod]
+    public async Task SetSidebarViewMode_RecentlyModified_RebuildsFlatListSortedByModified()
+    {
+        TouchWithTime("old.md", new DateTime(2020, 1, 1));
+        TouchWithTime("docs/mid.md", new DateTime(2022, 6, 1));
+        TouchWithTime("recent.md", new DateTime(2024, 12, 31));
+        var vm = CreateViewModel();
+        await vm.OpenFolderAsync(_root);
+
+        await vm.SetSidebarViewModeCommand.ExecuteAsync(SidebarViewMode.RecentlyModified);
+
+        Assert.AreEqual(SidebarViewMode.RecentlyModified, vm.SidebarViewMode);
+        Assert.IsTrue(vm.RootItems.All(i => !i.IsFolder), "一覧モードは全 leaf のフラット表示。");
+        CollectionAssert.AreEqual(
+            new[] { "recent.md", "mid.md", "old.md" },
+            vm.RootItems.Select(i => i.Name).ToArray());
+        // nested ファイルには親フォルダー相対パスが入る。
+        Assert.AreEqual("docs", vm.RootItems.Single(i => i.Name == "mid.md").RelativeFolder);
+    }
+
+    [TestMethod]
+    public async Task SetSidebarViewMode_PersistsModeToSettings()
+    {
+        Touch("README.md");
+        var vm = CreateViewModel();
+        await vm.OpenFolderAsync(_root);
+        var savesBefore = _settings.SaveAsyncCalls;
+
+        await vm.SetSidebarViewModeCommand.ExecuteAsync(SidebarViewMode.RecentlyModified);
+
+        Assert.AreEqual(SidebarViewMode.RecentlyModified, _settings.Current.SidebarViewMode);
+        Assert.AreEqual(savesBefore + 1, _settings.SaveAsyncCalls, "モード変更で設定が 1 回保存される。");
+    }
+
+    [TestMethod]
+    public async Task SetSidebarViewMode_PreservesSelection_ByRelativePath()
+    {
+        // README.md を置くと Tree モードの初期選択がルートの README.md になる。
+        TouchWithTime("README.md", new DateTime(2020, 1, 1));
+        TouchWithTime("recent.md", new DateTime(2024, 1, 1));
+        var vm = CreateViewModel();
+        await vm.OpenFolderAsync(_root);
+        Assert.AreEqual("README.md", vm.SelectedItem!.RelativePath);
+
+        await vm.SetSidebarViewModeCommand.ExecuteAsync(SidebarViewMode.RecentlyModified);
+
+        // 切り替えても同じ相対パスのファイルが (新インスタンス上で) 選択され続ける。
+        Assert.IsNotNull(vm.SelectedItem);
+        Assert.AreEqual("README.md", vm.SelectedItem!.RelativePath);
+    }
+
+    [TestMethod]
+    public async Task SetSidebarViewMode_BackToTree_RestoresHierarchy()
+    {
+        Touch("README.md");
+        Touch("docs/intro.md");
+        var vm = CreateViewModel();
+        await vm.OpenFolderAsync(_root);
+
+        await vm.SetSidebarViewModeCommand.ExecuteAsync(SidebarViewMode.RecentlyModified);
+        await vm.SetSidebarViewModeCommand.ExecuteAsync(SidebarViewMode.Tree);
+
+        Assert.AreEqual(SidebarViewMode.Tree, vm.SidebarViewMode);
+        // docs フォルダー + README.md の階層に戻る。
+        Assert.IsTrue(vm.RootItems.Any(i => i.IsFolder && i.Name == "docs"));
+    }
+
+    [TestMethod]
+    public async Task OpenFolderAsync_RecentMode_DoesNotPrioritizeReadme()
+    {
+        _settings.Current.SidebarViewMode = SidebarViewMode.RecentlyModified;
+        TouchWithTime("README.md", new DateTime(2020, 1, 1));
+        TouchWithTime("zzz.md", new DateTime(2024, 1, 1));
+        var vm = CreateViewModel();
+
+        await vm.OpenFolderAsync(_root);
+
+        // 一覧モードでは README ではなく最新ファイルを初期選択する。
+        Assert.AreEqual("zzz.md", vm.SelectedItem!.Name);
     }
 }

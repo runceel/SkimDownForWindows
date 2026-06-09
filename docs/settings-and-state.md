@@ -15,6 +15,7 @@ SkimDown for Windows は、グローバル設定 (テーマ・サイドバー幅
 | `SidebarWidth` | `double` | `280` | グローバル |
 | `SidebarVisible` | `bool` | `true` | グローバル (folder mode 用) |
 | `SidebarPosition` | `SidebarPosition` | `Left` | グローバル |
+| `SidebarViewMode` | `SidebarViewMode` | `Tree` | グローバル。サイドバーのファイル一覧の表示モード。`Tree`=フォルダー階層ツリー / `RecentlyModified`=全 Markdown を更新日時の新しい順に並べたフラット一覧 ([markdown-content-pipeline.md](markdown-content-pipeline.md) 参照) |
 | `ContentMaxWidth` | `ContentMaxWidth` | `Full` | グローバル。Markdown プレビュー本文の最大幅段階 (Standard=760px / Wide=960px / ExtraWide=1200px / Full=無制限)。CSS の `max-width` として効くため、ウィンドウが指定段階より狭ければ本文はウィンドウ幅にフィットし、広ければ指定段階で頭打ちになる |
 | `OpenContainingFolderOnSingleFileActivation` | `bool` | `false` | グローバル。`OpenSingleFileActivation` を軽量 single-file mode で開く (`false`) か、親フォルダーを開いて対象ファイルを選択する (`true`) かを切り替える |
 | `RememberWindowPosition` | `bool` | `false` | グローバル。`true` のとき終了時のメインウィンドウ位置・サイズ・最大化状態を保存し、次回起動の最初のウィンドウ作成時に復元する |
@@ -42,6 +43,7 @@ SkimDown for Windows は、グローバル設定 (テーマ・サイドバー幅
 |---|---|
 | `Theme=Custom` かつ `CustomThemeId` が空 | `Theme=System`、`CustomThemeId=null` |
 | `Theme != Custom` かつ `CustomThemeId` に値あり | `CustomThemeId=null` (書き出し時に省略) |
+| `SidebarViewMode` が enum 定義外の値 (旧バージョンへのダウングレード等) | `SidebarViewMode=Tree` |
 
 カスタムテーマ ID が現在のテーマレジストリに存在しないケースは [`ColorSchemeRegistry.Normalize`](../src/SkimDownForWindows.Application/Theme/ColorSchemeRegistry.cs) で再度 `System` に戻される (`AppSettings` レイヤでは「ID が空文字でないか」しか見ない)。
 

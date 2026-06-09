@@ -7,11 +7,13 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:viewer="using:SkimDownForWindows.Viewer"
     xmlns:models="using:SkimDownForWindows.Application.Models"
+    xmlns:converters="using:SkimDownForWindows.Converters"
     AllowDrop="True"
     mc:Ignorable="d">
 
     <Page.Resources>
-        <!-- (Reserved for future styles) -->
+        <converters:ModifiedTimestampToStringConverter x:Key="ModifiedTimestampToString" />
+        <converters:NullableDateToVisibilityConverter x:Key="ModifiedDateToVisibility" />
     </Page.Resources>
 
     <Grid>
@@ -229,14 +231,41 @@
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="0,0,0,1"
                         Padding="12,10">
-                    <StackPanel>
-                        <TextBlock Text="{x:Bind ViewModel.OpenedFolderName, Mode=OneWay}"
-                                   Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                   TextTrimming="CharacterEllipsis" />
-                        <TextBlock x:Name="MarkdownCountText"
-                                   Opacity="0.65"
-                                   Style="{ThemeResource CaptionTextBlockStyle}" />
-                    </StackPanel>
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="{x:Bind ViewModel.OpenedFolderName, Mode=OneWay}"
+                                       Style="{ThemeResource BodyStrongTextBlockStyle}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock x:Name="MarkdownCountText"
+                                       Opacity="0.65"
+                                       Style="{ThemeResource CaptionTextBlockStyle}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal"
+                                    Spacing="2"
+                                    VerticalAlignment="Center">
+                            <ToggleButton x:Name="ViewModeTreeButton"
+                                          x:Uid="ViewModeTreeButton"
+                                          MinWidth="0"
+                                          Padding="7,4"
+                                          IsEnabled="{x:Bind IsNotSingleFileMode(ViewModel.IsSingleFileMode), Mode=OneWay}"
+                                          Click="OnSidebarViewTreeClick">
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8FD;" FontSize="14" />
+                            </ToggleButton>
+                            <ToggleButton x:Name="ViewModeRecentButton"
+                                          x:Uid="ViewModeRecentButton"
+                                          MinWidth="0"
+                                          Padding="7,4"
+                                          IsEnabled="{x:Bind IsNotSingleFileMode(ViewModel.IsSingleFileMode), Mode=OneWay}"
+                                          Click="OnSidebarViewRecentClick">
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE81C;" FontSize="14" />
+                            </ToggleButton>
+                        </StackPanel>
+                    </Grid>
                 </Border>
                 <ScrollViewer Grid.Row="1" Padding="4">
                     <TreeView x:Name="Tree"
@@ -248,11 +277,23 @@
                                 <TreeViewItem
                                     IsExpanded="{x:Bind IsExpanded, Mode=TwoWay}"
                                     ItemsSource="{x:Bind Children}">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <FontIcon FontFamily="Segoe Fluent Icons"
-                                                  Glyph="{x:Bind Glyph}"
-                                                  FontSize="14" Opacity="0.75" />
-                                        <TextBlock Text="{x:Bind Name}" />
+                                    <StackPanel Orientation="Vertical">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon FontFamily="Segoe Fluent Icons"
+                                                      Glyph="{x:Bind Glyph}"
+                                                      FontSize="14" Opacity="0.75" />
+                                            <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal"
+                                                    Spacing="6"
+                                                    Margin="20,0,0,0"
+                                                    Visibility="{x:Bind LastModified, Converter={StaticResource ModifiedDateToVisibility}}">
+                                            <TextBlock Text="{x:Bind LastModified, Converter={StaticResource ModifiedTimestampToString}}"
+                                                       Opacity="0.6" FontSize="11" />
+                                            <TextBlock Text="{x:Bind RelativeFolder}"
+                                                       Opacity="0.6" FontSize="11"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
                                     </StackPanel>
                                 </TreeViewItem>
                             </DataTemplate>

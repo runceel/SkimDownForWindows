@@ -71,6 +71,16 @@ Markdown ファイルを直接開く `single-file mode` を提供する。フォ
 - サイドバーは左 / 右を切り替えられる (`View > Move Sidebar to Right / Left`)
 - サイドバーは表示 / 非表示を切り替えられる (`View > Toggle Sidebar`、`Ctrl + B`)
 
+## サイドバー表示モード
+
+サイドバーのファイル一覧は 2 つの表示モードを持ち、サイドバー上部のトグルで切り替える。選択したモードはグローバルに永続化する (`SidebarViewMode`)。
+
+- **ツリー** (既定): 上記「ツリー」セクションの通り、フォルダー階層で表示する
+- **更新日順の一覧**: フォルダー階層を無視し、配下の全 Markdown を更新日時の新しい順 (降順) のフラットな一覧で表示する
+  - 同じ更新日時のファイルは名前順 → 相対パス順で決定的に並べる
+  - 各行にはファイル名に加えて、最終更新日時と、フォルダールートからの親フォルダー相対パスを表示する
+  - フォルダーの開閉状態はこのモードでは持たない (ツリーモードの開閉状態は保持され、ツリーに戻すと復元される)
+
 ## 初期選択
 
 フォルダーを開いた直後は、次の順で表示する Markdown を決める。
@@ -79,6 +89,8 @@ Markdown ファイルを直接開く `single-file mode` を提供する。フォ
 2. `README.md`
 3. ツリー内の先頭 Markdown (フォルダーツリーを深さ優先で走査した順)
 4. Markdown が無いフォルダーは「Markdown が無い」状態を表示する
+
+更新日順の一覧モードでは `README.md` を優先せず、「前回そのフォルダーで開いていた Markdown → 一覧の先頭 (= 最新の Markdown)」の順で決める。
 
 ## プレビュー
 
@@ -281,6 +293,7 @@ GitHub Flavored Markdown 寄りの表示を基本にする。
 - フォルダーごとのツリー開閉状態 (`FolderStates[folder].ExpandedFolders`)
 - サイドバー位置 (`SidebarPosition`: Left / Right)
 - サイドバー表示状態 (`SidebarVisible`)
+- サイドバー表示モード (`SidebarViewMode`: Tree / RecentlyModified)
 - サイドバー幅 (`SidebarWidth`)
 - テーマ選択 (`Theme`: System / Light / Dark / Custom)
 - カスタムテーマ ID (`CustomThemeId`、`Theme = Custom` の時のみ有効)
@@ -346,6 +359,7 @@ MVP では純粋ロジックをユニットテストで固める。テストプ�
 - Markdown ファイル走査 (`MarkdownScannerTests`)
 - 除外ディレクトリ / 隠しファイル判定
 - ツリー構築と並び順 (`MarkdownTreeBuilderTests`)
+- 更新日順の一覧構築と並び順・tie-break (`RecentMarkdownListBuilderTests`)
 - 初期選択ロジック (`InitialSelectionPickerTests`)
 - 相対リンク解決とフォルダー外参照の拒否 (`LinkResolverTests`)
 - 設定保存のデフォルト値・正規化 (`AppSettingsTests`)
