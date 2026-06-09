@@ -15,6 +15,7 @@ Open a folder, and SkimDown shows only the Markdown files in a sidebar tree and 
 - Multiple windows for multiple folders (dropping a folder onto a window that already has one opens a new window)
 - Sidebar position is swappable left / right (**View → Move Sidebar to Right / Left**)
 - Folder-first, case-insensitive Markdown tree (recursive `.md` / `.markdown` discovery)
+- Switch the sidebar between the folder tree and a **flat list sorted by date modified** (newest first) — an app-wide toggle in the sidebar header; each row shows the file name, its last-modified time, and its subfolder
 - Hidden-file and ignored-directory filtering (`.git`, `node_modules`, `.build`, `DerivedData`, …)
 - Read-only WebView2 preview with bundled rendering assets (no CDN required, works fully offline)
 - Markdown rendering bundled: markdown-it + highlight.js + DOMPurify + KaTeX + Mermaid + emoji; GitHub-style alerts and inline color swatches included
@@ -22,7 +23,7 @@ Open a folder, and SkimDown shows only the Markdown files in a sidebar tree and 
 - Zoom the preview with **Ctrl+`+`** / **Ctrl+`-`** / **Ctrl+`0`** (View → Zoom), or smoothly with **Ctrl+mouse wheel** and **precision-touchpad pinch** — the zoom level is persisted (clamped to 50–300 %)
 - Live reload — Markdown add / delete / rename / update events refresh the tree and preview (also works in single-file mode for the open file)
 - **VS Code-compatible custom color schemes** — drop a `*.json` theme into the Themes folder and pick it from **View → Theme** (see [Custom color schemes](#custom-color-schemes))
-- Persists sidebar position, visibility, width, theme, zoom level, recent folders, last selected file, and tree expansion state (single-file mode never updates RecentFolders / LastFolderPath, so explorer double-clicks don't pollute folder history)
+- Persists sidebar position, view mode (tree / by date modified), visibility, width, theme, zoom level, recent folders, last selected file, and tree expansion state (single-file mode never updates RecentFolders / LastFolderPath, so explorer double-clicks don't pollute folder history)
 - Local-only — no telemetry, no Markdown text leaves your machine
 
 ## Single-file mode
@@ -56,8 +57,8 @@ The solution is split into 4 + 1 projects following clean-architecture-style lay
 
 | Project | TFM | Role |
 |---|---|---|
-| **`SkimDownForWindows.Domain`** | `net10.0` | Pure value objects / enums (`AppTheme`, `SidebarPosition`, `LinkKind`, `LinkClassification`). No external dependencies. |
-| **`SkimDownForWindows.Application`** | `net10.0` | Use case layer: abstractions (`IFileSystem`, `IFolderWatcher`, `ISettingsRepository`, `IClipboardService`, `IShellService`, `ISystemThemeProvider`, `IUiDispatcher`, `IExternalUriLauncher`, `IWindowService`, `IAppLogger`, `IMarkdownFileReader`), pure services (`MarkdownScanner`, `MarkdownTreeBuilder`, `InitialSelectionPicker`, `LinkResolver`, `CommandLineLauncher`), ViewModels (`MainPageViewModel`), persistence DTOs (`AppSettings`, `FolderState`), UI-bound models (`MarkdownTreeItem`, `LoadRequest`, `RecentFolderEntry`), and path utilities. |
+| **`SkimDownForWindows.Domain`** | `net10.0` | Pure value objects / enums (`AppTheme`, `SidebarPosition`, `SidebarViewMode`, `LinkKind`, `LinkClassification`). No external dependencies. |
+| **`SkimDownForWindows.Application`** | `net10.0` | Use case layer: abstractions (`IFileSystem`, `IFolderWatcher`, `ISettingsRepository`, `IClipboardService`, `IShellService`, `ISystemThemeProvider`, `IUiDispatcher`, `IExternalUriLauncher`, `IWindowService`, `IAppLogger`, `IMarkdownFileReader`), pure services (`MarkdownScanner`, `MarkdownTreeBuilder`, `RecentMarkdownListBuilder`, `InitialSelectionPicker`, `LinkResolver`, `CommandLineLauncher`), ViewModels (`MainPageViewModel`), persistence DTOs (`AppSettings`, `FolderState`), UI-bound models (`MarkdownTreeItem`, `LoadRequest`, `RecentFolderEntry`), and path utilities. |
 | **`SkimDownForWindows.Infrastructure`** | `net10.0-windows10.0.26100.0` | Platform implementations of the abstractions — `LocalFileSystem`, `FileSystemFolderWatcher`, `JsonSettingsRepository`, `WindowsClipboardService`, `ExplorerShellService`, `UiSettingsThemeProvider`, `LauncherExternalUriService`, `FileAppLogger`. References WinRT only — **does not depend on `Microsoft.WindowsAppSDK`**. |
 | **`SkimDownForWindows`** (App / Presentation) | `net10.0-windows10.0.26100.0` | XAML pages / windows / `MarkdownPreview` UserControl, the DI composition root (`App.Services`), and WindowsAppSDK-specific service implementations (`DispatcherQueueUiDispatcher`, `WindowService`). |
 | **`SkimDownForWindows.Tests`** | `net10.0` | Unit + opt-in integration tests against Domain + Application. Stays cross-platform-neutral (no Infrastructure reference). |

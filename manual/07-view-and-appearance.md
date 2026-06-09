@@ -62,3 +62,7 @@ You can reposition or hide the sidebar:
 ![SkimDown with the sidebar moved to the right side](images/sidebar-right.png)
 
 SkimDown remembers the sidebar's **position**, **visibility**, and **width** between sessions.
+
+You can also switch the sidebar between a **folder tree** and a **date‑sorted flat list** with the
+toggle in its header — see
+[The folder view & navigation](03-folder-view-and-navigation.md#view-modes).

@@ -9,7 +9,8 @@ Once a folder is open, SkimDown shows two areas: the **sidebar tree** on one sid
 
 1. **Title bar** — shows the folder name and the app name, e.g. `SkimDown Demo — SkimDown`.
 2. **Menu bar** — **File**, **Edit**, **View**, **Window**, **Help**.
-3. **Sidebar header** — the folder name plus a count such as **6 markdown files**.
+3. **Sidebar header** — the folder name, a count such as **6 markdown files**, and the
+   **view‑mode toggle** (tree or date‑sorted list).
 4. **Sidebar tree** — every Markdown file in the folder, organized by subfolder.
 5. **Preview** — the rendered Markdown of the selected file.
 
@@ -30,6 +31,22 @@ Hidden files and noise directories are filtered out automatically — folders su
 
 SkimDown **remembers your expansion state per folder**, as well as the last file you had selected,
 so reopening a folder brings you right back to where you were.
+
+## View modes
+
+The two buttons in the **sidebar header** switch how the file list is organized:
+
+- **Tree view** — the default. Markdown files are grouped by subfolder and sorted
+  case‑insensitively, folder‑first (as described above).
+- **Sort by date modified** — a single **flat list** of every Markdown file in the folder,
+  **newest first**. Subfolder grouping is ignored; instead each row shows the file name with its
+  **last‑modified date and time** and the **subfolder it lives in** just below (blank for files at
+  the top level). This makes it easy to jump straight to whatever changed most recently.
+
+Your choice is a single **app‑wide preference** — it applies to every folder you open and is
+remembered between sessions, so the next folder (and the next launch) opens in the same mode. The
+toggle is unavailable in [single‑file mode](05-single-file-mode.md), which shows just one file with
+no list.
 
 ## Live updates
 
