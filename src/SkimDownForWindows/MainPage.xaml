@@ -272,28 +272,51 @@
                               ItemsSource="{x:Bind ViewModel.RootItems, Mode=OneWay}"
                               ItemInvoked="OnTreeItemInvoked"
                               SelectionMode="Single">
+                        <TreeView.ItemContainerStyle>
+                            <Style TargetType="TreeViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            </Style>
+                        </TreeView.ItemContainerStyle>
                         <TreeView.ItemTemplate>
                             <DataTemplate x:DataType="models:MarkdownTreeItem">
                                 <TreeViewItem
                                     IsExpanded="{x:Bind IsExpanded, Mode=TwoWay}"
+                                    HorizontalContentAlignment="Stretch"
                                     ItemsSource="{x:Bind Children}">
                                     <StackPanel Orientation="Vertical">
-                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <FontIcon FontFamily="Segoe Fluent Icons"
+                                        <Grid ColumnSpacing="6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Grid.Column="0"
+                                                      FontFamily="Segoe Fluent Icons"
                                                       Glyph="{x:Bind Glyph}"
-                                                      FontSize="14" Opacity="0.75" />
-                                            <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
-                                        </StackPanel>
-                                        <StackPanel Orientation="Horizontal"
-                                                    Spacing="6"
-                                                    Margin="20,0,0,0"
-                                                    Visibility="{x:Bind LastModified, Converter={StaticResource ModifiedDateToVisibility}}">
-                                            <TextBlock Text="{x:Bind LastModified, Converter={StaticResource ModifiedTimestampToString}}"
-                                                       Opacity="0.6" FontSize="11" />
-                                            <TextBlock Text="{x:Bind RelativeFolder}"
+                                                      FontSize="14" Opacity="0.75"
+                                                      VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{x:Bind Name}"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTipService.ToolTip="{x:Bind Name}" />
+                                        </Grid>
+                                        <Grid ColumnSpacing="6"
+                                              Margin="20,0,0,0"
+                                              Visibility="{x:Bind LastModified, Converter={StaticResource ModifiedDateToVisibility}}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0"
+                                                       Text="{x:Bind LastModified, Converter={StaticResource ModifiedTimestampToString}}"
                                                        Opacity="0.6" FontSize="11"
-                                                       TextTrimming="CharacterEllipsis" />
-                                        </StackPanel>
+                                                       VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{x:Bind RelativeFolder}"
+                                                       Opacity="0.6" FontSize="11"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center"
+                                                       ToolTipService.ToolTip="{x:Bind RelativeFolder}" />
+                                        </Grid>
                                     </StackPanel>
                                 </TreeViewItem>
                             </DataTemplate>

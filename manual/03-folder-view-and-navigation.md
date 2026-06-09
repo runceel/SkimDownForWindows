@@ -43,6 +43,9 @@ The two buttons in the **sidebar header** switch how the file list is organized:
   **last‑modified date and time** and the **subfolder it lives in** just below (blank for files at
   the top level). This makes it easy to jump straight to whatever changed most recently.
 
+Long file names and folder paths that don't fit the sidebar width are shortened with an ellipsis
+(`…`); hover over a row to see the full text in a tooltip.
+
 Your choice is a single **app‑wide preference** — it applies to every folder you open and is
 remembered between sessions, so the next folder (and the next launch) opens in the same mode. The
 toggle is unavailable in [single‑file mode](05-single-file-mode.md), which shows just one file with
