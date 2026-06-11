@@ -52,10 +52,10 @@
     <value>Open Another Folder…</value>
   </data>
   <data name="MainWindow.Title" xml:space="preserve">
-    <value>SkimDown</value>
+    <value>SkimDown (Demo)</value>
   </data>
   <data name="AppTitleBar.Title" xml:space="preserve">
-    <value>SkimDown</value>
+    <value>SkimDown (Demo)</value>
   </data>
   <data name="FileMenuBarItem.Title" xml:space="preserve">
     <value>File</value>
