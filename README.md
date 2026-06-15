@@ -10,8 +10,8 @@ Open a folder, and SkimDown shows only the Markdown files in a sidebar tree and 
 
 ## Highlights
 
-- Open a folder with **File → Open Folder…**, **Ctrl+O**, **Window → New Window** (Ctrl+N), by dragging a folder onto the window, or by passing a folder path on the command line — once the app is installed, a `skimdown` execution alias is registered automatically, so `skimdown D:\notes` (or `skimdown .` in any folder) works from any terminal
-- **Open a single Markdown file** by double-clicking a `.md` / `.markdown` file in Explorer (after choosing "Open with → SkimDown"), by `skimdown README.md` on the command line, or by dragging a `.md` file onto the window — opens a focused **single-file mode** window with the sidebar hidden; one process is reused across activations
+- Open a folder with **File → Open Folder…**, **Ctrl+O**, **Window → New Window** (Ctrl+N), by dragging a folder onto the window, or by passing a folder path on the command line — once the app is installed, `skimdown` and `skim` execution aliases are registered automatically, so `skimdown D:\notes` / `skim D:\notes` (or `skimdown .` / `skim .` in any folder) works from any terminal
+- **Open a single Markdown file** by double-clicking a `.md` / `.markdown` file in Explorer (after choosing "Open with → SkimDown"), by `skimdown README.md` or `skim README.md` on the command line, or by dragging a `.md` file onto the window — opens a focused **single-file mode** window with the sidebar hidden; one process is reused across activations
 - Multiple windows for multiple folders (dropping a folder onto a window that already has one opens a new window)
 - Sidebar position is swappable left / right (**View → Move Sidebar to Right / Left**)
 - Folder-first, case-insensitive Markdown tree (recursive `.md` / `.markdown` discovery)
@@ -41,7 +41,7 @@ When you open a Markdown file directly (instead of a folder), SkimDown enters **
 How to enter single-file mode:
 
 - **Explorer** — right-click a `.md` / `.markdown` file → **Open with → SkimDown** (set as default after the first time)
-- **Command line** — `skimdown README.md`
+- **Command line** — `skimdown README.md` / `skim README.md`
 - **Drag-drop** — drag a `.md` file onto a SkimDown window. If the window already has a folder or another single file, the dropped file opens in a new window
 - **Multiple files** — select several `.md` files in Explorer and choose **Open with → SkimDown**, and each file gets its own window
 

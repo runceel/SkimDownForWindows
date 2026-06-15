@@ -47,6 +47,7 @@
         <uap5:Extension Category="windows.appExecutionAlias">
           <uap5:AppExecutionAlias>
             <uap5:ExecutionAlias Alias="skimdown.exe" />
+            <uap5:ExecutionAlias Alias="skim.exe" />
           </uap5:AppExecutionAlias>
         </uap5:Extension>
         <uap:Extension Category="windows.fileTypeAssociation">
