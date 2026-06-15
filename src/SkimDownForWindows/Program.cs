@@ -35,7 +35,7 @@ public static class Program
     private static int Main(string[] args)
     {
         // packaged WinUI app では console host (pwsh / cmd / WindowsTerminal 等) から alias
-        // (`skimdown <path>`) で起動された場合、起動元のターミナルは子プロセスの終了まで
+        // (`skimdown <path>` / `skim <path>`) で起動された場合、起動元のターミナルは子プロセスの終了まで
         // プロンプトを解放しない。本アプリは GUI subsystem (PE subsystem = 2) だが、それでも
         // 解放されないのは launcher (alias reparse point) 経由の CreateProcess が同期 spawn
         // として扱われ、shell が `WaitForSingleObject` で完了を待つため。

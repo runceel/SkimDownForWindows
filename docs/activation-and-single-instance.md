@@ -1,6 +1,6 @@
 # 起動とシングルインスタンス
 
-SkimDown for Windows は **1 プロセス / 複数ウィンドウ** で動く。2 個目以降の `skimdown` 起動や Explorer のダブルクリックは、既存プロセスに **redirect** されて新規ウィンドウだけが追加で開く。`settings.json` への書き込み競合は構造的に発生しない。
+SkimDown for Windows は **1 プロセス / 複数ウィンドウ** で動く。2 個目以降の `skimdown` / `skim` 起動や Explorer のダブルクリックは、既存プロセスに **redirect** されて新規ウィンドウだけが追加で開く。`settings.json` への書き込み競合は構造的に発生しない。
 
 判断の経緯は [ADR-0005](../.github/adr/0005-single-file-mode-and-file-activation.md)。
 
@@ -17,7 +17,7 @@ sequenceDiagram
     participant WS as IWindowService
     participant W as MainWindow (既存 / 新規)
 
-    U->>P2: skimdown README.md / .md ダブルクリック
+    U->>P2: skimdown README.md / skim README.md / .md ダブルクリック
     P2->>P2: WinRT.ComWrappersSupport.InitializeComWrappers
     P2->>P2: AppInstance.FindOrRegisterForKey("SkimDownForWindowsMain")
     Note over P2: mainInstance.IsCurrent == false
@@ -55,7 +55,7 @@ WinUI 3 のデフォルトは XAML ジェネレーターが `Main` を自動生�
 
 ### 親ターミナルの解放 (CLI 起動時の self-relaunch)
 
-`windows.appExecutionAlias` 経由で `skimdown <path>` が PowerShell / cmd から起動されると、起動元のシェルは spawn した SkimDown プロセスを `WaitForSingleObject` で待ち続ける。これは GUI subsystem (PE subsystem = 2) の SkimDown 自体がコンソール出力を持たなくても、`FreeConsole` で子プロセスのコンソールを detach しても止まらない (シェルはプロセスハンドルで wait しているため)。
+`windows.appExecutionAlias` 経由で `skimdown <path>` または `skim <path>` が PowerShell / cmd から起動されると、起動元のシェルは spawn した SkimDown プロセスを `WaitForSingleObject` で待ち続ける。これは GUI subsystem (PE subsystem = 2) の SkimDown 自体がコンソール出力を持たなくても、`FreeConsole` で子プロセスのコンソールを detach しても止まらない (シェルはプロセスハンドルで wait しているため)。
 
 このため `Program.Main` の **先頭** で次の手順を踏む:
 
@@ -68,7 +68,7 @@ WinUI 3 のデフォルトは XAML ジェネレーターが `Main` を自動生�
 
 親プロセス名による判定は次の理由による:
 - packaged WinUI app (broker spawn) では `GetConsoleWindow()` が常に 0 を返すため、コンソールへの attach 有無では判定できない
-- `windows.appExecutionAlias` は 0 バイトの reparse point ファイル (`%LOCALAPPDATA%\Microsoft\WindowsApps\skimdown.exe`) で、kernel filter が解決して `SkimDownForWindows.exe` を直接起動する。起動元シェルからは別プロセスを介さず親 PID = シェル PID になる
+- `windows.appExecutionAlias` は 0 バイトの reparse point ファイル (`%LOCALAPPDATA%\Microsoft\WindowsApps\skimdown.exe` / `%LOCALAPPDATA%\Microsoft\WindowsApps\skim.exe`) で、kernel filter が解決して `SkimDownForWindows.exe` を直接起動する。起動元シェルからは別プロセスを介さず親 PID = シェル PID になる
 - 親 PID は `NtQueryInformationProcess` の `PROCESS_BASIC_INFORMATION.InheritedFromUniqueProcessId` から取得する
 
 親プロセス名が上記リストに該当しない場合 (Explorer ダブルクリック / Start Menu / file activation / `winapp run` のような dev 経路) は self-relaunch せず通常フローに入る。
@@ -114,7 +114,7 @@ public static void OnRedirectedActivation(object? sender, AppActivationArguments
 | `ExtendedActivationKind` | 取り方 | 備考 |
 |---|---|---|
 | `File` | `((FileActivatedEventArgs)args.Data).Files` を `StorageFile.Path` / `StorageFolder.Path` に変換 | Explorer ダブルクリック / Open With。複数選択あり |
-| `Launch` (および既定) | `Environment.GetCommandLineArgs()[1..]` のうち、空白でないかつ `-` で始まらないものを採用 | CLI 起動 (`skimdown README.md`) や、引数なしの通常起動 |
+| `Launch` (および既定) | `Environment.GetCommandLineArgs()[1..]` のうち、空白でないかつ `-` で始まらないものを採用 | CLI 起動 (`skimdown README.md` / `skim README.md`) や、引数なしの通常起動 |
 
 引数なしの `Launch` の場合は targets が空。`OpenFirstWindowFromActivation` は空 → `CreateWindow(initialFolderPath: null, restoreLastFolder: true)` で **last folder を復元** する起動になる。
 
@@ -169,10 +169,10 @@ public sealed record OpenSingleFileActivation(string FilePath) : InitialActivati
 
 ## File Type Association ([`Package.appxmanifest`](../src/SkimDownForWindows/Package.appxmanifest))
 
-`windows.fileTypeAssociation` 拡張で `.md` / `.markdown` を SkimDown に紐付ける。`windows.appExecutionAlias` で `skimdown.exe` を登録する。これにより:
+`windows.fileTypeAssociation` 拡張で `.md` / `.markdown` を SkimDown に紐付ける。`windows.appExecutionAlias` で `skimdown.exe` と `skim.exe` を登録する。これにより:
 
 - Explorer で `.md` を右クリック → Open with → SkimDown で開ける
-- 任意のフォルダーで `skimdown README.md` / `skimdown .` がコマンドラインから動く (MSIX install 時に自動登録される PATH エイリアス)
+- 任意のフォルダーで `skimdown README.md` / `skim README.md` / `skimdown .` / `skim .` がコマンドラインから動く (MSIX install 時に自動登録される PATH エイリアス)
 
 ## 終了処理
 

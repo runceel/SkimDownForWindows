@@ -26,7 +26,7 @@
 - 空ウィンドウへフォルダーをドロップした場合、そのウィンドウで開く
 - すでにフォルダーを開いているウィンドウへフォルダーをドロップした場合、新しいウィンドウで開く
 - `Ctrl + N` で新規空ウィンドウを開く
-- コマンドラインから `skimdown <folder>` (例: `skimdown .` / `skimdown D:\notes`) で指定フォルダーを開く。`skimdown` は MSIX install 時に自動登録される実行エイリアス
+- コマンドラインから `skimdown <folder>` または `skim <folder>` (例: `skimdown .` / `skim .` / `skimdown D:\notes` / `skim D:\notes`) で指定フォルダーを開く。`skimdown` と `skim` は MSIX install 時に自動登録される実行エイリアス
 
 ## 単一ファイルを開く (single-file mode)
 
@@ -35,7 +35,7 @@ Markdown ファイルを直接開く `single-file mode` を提供する。フォ
 ### 起動経路
 
 - **Explorer ダブルクリック**: `.md` / `.markdown` を右クリック → `Open with → SkimDown` (一度選ぶと既定にできる)
-- **コマンドライン**: `skimdown README.md`
+- **コマンドライン**: `skimdown README.md` / `skim README.md`
 - **Drag-drop**: `.md` ファイルをウィンドウへドロップ。空ウィンドウであれば現ウィンドウで開き、folder mode / 別の single-file が表示中であれば新ウィンドウで開く
 - **複数ファイル**: Explorer で複数 `.md` を選択し `Open with → SkimDown` を実行すると、各ファイルごとに 1 ウィンドウで開く
 
@@ -313,7 +313,7 @@ Single-file mode 中は `RecentFolders` / `LastFolderPath` / `FolderStates` / `S
 ## プロセスモデルと多重起動
 
 - SkimDown for Windows は **ユーザーあたり単一プロセス** として動作する
-- `AppInstance.FindOrRegisterForKey("SkimDownForWindowsMain")` で main instance を決め、2 回目以降の起動 (Explorer ダブルクリック / `skimdown` CLI 起動 / file association 経由) は **既存プロセスにアクティベーションが redirect** される
+- `AppInstance.FindOrRegisterForKey("SkimDownForWindowsMain")` で main instance を決め、2 回目以降の起動 (Explorer ダブルクリック / `skimdown` または `skim` CLI 起動 / file association 経由) は **既存プロセスにアクティベーションが redirect** される
 - これにより `settings.json` への並行書き込み競合が原理的に発生しない
 - Redirect 受信側は activation 引数 (folder path / file path 群) を解析し、`IWindowService` 経由で必要に応じて新ウィンドウまたは既存空ウィンドウを再利用する
 - UI / DI が ready になる前に届いた redirect は pending queue に積み、`OnLaunched` 完了後に drain する
@@ -327,7 +327,7 @@ Single-file mode 中は `RecentFolders` / `LastFolderPath` / `FolderStates` / `S
 - Identity: `45014okazuki.SkimDown` / Publisher: `CN=57A8C5FA-395A-4109-91A0-CF1B93556B5D` / PublisherDisplayName: `okazuki`
 - `Package.appxmanifest` で次を宣言する:
   - **File type association** (`windows.fileTypeAssociation`): `.md`, `.markdown` を `Markdown Document` として SkimDown に関連付け、`OpenIsSafe="true"` を付ける
-  - **App execution alias** (`windows.appExecutionAlias`): `skimdown.exe` を `skimdown` として登録 (任意の作業ディレクトリから `skimdown` コマンドで起動できる)
+  - **App execution alias** (`windows.appExecutionAlias`): `skimdown.exe` (`skimdown`) と `skim.exe` (`skim`) を登録 (任意の作業ディレクトリから `skimdown` / `skim` コマンドで起動できる)
 
 ## セキュリティ
 

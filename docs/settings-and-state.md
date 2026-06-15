@@ -141,7 +141,7 @@ SkimDown for Windows は、グローバル設定 (テーマ・サイドバー幅
 
 ## single-file mode (`OpenContainingFolderOnSingleFileActivation=false`) で更新しないキー
 
-Explorer から `.md` ダブルクリック / `skimdown README.md` 等で起動した single-file mode のウィンドウは、**永続化キーを一切書き換えない**。これにより:
+Explorer から `.md` ダブルクリック / `skimdown README.md` / `skim README.md` 等で起動した single-file mode のウィンドウは、**永続化キーを一切書き換えない**。これにより:
 
 - folder mode の `RecentFolders` 履歴が Markdown のクイック閲覧で汚されない
 - `LastFolderPath` が壊れず、次回通常起動で前回フォルダーが正しく復元される
