@@ -10,6 +10,13 @@
     PrimaryButtonClick="OnPrimaryButtonClick"
     mc:Ignorable="d">
 
+    <ContentDialog.Resources>
+        <Style x:Key="SettingsDialogOptionLabelStyle" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="WrapWholeWords" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </ContentDialog.Resources>
+
     <ScrollViewer MaxHeight="640">
         <StackPanel Spacing="16">
             <TextBlock x:Uid="SettingsDialogGeneralSectionHeader"
@@ -30,7 +37,7 @@
                 <TextBlock Grid.Row="0"
                            Grid.Column="0"
                            x:Uid="SettingsDialogSingleFileFolderModeLabel"
-                           VerticalAlignment="Center" />
+                           Style="{StaticResource SettingsDialogOptionLabelStyle}" />
                 <ToggleSwitch x:Name="SingleFileFolderModeToggle"
                               Grid.Row="0"
                               Grid.Column="1"
@@ -40,7 +47,7 @@
                 <TextBlock Grid.Row="1"
                            Grid.Column="0"
                            x:Uid="SettingsDialogSearchCaseLabel"
-                           VerticalAlignment="Center" />
+                           Style="{StaticResource SettingsDialogOptionLabelStyle}" />
                 <ToggleSwitch x:Name="SearchCaseToggle"
                               Grid.Row="1"
                               Grid.Column="1"
@@ -50,7 +57,7 @@
                 <TextBlock Grid.Row="2"
                            Grid.Column="0"
                            x:Uid="SettingsDialogRememberWindowPositionLabel"
-                           VerticalAlignment="Center" />
+                           Style="{StaticResource SettingsDialogOptionLabelStyle}" />
                 <ToggleSwitch x:Name="RememberWindowPositionToggle"
                               Grid.Row="2"
                               Grid.Column="1"
@@ -60,7 +67,7 @@
                 <TextBlock Grid.Row="3"
                            Grid.Column="0"
                            x:Uid="SettingsDialogZoomLabel"
-                           VerticalAlignment="Center" />
+                           Style="{StaticResource SettingsDialogOptionLabelStyle}" />
                 <NumberBox x:Name="ZoomNumberBox"
                            Grid.Row="3"
                            Grid.Column="1"
@@ -90,7 +97,7 @@
                 <TextBlock Grid.Row="0"
                            Grid.Column="0"
                            x:Uid="SettingsDialogThemeLabel"
-                           VerticalAlignment="Center" />
+                           Style="{StaticResource SettingsDialogOptionLabelStyle}" />
                 <ComboBox x:Name="ThemeComboBox"
                           Grid.Row="0"
                           Grid.Column="1"
@@ -100,7 +107,7 @@
                 <TextBlock Grid.Row="1"
                            Grid.Column="0"
                            x:Uid="SettingsDialogContentWidthLabel"
-                           VerticalAlignment="Center" />
+                           Style="{StaticResource SettingsDialogOptionLabelStyle}" />
                 <ComboBox x:Name="ContentWidthComboBox"
                           Grid.Row="1"
                           Grid.Column="1"
@@ -115,7 +122,7 @@
                 <TextBlock Grid.Row="2"
                            Grid.Column="0"
                            x:Uid="SettingsDialogSidebarPositionLabel"
-                           VerticalAlignment="Center" />
+                           Style="{StaticResource SettingsDialogOptionLabelStyle}" />
                 <ComboBox x:Name="SidebarPositionComboBox"
                           Grid.Row="2"
                           Grid.Column="1"
@@ -128,7 +135,7 @@
                 <TextBlock Grid.Row="3"
                            Grid.Column="0"
                            x:Uid="SettingsDialogSidebarVisibleLabel"
-                           VerticalAlignment="Center" />
+                           Style="{StaticResource SettingsDialogOptionLabelStyle}" />
                 <ToggleSwitch x:Name="SidebarVisibleToggle"
                               Grid.Row="3"
                               Grid.Column="1"
