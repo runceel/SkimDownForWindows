@@ -142,43 +142,45 @@ gh release create v<X.Y.Z> `
 
 ### 7. リリースノートテンプレート
 
+GitHub Releases / Microsoft Store のリリースノート本文は **英語で記載**する。
+
 ````markdown
 # SkimDown for Windows v<X.Y.Z>
 
 ## What's new
-- (新機能 1) — リンク: `.github/adr/00NN-...md`
-- (新機能 2)
-- (バグ修正 1)
+- (Feature 1) — Link: `.github/adr/00NN-...md`
+- (Feature 2)
+- (Bug fix 1)
 
 ## Downloads (sideload)
-- `45014okazuki.SkimDown_<ver>_sideload.msixbundle` — x64 + ARM64 マルチアーキバンドル (自己署名)
-- `devcert.cer` — 上記 bundle の Publisher 証明書 (公開鍵のみ)
+- `45014okazuki.SkimDown_<ver>_sideload.msixbundle` — x64 + ARM64 multi-architecture bundle (self-signed)
+- `devcert.cer` — Publisher certificate for the bundle (public key only)
 
 ## Install (PowerShell, Run as Administrator)
 
 ```powershell
-# 1) この Publisher の自己署名証明書を信頼する (一度だけ)
+# 1) Trust this Publisher self-signed certificate (one-time setup)
 certutil -addstore -f "TrustedPeople" devcert.cer
 
-# 2) パッケージをインストール
+# 2) Install the package
 Add-AppxPackage .\45014okazuki.SkimDown_<ver>_sideload.msixbundle
 ```
 
-## ⚠️ 重要: Microsoft Store 版への移行について
+## ⚠️ Important: Migrating to the Microsoft Store build
 
-この GitHub Releases 版は**自己署名された sideload 用ビルド**です。
-Microsoft Store 版とは署名者・配布経路が異なるため、Store 版がリリースされた際は
-**上書きアップデートできず、一度アンインストールしてから Store 版を再インストール**
-する必要があります。
+This GitHub Releases build is a **self-signed sideload build**.
+Because the signer and distribution channel differ from the Microsoft Store build,
+you **cannot upgrade in place** to the Store build. Uninstall this build first,
+then install the Store build.
 
-通常ユーザーは Microsoft Store 版の利用を強く推奨します。
-(Store 公開後はこのページに Store リンクを追記します)
+We strongly recommend the Microsoft Store build for regular users.
+(After the Store release is published, add the Store link to this page.)
 
-## アンインストール
+## Uninstall
 
 ```powershell
 Get-AppxPackage 45014okazuki.SkimDown | Remove-AppxPackage
-# 証明書も削除する場合
+# Remove the certificate as well, if needed
 certutil -delstore TrustedPeople <thumbprint>
 ```
 ````
@@ -197,6 +199,31 @@ certutil -delstore TrustedPeople <thumbprint>
 - [ ] `bin\StorePackage\devcert.pfx` は安全に削除 (`Remove-Item bin\StorePackage\devcert.pfx`)
   - 同じ証明書を継続利用するなら、リポジトリ外の安全な場所 (Bitwarden / Vault) に退避
 - [ ] 次バージョン用の issue / プロジェクトボード更新
+
+### 10. Microsoft Store 提出時のリリースノートを記載
+
+Partner Center の submission 画面で「このバージョンの新機能」欄を更新する。以下のテンプレートをベースに、**英語で**・**ユーザー向けの表現**で埋めて貼り付ける (内部チケット番号や開発者向け略語は避ける)。
+
+```text
+SkimDown for Windows v<X.Y.Z>
+
+New features
+- <User-visible feature 1>
+- <User-visible feature 2>
+
+Improvements and fixes
+- <Main improvement or bug fix 1>
+- <Main improvement or bug fix 2>
+
+Breaking changes and notes
+- <Changes requiring settings migration/reconfiguration or removed behavior>
+- <If none, write "None">
+```
+
+- バージョン番号は `Package.appxmanifest` の `Major.Minor.Patch` と一致させる
+- 本文は英語で記載する
+- `New features` と `Breaking changes and notes` は必須で埋める
+- 既知の制限や回避方法があれば `Breaking changes and notes` に追記する
 
 ## やってはいけないこと
 
