@@ -150,18 +150,20 @@ Presentation 層 (`MainPage.xaml.cs`) は `PreviewLoadRequested` を購読して
 
 | イベント | 何が起きた時 | debounce | 引数 |
 |---|---|---|---|
-| `TreeMayHaveChanged` | Created / Deleted / Renamed (どんなエントリでも) / `FileSystemWatcher.Error` (バッファオーバーフローのフォールバック) | 250ms (`TreeDebounce`) | なし |
+| `TreeMayHaveChanged` | Markdown パスの Created / Renamed、ディレクトリの Created / Renamed、Deleted、`FileSystemWatcher.Error` (バッファオーバーフローのフォールバック) | 250ms (`TreeDebounce`) | なし |
 | `FileContentChanged` | `.md` / `.markdown` ファイルの Changed | なし (即時) | 絶対パス |
 
 両イベントとも UI スレッドに `IUiDispatcher.TryEnqueue` で marshal してから発火されるので、購読者 (VM) は UI スレッド前提でハンドラーを書ける。
 
 設定: `IncludeSubdirectories = true`、`InternalBufferSize = 64 * 1024`、`NotifyFilter = FileName | DirectoryName | LastWrite | Size`。
 
+Created / Renamed のうち、Markdown でもディレクトリでもない通常ファイルのイベントは `TreeMayHaveChanged` に変換されない。Deleted は OS から削除後のパスだけが届き、ファイル / ディレクトリの種別を安全に判定できないため、ツリー再走査対象として扱う。
+
 ### VM の取り扱い ([`MainPageViewModel.OnTreeMayHaveChanged` / `OnFileContentChanged`](../src/SkimDownForWindows.Application/ViewModels/MainPageViewModel.cs))
 
 | モード | `TreeMayHaveChanged` | `FileContentChanged` |
 |---|---|---|
-| folder mode | 現在の展開状態と選択状態を保持したまま再走査 → 再構築 → 復元 | 当該ファイルが今 selected なら再読込 |
+| folder mode | 再走査後のツリーが現在の `RootItems` と等価なら no-op。差分がある場合は現在の展開状態と選択状態を保持したまま再構築 → 復元 | 当該ファイルが今 selected なら再読込 |
 | single-file mode | **何もしない** (ツリーを使わないので再走査不要) | 監視対象ファイルと一致すれば `ReloadSingleFileAsync` |
 
 ## folder mode と single-file mode の差分
@@ -176,7 +178,7 @@ Presentation 層 (`MainPage.xaml.cs`) は `PreviewLoadRequested` を購読して
 | `MarkdownCount` | スキャン総数 | `1` |
 | `ISettingsRepository` 更新 | `RecentFolders`, `LastFolderPath`, `FolderState`, `SidebarVisible` (UI 経由) すべて更新 | **永続化キーは一切更新しない** ([settings-and-state.md](settings-and-state.md) 参照) |
 | `IFolderWatcher.Watch` | 開いたフォルダー | 対象ファイルの親フォルダー |
-| `TreeMayHaveChanged` の反応 | tree 再走査 | 無視 |
+| `TreeMayHaveChanged` の反応 | tree 再走査 (等価なら no-op) | 無視 |
 | 相対 Markdown リンク | tree 選択を切替 | 新規 single-file ウィンドウ |
 
 判断の経緯は [ADR-0005](../.github/adr/0005-single-file-mode-and-file-activation.md) を参照。

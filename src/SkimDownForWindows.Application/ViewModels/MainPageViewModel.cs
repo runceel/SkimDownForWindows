@@ -371,6 +371,37 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         }
     }
 
+    private bool RootMatches(MarkdownTreeItem root)
+        => TreeItemCollectionsEqual(RootItems, root.Children);
+
+    private static bool TreeItemCollectionsEqual(IList<MarkdownTreeItem> current, IList<MarkdownTreeItem> next)
+    {
+        if (current.Count != next.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < current.Count; i++)
+        {
+            if (!TreeItemsEqual(current[i], next[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TreeItemsEqual(MarkdownTreeItem current, MarkdownTreeItem next)
+        => current.IsFolder == next.IsFolder
+           && current.MarkdownCount == next.MarkdownCount
+           && current.LastModified == next.LastModified
+           && string.Equals(current.Name, next.Name, StringComparison.Ordinal)
+           && string.Equals(current.FullPath, next.FullPath, StringComparison.OrdinalIgnoreCase)
+           && string.Equals(current.RelativePath, next.RelativePath, StringComparison.Ordinal)
+           && string.Equals(current.RelativeFolder, next.RelativeFolder, StringComparison.Ordinal)
+           && TreeItemCollectionsEqual(current.Children, next.Children);
+
     private void ApplyExpansionState(IEnumerable<string> expandedRelativePaths)
     {
         var set = new HashSet<string>(expandedRelativePaths, StringComparer.OrdinalIgnoreCase);
@@ -516,10 +547,15 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
 
         if (string.IsNullOrEmpty(OpenedFolderPath)) return;
 
+        var root = BuildRoot(OpenedFolderPath);
+        if (RootMatches(root))
+        {
+            return;
+        }
+
         var expansion = CollectExpandedFolders();
         var currentSelectionRel = SelectedItem?.RelativePath;
 
-        var root = BuildRoot(OpenedFolderPath);
         ReplaceRoot(root);
         MarkdownCount = root.MarkdownCount;
         HasAnyMarkdown = MarkdownCount > 0;

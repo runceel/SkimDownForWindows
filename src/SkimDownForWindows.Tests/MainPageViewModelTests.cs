@@ -373,6 +373,25 @@ public sealed class MainPageViewModelTests
     }
 
     [TestMethod]
+    public async Task TreeMayHaveChanged_WithoutVisibleChanges_PreservesRootItemInstances()
+    {
+        Touch("README.md");
+        Touch("docs/intro.md");
+        var vm = CreateViewModel();
+        await vm.OpenFolderAsync(_root);
+        var originalRootItems = vm.RootItems.ToArray();
+        var originalNestedItem = originalRootItems.Single(i => i.IsFolder).Children.Single();
+        var savesBefore = _settings.SaveAsyncCalls;
+
+        _watcher.RaiseTreeMayHaveChanged();
+
+        Assert.AreEqual(savesBefore, _settings.SaveAsyncCalls);
+        Assert.AreSame(originalRootItems[0], vm.RootItems[0]);
+        Assert.AreSame(originalRootItems[1], vm.RootItems[1]);
+        Assert.AreSame(originalNestedItem, vm.RootItems.Single(i => i.IsFolder).Children.Single());
+    }
+
+    [TestMethod]
     public async Task TreeMayHaveChanged_SelectionRemovedFromDisk_ClearsPreview()
     {
         Touch("README.md");
