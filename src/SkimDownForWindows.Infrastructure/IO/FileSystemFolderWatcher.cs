@@ -65,10 +65,39 @@ public sealed class FileSystemFolderWatcher : IFolderWatcher
 
     private void OnCreatedDeletedOrRenamed(object sender, FileSystemEventArgs e)
     {
-        // Deleted/Renamed イベントではパスがディレクトリかどうか分からないので、
-        // 常にツリー再構築を発火させる。再走査は debounce 済みなので低コスト。
-        ScheduleTreeChanged();
+        if (ShouldScheduleTreeChanged(e))
+        {
+            ScheduleTreeChanged();
+        }
     }
+
+    private static bool ShouldScheduleTreeChanged(FileSystemEventArgs e)
+    {
+        if (string.IsNullOrEmpty(e.FullPath))
+        {
+            return false;
+        }
+
+        if (IsMarkdownPath(e.FullPath))
+        {
+            return true;
+        }
+
+        if (e is RenamedEventArgs renamed && IsMarkdownPath(renamed.OldFullPath))
+        {
+            return true;
+        }
+
+        if (e.ChangeType is WatcherChangeTypes.Created or WatcherChangeTypes.Renamed)
+        {
+            return Directory.Exists(e.FullPath);
+        }
+
+        return e.ChangeType == WatcherChangeTypes.Deleted;
+    }
+
+    private static bool IsMarkdownPath(string path)
+        => PathHelpers.IsMarkdownFile(Path.GetFileName(path));
 
     private void OnChanged(object sender, FileSystemEventArgs e)
     {
