@@ -105,6 +105,9 @@
   <data name="MoveSidebarMenuItem.Text" xml:space="preserve">
     <value>Move Sidebar to Right</value>
   </data>
+  <data name="TableOfContentsMenuItem.Text" xml:space="preserve">
+    <value>Table of Contents</value>
+  </data>
   <data name="OpenSettingsMenuItem.Text" xml:space="preserve">
     <value>Settings…</value>
   </data>
@@ -273,6 +276,9 @@
   <data name="SettingsDialogContentWidthLabel.Text" xml:space="preserve">
     <value>Content width</value>
   </data>
+  <data name="SettingsDialogTableOfContentsVisibleLabel.Text" xml:space="preserve">
+    <value>Show table of contents in preview</value>
+  </data>
   <data name="SettingsDialogSidebarPositionLabel.Text" xml:space="preserve">
     <value>Sidebar position</value>
   </data>
@@ -317,5 +323,11 @@
   </data>
   <data name="MermaidZoom.Hint" xml:space="preserve">
     <value>Wheel: zoom · Drag: pan · Esc: close</value>
+  </data>
+  <data name="TableOfContents.Title" xml:space="preserve">
+    <value>Contents</value>
+  </data>
+  <data name="TableOfContents.Empty" xml:space="preserve">
+    <value>No headings</value>
   </data>
 </root>

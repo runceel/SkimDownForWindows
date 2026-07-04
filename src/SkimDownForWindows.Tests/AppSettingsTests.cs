@@ -151,6 +151,7 @@ public sealed class AppSettingsTests
             SearchCaseSensitive = true,
             SidebarWidth = 320,
             SidebarVisible = false,
+            IsTableOfContentsVisible = false,
             SidebarPosition = SidebarPosition.Right,
             ContentMaxWidth = ContentMaxWidth.ExtraWide,
             OpenContainingFolderOnSingleFileActivation = true,
@@ -181,6 +182,7 @@ public sealed class AppSettingsTests
         Assert.IsTrue(round.SearchCaseSensitive);
         Assert.AreEqual(320, round.SidebarWidth);
         Assert.IsFalse(round.SidebarVisible);
+        Assert.IsFalse(round.IsTableOfContentsVisible);
         Assert.AreEqual(SidebarPosition.Right, round.SidebarPosition);
         Assert.AreEqual(ContentMaxWidth.ExtraWide, round.ContentMaxWidth);
         Assert.IsTrue(round.OpenContainingFolderOnSingleFileActivation);
@@ -210,6 +212,7 @@ public sealed class AppSettingsTests
         Assert.IsFalse(s.SearchCaseSensitive);
         Assert.AreEqual(280d, s.SidebarWidth);
         Assert.IsTrue(s.SidebarVisible);
+        Assert.IsTrue(s.IsTableOfContentsVisible);
         Assert.AreEqual(SidebarPosition.Left, s.SidebarPosition);
         Assert.AreEqual(ContentMaxWidth.Full, s.ContentMaxWidth);
         Assert.IsFalse(s.OpenContainingFolderOnSingleFileActivation);

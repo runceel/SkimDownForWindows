@@ -19,11 +19,12 @@ Open a folder, and SkimDown shows only the Markdown files in a sidebar tree and 
 - Hidden-file and ignored-directory filtering (`.git`, `node_modules`, `.build`, `DerivedData`, …)
 - Read-only WebView2 preview with bundled rendering assets (no CDN required, works fully offline)
 - Markdown rendering bundled: markdown-it + highlight.js + DOMPurify + KaTeX + Mermaid + emoji; GitHub-style alerts and inline color swatches included
+- Table of Contents pane on the right side of the Markdown preview, generated from rendered headings and toggleable from **View → Table of Contents** or Settings
 - In-document search for the current file (**Ctrl+F**), plus **Edit → Use Selection for Find** (Ctrl+E)
 - Zoom the preview with **Ctrl+`+`** / **Ctrl+`-`** / **Ctrl+`0`** (View → Zoom), or smoothly with **Ctrl+mouse wheel** and **precision-touchpad pinch** — the zoom level is persisted (clamped to 50–300 %)
 - Live reload — Markdown add / delete / rename / update events refresh the tree and preview (also works in single-file mode for the open file)
 - **VS Code-compatible custom color schemes** — drop a `*.json` theme into the Themes folder and pick it from **View → Theme** (see [Custom color schemes](#custom-color-schemes))
-- Persists sidebar position, view mode (tree / by date modified), visibility, width, theme, zoom level, recent folders, last selected file, and tree expansion state (single-file mode never updates RecentFolders / LastFolderPath, so explorer double-clicks don't pollute folder history)
+- Persists sidebar position, view mode (tree / by date modified), visibility, width, preview Table of Contents visibility, theme, zoom level, recent folders, last selected file, and tree expansion state (single-file mode never updates RecentFolders / LastFolderPath, so explorer double-clicks don't pollute folder history)
 - Local-only — no telemetry, no Markdown text leaves your machine
 
 ## Single-file mode

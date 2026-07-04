@@ -15,7 +15,7 @@ const ROOT = path.resolve(__dirname, "src/SkimDownForWindows/Assets/Web");
 // Build a synthetic HTML page with inline scripts so jsdom doesn't try to fetch.
 const html = fs.readFileSync(path.join(ROOT, "renderer.html"), "utf8");
 
-const dom = new JSDOM(`<!doctype html><html><body><div id="skim-zoom-root"><main id="content"></main></div><div id="search-status" hidden></div></body></html>`, {
+const dom = new JSDOM(`<!doctype html><html><body><div id="skim-zoom-root"><main id="content"></main></div><button id="table-of-contents-opener" class="skim-toc-opener" type="button" aria-controls="table-of-contents" aria-expanded="false" hidden>Contents</button><aside id="table-of-contents" class="skim-toc" hidden><div id="table-of-contents-title"></div><div id="table-of-contents-empty" hidden></div><nav id="table-of-contents-list"></nav></aside><div id="search-status" hidden></div></body></html>`, {
     url: "https://skimdown-app.example/renderer.html",
     runScripts: "outside-only",
     pretendToBeVisual: true,
@@ -128,6 +128,61 @@ async function main() {
     check("h1 gets slug id", /<h1\s+id="hello-world"/.test(h));
     check("h2 gets slug id", /<h2\s+id="section-12-beta"/.test(h));
     check("duplicate h2 gets -1 suffix", /<h2\s+id="section-12-beta-1"/.test(h));
+
+    // --- 2b. Table of Contents ---
+    console.log("[2b] Table of Contents");
+    var toc = window.document.getElementById("table-of-contents");
+    var tocOpener = window.document.getElementById("table-of-contents-opener");
+    var tocList = window.document.getElementById("table-of-contents-list");
+    var tocEmpty = window.document.getElementById("table-of-contents-empty");
+    var tocButtons = tocList ? Array.prototype.slice.call(tocList.querySelectorAll(".skim-toc-item")) : [];
+    check("TOC pane is visible after rendering headings",
+        toc && toc.hidden === false && window.document.body.dataset.tocVisible === "true");
+    check("TOC contains one item per heading",
+        tocButtons.length === 3,
+        "got: " + tocButtons.length);
+    check("TOC uses heading text and duplicate slug ids",
+        tocButtons[0] && tocButtons[0].textContent === "Hello World" &&
+        tocButtons[1] && tocButtons[1].dataset.headingId === "section-12-beta" &&
+        tocButtons[2] && tocButtons[2].dataset.headingId === "section-12-beta-1");
+    check("TOC opener is available when TOC is enabled",
+        tocOpener && tocOpener.hidden === false && tocOpener.textContent === "Contents");
+    if (tocOpener) {
+        tocOpener.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+        check("TOC opener toggles the drawer open",
+            window.document.body.dataset.tocDrawerOpen === "true" &&
+            tocOpener.getAttribute("aria-expanded") === "true");
+    }
+    if (tocButtons[1]) {
+        var targetHeading = window.document.getElementById("section-12-beta");
+        var scrolled = false;
+        targetHeading.scrollIntoView = function () { scrolled = true; };
+        tocButtons[1].dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+        await new Promise(r => setTimeout(r, 30));
+        check("clicking a TOC item scrolls to the matching heading", scrolled);
+        check("clicked TOC item becomes active",
+            tocButtons[1].classList.contains("active"));
+        check("clicking a TOC item closes the drawer",
+            !("tocDrawerOpen" in window.document.body.dataset) &&
+            tocOpener.getAttribute("aria-expanded") === "false");
+    }
+    postToRenderer({ type: "tocVisible", visible: false });
+    await new Promise(r => setTimeout(r, 30));
+    check("tocVisible=false hides the pane/opener and clears body reservation",
+        toc.hidden === true &&
+        tocOpener.hidden === true &&
+        !("tocVisible" in window.document.body.dataset) &&
+        !("tocDrawerOpen" in window.document.body.dataset));
+    postToRenderer({ type: "tocVisible", visible: true });
+    await new Promise(r => setTimeout(r, 30));
+    check("tocVisible=true shows the pane/opener again",
+        toc.hidden === false &&
+        tocOpener.hidden === false &&
+        window.document.body.dataset.tocVisible === "true");
+    h = await renderMd("Plain paragraph only\n");
+    check("TOC empty state appears for documents without headings",
+        tocEmpty && tocEmpty.hidden === false && tocList.hidden === true);
 
     // --- 3. Single-tilde strikethrough ---
     console.log("[3] Single-tilde strikethrough");
@@ -644,6 +699,24 @@ async function main() {
             "rule body: " + wrapBody);
     }
 
+    console.log("[23] TOC responsive drawer CSS");
+    var tocMediaRule = cssText.match(/@media\s*\(max-width:\s*760px\)\s*\{[\s\S]*?body\[data-toc-drawer-open="true"\]\s+\.skim-toc\s*\{[\s\S]*?\n\s*\}\n\}/);
+    check("TOC drawer uses the 760px responsive breakpoint",
+        tocMediaRule !== null,
+        tocMediaRule ? "" : "could not locate TOC drawer media rule");
+    if (tocMediaRule) {
+        check("TOC drawer media rule keeps the opener visible when TOC is enabled",
+            /body\[data-toc-visible="true"\]\s+\.skim-toc-opener\s*\{[\s\S]*display\s*:\s*block/i.test(tocMediaRule[0]),
+            "rule: " + tocMediaRule[0]);
+        check("TOC pane is off-canvas by default in narrow mode",
+            /\.skim-toc\s*\{[\s\S]*transform\s*:\s*translateX/i.test(tocMediaRule[0]),
+            "rule: " + tocMediaRule[0]);
+        check("TOC drawer opens without hiding the pane with display:none",
+            !/\.skim-toc\s*\{[^}]*display\s*:\s*none/i.test(tocMediaRule[0]) &&
+            /body\[data-toc-drawer-open="true"\]\s+\.skim-toc\s*\{[\s\S]*transform\s*:\s*translateX\(0\)/i.test(tocMediaRule[0]),
+            "rule: " + tocMediaRule[0]);
+    }
+
     console.log("");
     if (failures === 0) {
         console.log("✅ ALL RENDERER SMOKE CHECKS PASSED");
@@ -658,4 +731,3 @@ main().catch(e => {
     console.error("FATAL:", e);
     process.exit(2);
 });
-

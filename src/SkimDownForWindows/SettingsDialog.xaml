@@ -92,6 +92,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0"
@@ -121,10 +122,20 @@
 
                 <TextBlock Grid.Row="2"
                            Grid.Column="0"
+                           x:Uid="SettingsDialogTableOfContentsVisibleLabel"
+                           Style="{StaticResource SettingsDialogOptionLabelStyle}" />
+                <ToggleSwitch x:Name="TableOfContentsVisibleToggle"
+                              Grid.Row="2"
+                              Grid.Column="1"
+                              x:Uid="SettingsDialogTableOfContentsVisibleToggle"
+                              VerticalAlignment="Center" />
+
+                <TextBlock Grid.Row="3"
+                           Grid.Column="0"
                            x:Uid="SettingsDialogSidebarPositionLabel"
                            Style="{StaticResource SettingsDialogOptionLabelStyle}" />
                 <ComboBox x:Name="SidebarPositionComboBox"
-                          Grid.Row="2"
+                          Grid.Row="3"
                           Grid.Column="1"
                           Width="220"
                           HorizontalAlignment="Right">
@@ -132,12 +143,12 @@
                     <ComboBoxItem x:Uid="SettingsDialogSidebarPositionRightItem" Tag="Right" />
                 </ComboBox>
 
-                <TextBlock Grid.Row="3"
+                <TextBlock Grid.Row="4"
                            Grid.Column="0"
                            x:Uid="SettingsDialogSidebarVisibleLabel"
                            Style="{StaticResource SettingsDialogOptionLabelStyle}" />
                 <ToggleSwitch x:Name="SidebarVisibleToggle"
-                              Grid.Row="3"
+                              Grid.Row="4"
                               Grid.Column="1"
                               x:Uid="SettingsDialogSidebarVisibleToggle"
                               VerticalAlignment="Center" />

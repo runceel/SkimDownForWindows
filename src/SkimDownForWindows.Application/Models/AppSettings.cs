@@ -33,6 +33,9 @@ public sealed class AppSettings
 
     public bool SidebarVisible { get; set; } = true;
 
+    /// <summary>Markdown プレビュー右側の Table of Contents pane を表示するか。既定は表示。</summary>
+    public bool IsTableOfContentsVisible { get; set; } = true;
+
     /// <summary>サイドバーがウィンドウの左右どちらに表示されるか。既定は <see cref="SidebarPosition.Left"/>。</summary>
     public SidebarPosition SidebarPosition { get; set; } = SidebarPosition.Left;
 

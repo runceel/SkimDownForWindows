@@ -16,6 +16,7 @@ public sealed partial class SettingsDialog : ContentDialog
     public ContentMaxWidth ContentMaxWidth { get; private set; }
     public SidebarPosition SidebarPosition { get; private set; }
     public bool SidebarVisible { get; private set; }
+    public bool IsTableOfContentsVisible { get; private set; }
     public bool SearchCaseSensitive { get; private set; }
     public double ZoomFactor { get; private set; }
     public bool OpenContainingFolderOnSingleFileActivation { get; private set; }
@@ -33,6 +34,7 @@ public sealed partial class SettingsDialog : ContentDialog
         SearchCaseToggle.IsOn = current.SearchCaseSensitive;
         RememberWindowPositionToggle.IsOn = current.RememberWindowPosition;
         SidebarVisibleToggle.IsOn = current.SidebarVisible;
+        TableOfContentsVisibleToggle.IsOn = current.IsTableOfContentsVisible;
         ZoomNumberBox.Value = Math.Clamp(current.ZoomFactor, 0.5, 3.0);
 
         Theme = current.Theme;
@@ -40,6 +42,7 @@ public sealed partial class SettingsDialog : ContentDialog
         ContentMaxWidth = current.ContentMaxWidth;
         SidebarPosition = current.SidebarPosition;
         SidebarVisible = current.SidebarVisible;
+        IsTableOfContentsVisible = current.IsTableOfContentsVisible;
         SearchCaseSensitive = current.SearchCaseSensitive;
         ZoomFactor = Math.Clamp(current.ZoomFactor, 0.5, 3.0);
         OpenContainingFolderOnSingleFileActivation = current.OpenContainingFolderOnSingleFileActivation;
@@ -133,6 +136,7 @@ public sealed partial class SettingsDialog : ContentDialog
         ContentMaxWidth = contentWidth;
         SidebarPosition = sidebarPosition;
         SidebarVisible = SidebarVisibleToggle.IsOn;
+        IsTableOfContentsVisible = TableOfContentsVisibleToggle.IsOn;
         SearchCaseSensitive = SearchCaseToggle.IsOn;
         ZoomFactor = Math.Clamp(
             double.IsFinite(ZoomNumberBox.Value) ? ZoomNumberBox.Value : 1.0,

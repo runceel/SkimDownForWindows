@@ -39,7 +39,7 @@ resw 上のキー (`name` 属性) は用途別に 2 つの形式が混在する�
 | 用途 | resw キー形式 | 例 | 消費側 |
 |---|---|---|---|
 | `x:Uid` バインド | `<UidName>.<PropertyName>` | `AboutDialog.Title`, `OpenFolderMenuItem.Text`, `SearchPreviousButton.AutomationProperties.Name`, `ViewModeTreeButton.ToolTipService.ToolTip`, `ViewModeRecentButton.AutomationProperties.Name` | XAML (`x:Uid="AboutDialog"` で `AboutDialog.*` 系プロパティを自動解決) |
-| `ResourceLoader.GetString` 直呼び | `<Category>.<Key>` | `MarkdownCount.OneFile`, `Sidebar.MoveToRight`, `RecentFolders.Empty` | code-behind (`_strings.GetString("MarkdownCount/OneFile")` のように `.` → `/`) |
+| `ResourceLoader.GetString` 直呼び | `<Category>.<Key>` | `MarkdownCount.OneFile`, `Sidebar.MoveToRight`, `RecentFolders.Empty`, `TableOfContents.Title` | code-behind (`_strings.GetString("MarkdownCount/OneFile")` のように `.` → `/`) |
 
 両者は resw 上では同じ `<data name="...">` で表現され、ロケール追加時はどちらも同じ翻訳プロセスに乗る。
 
@@ -101,6 +101,7 @@ MarkdownCountText.Text = string.Format(
 | `MainPage.xaml.cs` | `DragDrop/OpenInNewWindow`, `DragDrop/OpenInSkimDown` | ドラッグオーバー時のオーバーレイ文言 |
 | `MainPage.xaml.cs` | `Search/NoResults` | 検索結果ゼロ時の SearchStatus |
 | `MainPage.xaml.cs` | `Sidebar/MoveToRight`, `Sidebar/MoveToLeft` | サイドバー位置トグルの label を状態で切り替え |
+| `MainPage.xaml.cs` (`BuildPreviewLocalizedStrings`) | `MermaidZoom/*`, `TableOfContents/Title`, `TableOfContents/Empty` | WebView2 renderer に渡すローカライズ済み文字列。JS 側では `mermaidZoom.*` / `tableOfContents.*` キーとして使われる |
 
 ## レイヤー境界
 
