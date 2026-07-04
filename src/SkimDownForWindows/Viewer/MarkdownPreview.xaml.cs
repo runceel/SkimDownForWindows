@@ -57,6 +57,7 @@ public sealed partial class MarkdownPreview : UserControl
     private bool _hasPendingThemeOnlyUpdate;
     private double? _pendingZoom;
     private string? _pendingContentMaxWidth;
+    private bool? _pendingTableOfContentsVisible;
     private IReadOnlyDictionary<string, string>? _pendingStrings;
     private string? _currentFolderRoot;
 
@@ -329,9 +330,18 @@ public sealed partial class MarkdownPreview : UserControl
         }
     }
 
+    public void SetTableOfContentsVisible(bool visible)
+    {
+        _pendingTableOfContentsVisible = visible;
+        if (_webReady)
+        {
+            Post(new { type = "tocVisible", visible });
+        }
+    }
+
     /// <summary>
-    /// Push a localized strings dictionary to the renderer (currently used by
-    /// the Mermaid zoom modal — "mermaidZoom.openHint" etc.). Keys are
+    /// Push a localized strings dictionary to the renderer (for example,
+    /// "mermaidZoom.openHint" and "tableOfContents.title"). Keys are
     /// renderer-internal JS-friendly identifiers; values are display strings
     /// already resolved from <c>Resources.resw</c> by the caller.
     ///
@@ -434,6 +444,12 @@ public sealed partial class MarkdownPreview : UserControl
         {
             Post(new { type = "contentMaxWidth", value = pendingContentMax });
             _pendingContentMaxWidth = null;
+        }
+
+        if (_pendingTableOfContentsVisible is bool pendingTableOfContentsVisible)
+        {
+            Post(new { type = "tocVisible", visible = pendingTableOfContentsVisible });
+            _pendingTableOfContentsVisible = null;
         }
 
         // ローカライズ文字列も render より前に届ける。これで Mermaid の

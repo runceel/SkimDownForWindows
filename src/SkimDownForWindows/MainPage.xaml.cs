@@ -117,6 +117,7 @@ public sealed partial class MainPage : Page
             UpdateContentVisibility();
             UpdateThemeMenuChecks();
             UpdateContentWidthMenuChecks();
+            UpdateTableOfContentsMenuCheck();
             UpdateMoveSidebarLabel();
         }
     }
@@ -150,6 +151,8 @@ public sealed partial class MainPage : Page
 
         Preview.SetZoom(settings.ZoomFactor);
         Preview.SetContentMaxWidth(ContentMaxWidthMap.ToCssValue(settings.ContentMaxWidth));
+        Preview.SetTableOfContentsVisible(settings.IsTableOfContentsVisible);
+        UpdateTableOfContentsMenuCheck();
 
         // ページとウィンドウに永続テーマを適用
         ApplyThemeToShell(settings.Theme);
@@ -501,6 +504,10 @@ public sealed partial class MainPage : Page
         settings.ContentMaxWidth = dialog.ContentMaxWidth;
         Preview.SetContentMaxWidth(ContentMaxWidthMap.ToCssValue(dialog.ContentMaxWidth));
         UpdateContentWidthMenuChecks();
+
+        settings.IsTableOfContentsVisible = dialog.IsTableOfContentsVisible;
+        Preview.SetTableOfContentsVisible(dialog.IsTableOfContentsVisible);
+        UpdateTableOfContentsMenuCheck();
 
         settings.SidebarPosition = dialog.SidebarPosition;
         settings.SidebarVisible = dialog.SidebarVisible;
@@ -940,6 +947,19 @@ public sealed partial class MainPage : Page
         await ViewModel.Settings.SaveAsync();
     }
 
+    private async void OnToggleTableOfContentsClick(object? sender, RoutedEventArgs e)
+    {
+        var visible = TableOfContentsMenuItem.IsChecked;
+        ViewModel.Settings.Current.IsTableOfContentsVisible = visible;
+        Preview.SetTableOfContentsVisible(visible);
+        await ViewModel.Settings.SaveAsync();
+    }
+
+    private void UpdateTableOfContentsMenuCheck()
+    {
+        TableOfContentsMenuItem.IsChecked = ViewModel.Settings.Current.IsTableOfContentsVisible;
+    }
+
     private void ApplySidebarPosition(SidebarPosition position)
     {
         if (position == SidebarPosition.Left)
@@ -993,7 +1013,7 @@ public sealed partial class MainPage : Page
     /// this method returns a flat dictionary that <see cref="MarkdownPreview.SetStrings"/>
     /// sends as <c>{ type: "strings", strings: { ... } }</c>.
     ///
-    /// Adding a new <c>MermaidZoom/*</c> resource entry: append it here too
+    /// Adding a new renderer-facing resource entry: append it here too
     /// so it gets pushed across the WebView2 boundary. Keep keys ordered the
     /// same as the resw file to make audits trivial.
     /// </summary>
@@ -1007,6 +1027,8 @@ public sealed partial class MainPage : Page
         AddIfPresent(dict, loader, "mermaidZoom.reset", "MermaidZoom/Reset");
         AddIfPresent(dict, loader, "mermaidZoom.close", "MermaidZoom/Close");
         AddIfPresent(dict, loader, "mermaidZoom.hint", "MermaidZoom/Hint");
+        AddIfPresent(dict, loader, "tableOfContents.title", "TableOfContents/Title");
+        AddIfPresent(dict, loader, "tableOfContents.empty", "TableOfContents/Empty");
         return dict;
     }
 

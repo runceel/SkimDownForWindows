@@ -10,6 +10,7 @@
  *   { type: "theme",  theme, themeType, themeIsDark, themeVars } // theme: "system"|"light"|"dark"|"custom"
  *   { type: "zoom",   factor }           // 0.5..3.0
  *   { type: "contentMaxWidth", value }   // CSS max-width: "760px"|"960px"|"1200px"|"none"
+ *   { type: "tocVisible", visible }      // show/hide renderer-side Table of Contents
  *   { type: "search", query, caseSensitive }
  *   { type: "search/next" } / { type: "search/prev" } / { type: "search/clear" }
  *
@@ -32,6 +33,11 @@
 
     var md = null;
     var contentEl = null;
+    var tocEl = null;
+    var tocOpenerEl = null;
+    var tocTitleEl = null;
+    var tocEmptyEl = null;
+    var tocListEl = null;
     var currentSourceDir = "";
     var currentContentBaseUri = "";
     var lastRenderedMarkdown = "";
@@ -41,6 +47,12 @@
     var currentThemeIsDark = false;
     var appliedCustomVars = [];       // CSS variable names currently set on documentElement
     var mermaidReady = false;
+    var tableOfContentsVisible = true;
+    var hasRenderedDocument = false;
+    var currentTocItems = [];
+    var activeHeadingID = "";
+    var activeHeadingFrameRequest = 0;
+    var tocDrawerOpen = false;
 
     // ----- Zoom state -----
     // Local mirror of the host's AppSettings.ZoomFactor. Kept in sync via:
@@ -79,6 +91,8 @@
         "mermaidZoom.reset": "Reset",
         "mermaidZoom.close": "Close",
         "mermaidZoom.hint": "Wheel: zoom \u00B7 Drag: pan \u00B7 Esc: close",
+        "tableOfContents.title": "Contents",
+        "tableOfContents.empty": "No headings",
     };
     var currentStrings = {};
     for (var __k in DEFAULT_STRINGS) {
@@ -109,6 +123,7 @@
         }
         applyStringsToZoomModal();
         applyStringsToZoomHints();
+        applyStringsToTableOfContents();
     }
 
     // ----- Mermaid zoom modal state -----
@@ -735,6 +750,182 @@
         }
     }
 
+    // ----- Table of Contents -----
+    //
+    // Upstream macOS SkimDown exposes the rendered heading list from renderer.js
+    // and shows it in a native AppKit pane. The Windows port keeps the same DOM
+    // source of truth but renders the pane inside WebView2, so anchor scrolling
+    // and active-heading tracking stay local to the document.
+
+    function headingElements(root) {
+        if (!root || typeof root.querySelectorAll !== "function") return [];
+        return Array.prototype.slice.call(root.querySelectorAll("h1, h2, h3, h4, h5, h6"))
+            .filter(function (heading) { return !!heading.id; });
+    }
+
+    function tableOfContents() {
+        return headingElements(contentEl).map(function (heading) {
+            var level = parseInt((heading.tagName || "H1").substring(1), 10);
+            if (!isFinite(level) || level < 1 || level > 6) level = 1;
+            return {
+                level: level,
+                title: (heading.textContent || "").trim(),
+                id: heading.id,
+            };
+        });
+    }
+
+    function applyStringsToTableOfContents() {
+        if (tocTitleEl) tocTitleEl.textContent = t("tableOfContents.title");
+        if (tocEmptyEl) tocEmptyEl.textContent = t("tableOfContents.empty");
+        if (tocOpenerEl) {
+            var title = t("tableOfContents.title");
+            tocOpenerEl.textContent = title;
+            tocOpenerEl.title = title;
+            tocOpenerEl.setAttribute("aria-label", title);
+        }
+    }
+
+    function setTableOfContentsVisible(visible) {
+        tableOfContentsVisible = !!visible;
+        if (!tableOfContentsVisible) {
+            setTableOfContentsDrawerOpen(false);
+        }
+        updateTableOfContentsVisibility();
+    }
+
+    function updateTableOfContentsVisibility() {
+        if (!tocEl) return;
+        var visible = tableOfContentsVisible && hasRenderedDocument && !isZoomModalOpen();
+        tocEl.hidden = !visible;
+        if (tocOpenerEl) {
+            tocOpenerEl.hidden = !visible;
+        }
+        if (!visible) {
+            tocDrawerOpen = false;
+        }
+        if (visible) {
+            document.body.dataset.tocVisible = "true";
+        } else {
+            delete document.body.dataset.tocVisible;
+        }
+        if (tocDrawerOpen) {
+            document.body.dataset.tocDrawerOpen = "true";
+        } else {
+            delete document.body.dataset.tocDrawerOpen;
+        }
+        if (tocOpenerEl) {
+            tocOpenerEl.setAttribute("aria-expanded", tocDrawerOpen ? "true" : "false");
+        }
+    }
+
+    function setTableOfContentsDrawerOpen(open) {
+        tocDrawerOpen = !!open && tableOfContentsVisible && hasRenderedDocument && !isZoomModalOpen();
+        updateTableOfContentsVisibility();
+    }
+
+    function toggleTableOfContentsDrawer() {
+        setTableOfContentsDrawerOpen(!tocDrawerOpen);
+    }
+
+    function renderTableOfContents() {
+        if (!tocEl || !tocListEl) return;
+
+        currentTocItems = tableOfContents();
+        activeHeadingID = "";
+        tocListEl.textContent = "";
+
+        var minLevel = 1;
+        if (currentTocItems.length > 0) {
+            minLevel = currentTocItems.reduce(function (min, item) {
+                return Math.min(min, item.level);
+            }, currentTocItems[0].level);
+        }
+
+        for (var i = 0; i < currentTocItems.length; i++) {
+            var item = currentTocItems[i];
+            var button = document.createElement("button");
+            button.type = "button";
+            button.className = "skim-toc-item";
+            button.textContent = item.title || item.id;
+            button.title = item.title || item.id;
+            button.dataset.headingId = item.id;
+            button.style.paddingLeft = (8 + Math.max(0, item.level - minLevel) * 12) + "px";
+            button.addEventListener("click", function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                var id = ev.currentTarget && ev.currentTarget.dataset
+                    ? ev.currentTarget.dataset.headingId
+                    : "";
+                if (!id) return;
+                setActiveTableOfContentsHeading(id, false);
+                scrollToAnchorByHash("#" + encodeURIComponent(id));
+                setTableOfContentsDrawerOpen(false);
+            });
+            tocListEl.appendChild(button);
+        }
+
+        if (tocEmptyEl) tocEmptyEl.hidden = currentTocItems.length !== 0;
+        tocListEl.hidden = currentTocItems.length === 0;
+        applyStringsToTableOfContents();
+        updateTableOfContentsVisibility();
+        scheduleActiveHeadingUpdate();
+    }
+
+    function setActiveTableOfContentsHeading(headingID, scrollIntoView) {
+        activeHeadingID = headingID || "";
+        if (!tocListEl) return;
+        var activeButton = null;
+        var buttons = tocListEl.querySelectorAll(".skim-toc-item");
+        for (var i = 0; i < buttons.length; i++) {
+            var button = buttons[i];
+            var isActive = !!activeHeadingID && button.dataset.headingId === activeHeadingID;
+            button.classList.toggle("active", isActive);
+            if (isActive) activeButton = button;
+        }
+        if (scrollIntoView && activeButton && activeButton.scrollIntoView) {
+            try { activeButton.scrollIntoView({ block: "nearest" }); }
+            catch (e) { /* best-effort */ }
+        }
+    }
+
+    function scheduleActiveHeadingUpdate() {
+        if (activeHeadingFrameRequest) return;
+        var raf = window.requestAnimationFrame || function (cb) { return setTimeout(cb, 0); };
+        activeHeadingFrameRequest = raf(function () {
+            activeHeadingFrameRequest = 0;
+            updateActiveHeading();
+        });
+    }
+
+    function updateActiveHeading() {
+        if (!hasRenderedDocument || currentTocItems.length === 0) {
+            setActiveTableOfContentsHeading("", false);
+            return;
+        }
+
+        var headings = headingElements(contentEl);
+        if (headings.length === 0) {
+            setActiveTableOfContentsHeading("", false);
+            return;
+        }
+
+        var threshold = Math.min(160, Math.max(64, (window.innerHeight || 0) * 0.25));
+        var active = headings[0];
+        for (var i = 0; i < headings.length; i++) {
+            var rect = headings[i].getBoundingClientRect();
+            if (rect.top <= threshold) {
+                active = headings[i];
+            } else {
+                break;
+            }
+        }
+
+        if (active && active.id !== activeHeadingID) {
+            setActiveTableOfContentsHeading(active.id, true);
+        }
+    }
+
     // Attach a click-to-zoom hint + click handler to every Mermaid wrap that
     // does not yet have one. Idempotent via dataset.zoomBound.
     function bindZoomToMermaidWraps() {
@@ -835,6 +1026,7 @@
         zoomContent.appendChild(clone);
 
         modal.classList.add("open");
+        updateTableOfContentsVisibility();
         document.body.style.overflow = "hidden";
 
         // Take the markdown body OUT of the accessibility tree while the
@@ -892,6 +1084,7 @@
     function closeZoomModal() {
         if (!zoomModal) return;
         zoomModal.classList.remove("open");
+        updateTableOfContentsVisibility();
         if (zoomContent) zoomContent.innerHTML = "";
         document.body.style.overflow = "";
 
@@ -1662,6 +1855,7 @@
         lastRenderedMarkdown = markdown;
         lastRenderedHtml = clean;
         contentEl.innerHTML = clean;
+        hasRenderedDocument = true;
 
         // DOMPurify strips `data-source` on <pre class="mermaid"> when the
         // value contains characters it flags as risky (e.g. raw `>`), so
@@ -1690,6 +1884,7 @@
         // Color swatches run AFTER DOMPurify because the swatch needs an inline
         // style attribute that our DOMPurify hook strips outside `.katex` subtrees.
         assignHeadingAnchorIDs();
+        renderTableOfContents();
         normalizeTaskLists();
         applyGithubAlerts();
         convertBacktickMath();
@@ -1701,6 +1896,7 @@
         renderMermaidBlocks();
 
         try { window.scrollTo(0, 0); } catch (e) { /* test envs may not implement scrollTo */ }
+        scheduleActiveHeadingUpdate();
 
         // Re-apply current search if any.
         if (search.query) {
@@ -2069,6 +2265,13 @@
             // Other keys (e.g. Ctrl+W to close window) still fall through.
         }
 
+        if (tocDrawerOpen && ev.key === "Escape") {
+            ev.preventDefault();
+            ev.stopPropagation();
+            setTableOfContentsDrawerOpen(false);
+            return;
+        }
+
         // Don't hijack keystrokes the user is typing into a real input.
         if (isEditableTarget(ev.target)) return;
 
@@ -2083,7 +2286,26 @@
     // ----- Bootstrap -----
     function onReady() {
         contentEl = document.getElementById("content");
+        tocEl = document.getElementById("table-of-contents");
+        tocOpenerEl = document.getElementById("table-of-contents-opener");
+        tocTitleEl = document.getElementById("table-of-contents-title");
+        tocEmptyEl = document.getElementById("table-of-contents-empty");
+        tocListEl = document.getElementById("table-of-contents-list");
+        applyStringsToTableOfContents();
         contentEl.addEventListener("click", handleClick, true);
+        if (tocOpenerEl) {
+            tocOpenerEl.addEventListener("click", function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                toggleTableOfContentsDrawer();
+            });
+        }
+        document.addEventListener("click", function (ev) {
+            if (!tocDrawerOpen) return;
+            if (tocEl && tocEl.contains(ev.target)) return;
+            if (tocOpenerEl && tocOpenerEl.contains(ev.target)) return;
+            setTableOfContentsDrawerOpen(false);
+        });
 
         // Capture-phase so we see the key before any child handler can
         // swallow it (e.g. KaTeX-rendered widgets).
@@ -2094,6 +2316,8 @@
         // required for preventDefault(); capture:true ensures inner
         // scrollables don't eat the event first.
         window.addEventListener("wheel", handleWheelZoom, { passive: false, capture: true });
+        window.addEventListener("scroll", scheduleActiveHeadingUpdate, { passive: true });
+        window.addEventListener("resize", scheduleActiveHeadingUpdate);
 
         // Make sure a zoom change that's still in the debounce window when
         // the window/tab goes away gets persisted instead of being silently
@@ -2145,6 +2369,9 @@
                             } catch (e) { /* best-effort */ }
                         }
                         break;
+                    case "tocVisible":
+                        setTableOfContentsVisible(!!msg.visible);
+                        break;
                     case "search":
                         applySearch(msg.query, !!msg.caseSensitive, true);
                         break;
@@ -2170,7 +2397,13 @@
                         } catch (e) { /* best-effort */ }
                         break;
                     case "empty":
+                        hasRenderedDocument = false;
+                        currentTocItems = [];
+                        activeHeadingID = "";
+                        tocDrawerOpen = false;
+                        if (tocListEl) tocListEl.textContent = "";
                         contentEl.innerHTML = '<div class="skim-empty">No Markdown selected.</div>';
+                        updateTableOfContentsVisibility();
                         break;
                 }
             });
@@ -2208,6 +2441,13 @@
             handleWheelZoom: handleWheelZoom,
             applyZoomLocal: applyZoomLocal,
             initMermaid: initMermaid,
+            headingElements: headingElements,
+            tableOfContents: tableOfContents,
+            renderTableOfContents: renderTableOfContents,
+            setTableOfContentsVisible: setTableOfContentsVisible,
+            setTableOfContentsDrawerOpen: setTableOfContentsDrawerOpen,
+            isTableOfContentsDrawerOpen: function () { return tocDrawerOpen; },
+            updateActiveHeading: updateActiveHeading,
         };
     }
 })();

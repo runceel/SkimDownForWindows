@@ -92,6 +92,9 @@
                                 x:Uid="MoveSidebarMenuItem"
                                 IsEnabled="{x:Bind IsNotSingleFileMode(ViewModel.IsSingleFileMode), Mode=OneWay}"
                                 Click="OnMoveSidebarClick" />
+                <ToggleMenuFlyoutItem x:Name="TableOfContentsMenuItem"
+                                      x:Uid="TableOfContentsMenuItem"
+                                      Click="OnToggleTableOfContentsClick" />
                 <MenuFlyoutItem x:Uid="OpenSettingsMenuItem"
                                 Click="OnOpenSettingsClick" />
                 <MenuFlyoutSeparator />

@@ -14,6 +14,7 @@ SkimDown for Windows は、グローバル設定 (テーマ・サイドバー幅
 | `SearchCaseSensitive` | `bool` | `false` | グローバル |
 | `SidebarWidth` | `double` | `280` | グローバル |
 | `SidebarVisible` | `bool` | `true` | グローバル (folder mode 用) |
+| `IsTableOfContentsVisible` | `bool` | `true` | グローバル。Markdown プレビュー右側の Table of Contents pane の表示状態 |
 | `SidebarPosition` | `SidebarPosition` | `Left` | グローバル |
 | `SidebarViewMode` | `SidebarViewMode` | `Tree` | グローバル。サイドバーのファイル一覧の表示モード。`Tree`=フォルダー階層ツリー / `RecentlyModified`=全 Markdown を更新日時の新しい順に並べたフラット一覧 ([markdown-content-pipeline.md](markdown-content-pipeline.md) 参照) |
 | `ContentMaxWidth` | `ContentMaxWidth` | `Full` | グローバル。Markdown プレビュー本文の最大幅段階 (Standard=760px / Wide=960px / ExtraWide=1200px / Full=無制限)。CSS の `max-width` として効くため、ウィンドウが指定段階より狭ければ本文はウィンドウ幅にフィットし、広ければ指定段階で頭打ちになる |
@@ -118,6 +119,7 @@ SkimDown for Windows は、グローバル設定 (テーマ・サイドバー幅
   "lastWindowMaximized": false,
   "sidebarWidth": 320,
   "sidebarVisible": true,
+  "isTableOfContentsVisible": true,
   "sidebarPosition": "Left",
   "recentFolders": [ "C:\\src\\notes", "D:\\docs" ],
   "lastFolderPath": "C:\\src\\notes",
@@ -164,6 +166,7 @@ Explorer から `.md` ダブルクリック / `skimdown README.md` / `skim READM
 | `Theme` / `CustomThemeId` | View > Theme でテーマ変更すれば反映 |
 | `ZoomFactor` | Ctrl+wheel / `View > Zoom` で変えると保存される |
 | `SearchCaseSensitive` | Find バーで切り替えると保存される |
+| `IsTableOfContentsVisible` | View > Table of Contents または Settings で切り替えると保存される |
 | `SidebarWidth` / `SidebarPosition` | 仕様上更新されうるが single-file mode ではサイドバー非表示のため通常は変化しない |
 
 ## 関連

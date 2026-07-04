@@ -24,8 +24,8 @@ Markdown はすべて WebView2 上のレンダラー (`Assets/Web/renderer.html`
 | ファイル | 中身 |
 |---|---|
 | `renderer.html` | エントリーポイント。`renderer.js` と `skimdown.css`、各 vendor を読み込む |
-| `renderer.js` | host メッセージ受信ループ、markdown-it 構成、リンク・ショートカット・検索・ズームのハンドラー |
-| `skimdown.css` | アプリ既定のスタイル / フォールバック `--skim-*` 変数 |
+| `renderer.js` | host メッセージ受信ループ、markdown-it 構成、Table of Contents、リンク・ショートカット・検索・ズームのハンドラー |
+| `skimdown.css` | アプリ既定のスタイル / フォールバック `--skim-*` 変数 / preview 内 Table of Contents レイアウト |
 | `vendor/markdown-it.min.js` ほか | markdown-it 本体 + footnote / emoji / imsize プラグイン |
 | `vendor/highlight.min.js` + `vendor/github*.min.css` | シンタックスハイライト (light/dark の 2 CSS をテーマで切替) |
 | `vendor/dompurify.min.js` | サニタイズ。HTML 埋め込みはこれを通してから DOM に挿入 |
@@ -73,7 +73,7 @@ sequenceDiagram
     R-->>MV: PostMessage {type:"log"|"link"|"copy"|... } (必要に応じて)
 ```
 
-`_webReady` フラグが立つ前に `LoadAsync` / `SetTheme` / `SetZoom` が呼ばれた場合は host 側で pending に保存し、`ready` 受信で `FlushPendingAsync` がまとめて送る。
+`_webReady` フラグが立つ前に `LoadAsync` / `SetTheme` / `SetZoom` / `SetContentMaxWidth` / `SetTableOfContentsVisible` / `SetStrings` が呼ばれた場合は host 側で pending に保存し、`ready` 受信で `FlushPendingAsync` がまとめて送る。`FlushPendingAsync` は zoom / content width / TOC visibility / strings を `render` より前に送る。
 
 ## メッセージプロトコル
 
@@ -87,7 +87,8 @@ sequenceDiagram
 | `theme` | `theme`, `themeType`, `themeIsDark`, `themeVars` | テーマだけを切替 (Markdown は再描画しない) |
 | `zoom` | `factor` | レンダラー zoom 倍率を設定 (host の `ZoomFactor` と sync) |
 | `contentMaxWidth` | `value` (CSS 値: `"760px"` / `"960px"` / `"1200px"` / `"none"`) | 本文 (`main.markdown-body`) の `max-width` を `--skim-content-max` CSS 変数経由で上書きする (`AppSettings.ContentMaxWidth` と sync) |
-| `strings` | `strings` (flat object: `{ "mermaidZoom.openHint": "..." , ... }`) | renderer 内のローカライズ可能 UI 文字列 (現状は Mermaid 拡大モーダル) を差し替える。renderer は英語デフォルトを内包しており、欠落キーはフォールバックする。`FlushPendingAsync` は `render` より前に送って初回描画の英語ちらつきを防ぐ |
+| `tocVisible` | `visible` | renderer 内 Table of Contents pane の表示状態を切り替える (`AppSettings.IsTableOfContentsVisible` と sync)。非表示時は pane を隠し、本文右側の予約幅も解除する |
+| `strings` | `strings` (flat object: `{ "mermaidZoom.openHint": "...", "tableOfContents.title": "...", ... }`) | renderer 内のローカライズ可能 UI 文字列 (Mermaid 拡大モーダル、Table of Contents) を差し替える。renderer は英語デフォルトを内包しており、欠落キーはフォールバックする。`FlushPendingAsync` は `render` より前に送って初回描画の英語ちらつきを防ぐ |
 | `empty` | (なし) | 空状態にクリア |
 | `search` | `query`, `caseSensitive` | 検索開始 |
 | `search/next` / `search/prev` / `search/clear` | (なし) | 検索の前後移動 / クリア |
@@ -128,6 +129,18 @@ renderer は markdown-it のレンダリング結果に DOMPurify を必ず通�
 `{type:"theme"}` のペイロードに含まれる `themeVars` は **`--skim-*` プレフィックスのみ** が host 側 `CloneThemeVars` で安全網フィルタを通過する。renderer 側でも同じプレフィックスを再チェックする (二重防御)。値の妥当性は Application 層の [`ColorValueValidator`](../src/SkimDownForWindows.Application/Theme/ColorValueValidator.cs) で事前検証されているので、`var(--x)` / `calc(...)` / `;` / `{` / `}` 等が混ざることはない。
 
 テーマ全体の解決経路は [theming.md](theming.md) を参照。
+
+## Table of Contents pane
+
+Markdown preview の右側には renderer 内 DOM で作る Table of Contents pane がある。`renderer.html` は `<aside id="table-of-contents">` を `#skim-zoom-root` の兄弟として持ち、`renderer.js` が描画後の heading DOM (`h1`–`h6`) から項目を構築する。host との heading list 往復はなく、anchor scroll と active heading tracking は renderer 内で完結する。
+
+- 構築順: `render()` は markdown-it → DOMPurify → highlight.js の後に `assignHeadingAnchorIDs()` を実行し、その直後に `renderTableOfContents()` を呼ぶ。heading ID は GitHub 風 slug で、重複時は `-1`, `-2` が付く。TOC はこの ID と heading text を使う。
+- DOM: pane は `table-of-contents-title`, `table-of-contents-empty`, `table-of-contents-list` を持つ。見出しがない文書では pane 内に `tableOfContents.empty` の空状態が表示される。
+- 表示状態: `AppSettings.IsTableOfContentsVisible` は `MainPage` から `MarkdownPreview.SetTableOfContentsVisible` に渡され、renderer には `{type:"tocVisible", visible}` として届く。renderer は `body[data-toc-visible="true"]` を付け、CSS 変数 `--skim-toc-reserved` で本文右側の予約幅を作る。`760px` 以下では予約幅を外し、pane は右側 off-canvas drawer になる。
+- 狭幅 access: `renderer.html` は `<button id="table-of-contents-opener">` も持つ。`760px` 以下かつ TOC 表示設定が ON の時だけ CSS が右上に `Contents` ボタンを表示し、クリックで `body[data-toc-drawer-open="true"]` を付けて右側 drawer を開く。`tocVisible=false` では pane / opener / drawer がすべて hidden になる。
+- 操作: TOC 項目は `<button class="skim-toc-item">` として生成され、クリックで `scrollToAnchorByHash("#" + id)` を呼ぶ。drawer 表示中に項目をクリックすると drawer は閉じる。window scroll / resize のたびに `requestAnimationFrame` 経由で active heading を再計算し、現在位置に対応する項目に `.active` を付ける。
+- zoom modal との関係: Mermaid 拡大モーダルは `body` 直下に置かれ、open 中は `updateTableOfContentsVisibility()` が TOC pane / opener / drawer を隠す。modal close 後は設定値に応じて再表示される。
+- ローカライズ: title / empty text は `{type:"strings"}` の `tableOfContents.title` / `tableOfContents.empty` で上書きされる。リソース定義は [`Resources.resw`](../src/SkimDownForWindows/Strings/en-US/Resources.resw) の `TableOfContents.*` 系で、host 側の resw キー → JS キーへのマッピングは [`MainPage.BuildPreviewLocalizedStrings`](../src/SkimDownForWindows/MainPage.xaml.cs) にまとまっている。
 
 ## Mermaid 拡大モーダル
 
