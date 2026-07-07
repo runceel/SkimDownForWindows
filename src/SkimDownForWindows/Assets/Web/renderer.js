@@ -1738,8 +1738,8 @@
     }
 
     function rewriteRelativeUrls(html) {
-        if (!currentContentBaseUri || !currentSourceDir) return html;
-        // Use a DOM walker to rewrite src/href that look like relative paths.
+        if (!currentContentBaseUri) return html;
+        // Use a DOM walker to rewrite image src values that look like relative paths.
         var tmp = document.createElement("div");
         tmp.innerHTML = html;
 
@@ -1824,8 +1824,9 @@
         // sourceDir is the relative folder portion of sourcePath, forward-slash form.
         currentSourceDir = "";
         if (sourcePath && typeof sourcePath === "string") {
-            var idx = sourcePath.lastIndexOf("/");
-            if (idx >= 0) currentSourceDir = sourcePath.substring(0, idx);
+            var normalizedSourcePath = sourcePath.replace(/\\/g, "/");
+            var idx = normalizedSourcePath.lastIndexOf("/");
+            if (idx >= 0) currentSourceDir = normalizedSourcePath.substring(0, idx);
         }
         if (theme || themeType || typeof themeIsDark === "boolean" || themeVars) {
             setTheme(theme || currentTheme, themeType, themeIsDark, themeVars);
