@@ -124,6 +124,51 @@ public class CommandLineTokenizerTests
     }
 
     [TestMethod]
+    public void Tokenize_DoubledQuoteInsideQuotes_ExitsQuotedState()
+    {
+        // CommandLineToArgvW と同じ規則: "" はリテラル " を出しつつクォートを抜ける。
+        // クォート状態を維持すると以降のタブ/スペースがトークンに取り込まれてしまう。
+        var tokens = CommandLineTokenizer.Tokenize(
+            "\"C:\\Program Files\\Skim\\skim.exe\" \"\"\"::\t\t");
+
+        CollectionAssert.AreEqual(
+            new[] { "C:\\Program Files\\Skim\\skim.exe", "\"::" },
+            tokens.ToArray());
+    }
+
+    [TestMethod]
+    public void ExtractPositionalTargets_DropsBareProgramStem_WhenProgramNamesSupplied()
+    {
+        // cmd.exe は `skim README.md` と入力された場合 argv[0] を "skim" のまま渡す。
+        var targets = CommandLineTokenizer.ExtractPositionalTargets(
+            "skim  README.md",
+            new[] { "skim", "skimdown" });
+
+        CollectionAssert.AreEqual(new[] { "README.md" }, targets.ToArray());
+    }
+
+    [TestMethod]
+    public void ExtractPositionalTargets_DropsOnlyLeadingProgramToken_WhenTargetHasSameName()
+    {
+        // カレントに "skim" という名前のフォルダーがある場合でも、落とすのは argv[0] だけ。
+        var targets = CommandLineTokenizer.ExtractPositionalTargets(
+            "skim skim",
+            new[] { "skim", "skimdown" });
+
+        CollectionAssert.AreEqual(new[] { "skim" }, targets.ToArray());
+    }
+
+    [TestMethod]
+    public void ExtractPositionalTargets_KeepsBareStem_WhenNotAProgramName()
+    {
+        var targets = CommandLineTokenizer.ExtractPositionalTargets(
+            "skim.exe docs",
+            new[] { "skim", "skimdown" });
+
+        CollectionAssert.AreEqual(new[] { "docs" }, targets.ToArray());
+    }
+
+    [TestMethod]
     public void ExtractPositionalTargets_ExeOnly_ReturnsEmpty()
     {
         var targets = CommandLineTokenizer.ExtractPositionalTargets(

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.UI.Dispatching;
@@ -322,7 +323,8 @@ public partial class App : WinUIApplication
                 if (args.Data is ICommandLineActivatedEventArgs commandLineArgs
                     && commandLineArgs.Operation is { } operation)
                 {
-                    var cliTargets = CommandLineTokenizer.ExtractPositionalTargets(operation.Arguments);
+                    var cliTargets = CommandLineTokenizer.ExtractPositionalTargets(
+                        operation.Arguments, ProgramNameCandidates);
                     var cliCwd = string.IsNullOrWhiteSpace(operation.CurrentDirectoryPath)
                         ? Environment.CurrentDirectory
                         : operation.CurrentDirectoryPath;
@@ -337,7 +339,8 @@ public partial class App : WinUIApplication
                 // Launch: redirect 元プロセスのコマンドライン文字列が Arguments に入る。
                 if (args.Data is ILaunchActivatedEventArgs launchArgs)
                 {
-                    var launchTargets = CommandLineTokenizer.ExtractPositionalTargets(launchArgs.Arguments);
+                    var launchTargets = CommandLineTokenizer.ExtractPositionalTargets(
+                        launchArgs.Arguments, ProgramNameCandidates);
                     LogActivation(args.Kind, launchArgs.Arguments, launchTargets);
                     if (launchTargets.Count > 0)
                     {
@@ -365,6 +368,34 @@ public partial class App : WinUIApplication
                 LogActivation(args.Kind, "(Environment.GetCommandLineArgs)", list);
                 return new ActivationTargets(list, Environment.CurrentDirectory);
         }
+    }
+
+    /// <summary>
+    /// argv[0] とみなすプログラム名候補 (拡張子なし)。
+    ///
+    /// Windows App SDK は <c>GetCommandLine()</c> の全文を <c>Arguments</c> に入れるため、
+    /// 先頭トークンは必ずプログラム名になる。ただし <c>cmd.exe</c> は
+    /// <c>skim README.md</c> と入力された場合に argv[0] を <c>skim</c> のまま渡すので
+    /// <c>.exe</c> 判定だけでは落としきれない。Package.appxmanifest の
+    /// <c>windows.appExecutionAlias</c> (<c>skim.exe</c> / <c>skimdown.exe</c>) と
+    /// 実行ファイル自身の名前を候補にする。
+    /// </summary>
+    private static readonly string[] ProgramNameCandidates = BuildProgramNameCandidates();
+
+    private static string[] BuildProgramNameCandidates()
+    {
+        var names = new List<string>(3) { "skim", "skimdown" };
+        try
+        {
+            var stem = Path.GetFileNameWithoutExtension(Environment.ProcessPath);
+            if (!string.IsNullOrEmpty(stem)
+                && !names.Contains(stem, StringComparer.OrdinalIgnoreCase))
+            {
+                names.Add(stem);
+            }
+        }
+        catch { /* best-effort */ }
+        return names.ToArray();
     }
 
     /// <summary>

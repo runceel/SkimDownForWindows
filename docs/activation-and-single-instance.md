@@ -128,7 +128,9 @@ public static void OnRedirectedActivation(object? sender, AppActivationArguments
 
 `Environment.GetCommandLineArgs()` は **主プロセス自身の起動時引数**であり、redirect 受信時に読むと 2 回目以降の `skim <path>` が 1 回目と同じ対象を開いてしまう。このため `isStartup` フラグでフォールバックを起動時経路に限定している。
 
-`ExtractPositionalTargets` はコマンドライン文字列を `CommandLineToArgvW` 互換規則でトークナイズし、先頭が `.exe` で終わるトークン (argv[0]) と、空白のみ / `-` 始まりのトークンを落とす。
+`ExtractPositionalTargets` はコマンドライン文字列を `CommandLineToArgvW` 互換規則でトークナイズし、先頭の argv[0] トークンと、空白のみ / `-` 始まりのトークンを落とす。
+
+argv[0] の判定は「`.exe` で終わる」だけでは足りない。`cmd.exe` は `skim README.md` と入力された場合に argv[0] を入力どおり `skim` (拡張子なし) で渡すため、`.exe` 判定に加えて、拡張子を除いた名前が `Package.appxmanifest` の `windows.appExecutionAlias` (`skim` / `skimdown`) または実行ファイル自身の名前と一致する場合も argv[0] とみなす。落とすのは先頭 1 トークンだけなので、`skim` という名前のフォルダーを引数に渡した場合も対象として残る。
 
 引数なしの `Launch` の場合は targets が空。`OpenFirstWindowFromActivation` / `DispatchActivationTargets` はどちらも空 → `CreateWindow(initialFolderPath: null, restoreLastFolder: true)` で **last folder を復元** する起動になる。
 
