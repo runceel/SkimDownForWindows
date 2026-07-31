@@ -51,7 +51,7 @@ Application は Infrastructure を直接知らず、`Application/Abstractions/` 
 | [`Models/`](../src/SkimDownForWindows.Application/Models) | 永続化 DTO (`AppSettings`, `FolderState`)、UI バインドモデル (`MarkdownTreeItem`, `RecentFolderEntry`, `LoadRequest`)、起動時表現 (`InitialActivation`, `OpenFolderActivation`, `OpenSingleFileActivation`)、テーマ (`ColorScheme`, `ThemeSelection`, `AppThemeJsonConverter`) |
 | [`Markdown/`](../src/SkimDownForWindows.Application/Markdown) | 純粋サービス: `MarkdownScanner`, `MarkdownTreeBuilder`, `InitialSelectionPicker`, `LinkResolver` |
 | [`Theme/`](../src/SkimDownForWindows.Application/Theme) | `ColorSchemeRegistry`, `ColorMapping`, `ColorValueValidator`, `ResolvedTheme` |
-| [`CommandLine/`](../src/SkimDownForWindows.Application/CommandLine) | `CommandLineLauncher` (引数 → `InitialActivation` 解釈) |
+| [`CommandLine/`](../src/SkimDownForWindows.Application/CommandLine) | `CommandLineLauncher` (引数 → `InitialActivation` 解釈)、`CommandLineTokenizer` / `CommandLineArgumentNormalizer` (コマンドライン文字列の分解と相対パスの絶対化。純粋 static) |
 | [`ViewModels/`](../src/SkimDownForWindows.Application/ViewModels) | `MainPageViewModel : ObservableObject, IDisposable` |
 | [`Utilities/`](../src/SkimDownForWindows.Application/Utilities) | `PathHelpers` (純粋 `Path.*` ヘルパー) |
 | [`DependencyInjection/`](../src/SkimDownForWindows.Application/DependencyInjection) | `ApplicationServiceCollectionExtensions.AddSkimDownApplication` |

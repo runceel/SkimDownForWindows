@@ -89,10 +89,11 @@ public partial class App : WinUIApplication
         settings.Load();
 
         // 起動時のアクティベーションを解決して 1 個目のウィンドウを開く。
-        // - CLI / Launch: Environment.GetCommandLineArgs() を CommandLineLauncher で classify
+        // - CLI / Launch: ILaunchActivatedEventArgs.Arguments (無ければ Environment.GetCommandLineArgs())
+        //   をトークナイズして CommandLineLauncher で classify
         // - File activation (Explorer ダブルクリック): FileActivatedEventArgs.Files を Classify
         var startupActivation = AppInstance.GetCurrent().GetActivatedEventArgs();
-        var startupTargets = ExtractActivationTargets(startupActivation);
+        var startupTargets = ExtractActivationTargets(startupActivation, isStartup: true);
         OpenFirstWindowFromActivation(startupTargets);
 
         // OnLaunched が走り終わったら ready とし、pending queue を drain する。
@@ -140,7 +141,7 @@ public partial class App : WinUIApplication
     {
         try
         {
-            var targets = ExtractActivationTargets(e);
+            var targets = ExtractActivationTargets(e, isStartup: false);
             DispatchActivationTargets(targets);
         }
         catch (Exception ex)
@@ -153,11 +154,11 @@ public partial class App : WinUIApplication
     /// <summary>
     /// 起動時用: targets から最初の 1 ウィンドウを決める。何もなければ通常起動 (last folder 復元)。
     /// </summary>
-    private static void OpenFirstWindowFromActivation(IReadOnlyList<string> targets)
+    private static void OpenFirstWindowFromActivation(ActivationTargets targets)
     {
         var windowService = Services.GetRequiredService<IWindowService>();
 
-        if (targets.Count == 0)
+        if (targets.Paths.Count == 0)
         {
             // 引数も File activation も無い → 通常起動 (last folder 復元)
             var win = windowService.CreateWindow(initialFolderPath: null, restoreLastFolder: true);
@@ -172,10 +173,9 @@ public partial class App : WinUIApplication
         using (var startupScope = Services.CreateScope())
         {
             var cli = startupScope.ServiceProvider.GetRequiredService<CommandLineLauncher>();
-            var cwd = Environment.CurrentDirectory;
-            foreach (var target in targets)
+            foreach (var target in targets.Paths)
             {
-                var classified = cli.Classify(target, cwd);
+                var classified = cli.Classify(target, targets.CurrentDirectory);
                 if (classified is null) continue;
                 if (first is null) first = classified;
                 else rest.Add(classified);
@@ -224,26 +224,32 @@ public partial class App : WinUIApplication
 
     /// <summary>
     /// Redirect 受信時用: targets を全部処理し、各 target を常に新規ウィンドウで開く。
+    /// 開ける対象が 1 件も無い場合 (引数なしの <c>skim</c> など) は、コールドスタートと同じく
+    /// last folder を復元した新規ウィンドウを 1 つ開く。
     /// </summary>
-    private static void DispatchActivationTargets(IReadOnlyList<string> targets)
+    private static void DispatchActivationTargets(ActivationTargets targets)
     {
-        if (targets.Count == 0) return;
-
         var windowService = Services.GetRequiredService<IWindowService>();
 
         var classifiedList = new List<InitialActivation>();
-        using (var scope = Services.CreateScope())
+        if (targets.Paths.Count > 0)
         {
+            using var scope = Services.CreateScope();
             var cli = scope.ServiceProvider.GetRequiredService<CommandLineLauncher>();
-            var cwd = Environment.CurrentDirectory;
-            foreach (var target in targets)
+            foreach (var target in targets.Paths)
             {
-                var c = cli.Classify(target, cwd);
+                var c = cli.Classify(target, targets.CurrentDirectory);
                 if (c is not null) classifiedList.Add(c);
             }
         }
 
-        if (classifiedList.Count == 0) return;
+        if (classifiedList.Count == 0)
+        {
+            // 対象なし (引数なし起動 / 全件 classify 失敗) → コールドスタートと同じ挙動で新規ウィンドウ
+            var win = windowService.CreateWindow(initialFolderPath: null, restoreLastFolder: true);
+            win.Activate();
+            return;
+        }
 
         foreach (var act in classifiedList)
         {
@@ -259,14 +265,34 @@ public partial class App : WinUIApplication
     }
 
     /// <summary>
-    /// <see cref="AppActivationArguments"/> から「開く対象パス」のリストを抽出する。
-    /// - <c>Launch</c>: <see cref="Environment.GetCommandLineArgs"/> を使う (Args は raw command line)
-    /// - <c>File</c>: <see cref="FileActivatedEventArgs.Files"/> を絶対パスに変換
-    /// - その他の kind: 空リスト
+    /// アクティベーションから解決した「開く対象パス」と、相対パス解決に使うカレントディレクトリ。
     /// </summary>
-    private static IReadOnlyList<string> ExtractActivationTargets(AppActivationArguments? args)
+    private readonly record struct ActivationTargets(IReadOnlyList<string> Paths, string CurrentDirectory)
     {
-        if (args is null) return Array.Empty<string>();
+        public static ActivationTargets Empty => new(Array.Empty<string>(), Environment.CurrentDirectory);
+    }
+
+    /// <summary>
+    /// <see cref="AppActivationArguments"/> から「開く対象パス」のリストを抽出する。
+    ///
+    /// - <c>File</c>: <see cref="FileActivatedEventArgs.Files"/> を絶対パスに変換
+    /// - <c>CommandLineLaunch</c>: <see cref="CommandLineActivatedEventArgs"/> の
+    ///   <c>Operation.Arguments</c> / <c>Operation.CurrentDirectoryPath</c> を使う
+    /// - <c>Launch</c> (既定): <see cref="ILaunchActivatedEventArgs.Arguments"/> をトークナイズする
+    /// - その他の kind: 空リスト
+    ///
+    /// 重要: <see cref="Environment.GetCommandLineArgs"/> は **主プロセス自身の起動時引数** なので、
+    /// redirect 受信時 (<paramref name="isStartup"/> が <c>false</c>) には決して使わない。
+    /// 使ってしまうと 2 回目以降の <c>skim &lt;path&gt;</c> が 1 回目と同じ対象を開いてしまう。
+    /// </summary>
+    /// <param name="args">解決対象のアクティベーション引数。</param>
+    /// <param name="isStartup">
+    /// このプロセス自身の起動アクティベーション (<see cref="OnLaunched"/> 経由) なら <c>true</c>。
+    /// <c>true</c> のときに限り <see cref="Environment.GetCommandLineArgs"/> へのフォールバックを許可する。
+    /// </param>
+    private static ActivationTargets ExtractActivationTargets(AppActivationArguments? args, bool isStartup)
+    {
+        if (args is null) return ActivationTargets.Empty;
 
         // ExtendedKind は ExtendedActivationKind 列挙
         switch (args.Kind)
@@ -286,16 +312,48 @@ public partial class App : WinUIApplication
                             paths.Add(sfd.Path);
                         }
                     }
-                    return paths;
+                    LogActivation(args.Kind, string.Join(" ", paths), paths);
+                    return new ActivationTargets(paths, Environment.CurrentDirectory);
                 }
-                return Array.Empty<string>();
+                return ActivationTargets.Empty;
 
-            case ExtendedActivationKind.Launch:
             default:
-                // CLI で起動された場合: Environment.GetCommandLineArgs() の args[1..] を返す。
-                // args[0] (exe path) は CommandLineLauncher 側でスキップされる前提で全部含めて返す。
+                // CommandLineLaunch が届く環境では cwd も一緒に運ばれるので最優先で使う。
+                if (args.Data is ICommandLineActivatedEventArgs commandLineArgs
+                    && commandLineArgs.Operation is { } operation)
+                {
+                    var cliTargets = CommandLineTokenizer.ExtractPositionalTargets(operation.Arguments);
+                    var cliCwd = string.IsNullOrWhiteSpace(operation.CurrentDirectoryPath)
+                        ? Environment.CurrentDirectory
+                        : operation.CurrentDirectoryPath;
+                    LogActivation(args.Kind, operation.Arguments, cliTargets);
+                    if (cliTargets.Count > 0)
+                    {
+                        return new ActivationTargets(cliTargets, cliCwd);
+                    }
+                    return new ActivationTargets(Array.Empty<string>(), cliCwd);
+                }
+
+                // Launch: redirect 元プロセスのコマンドライン文字列が Arguments に入る。
+                if (args.Data is ILaunchActivatedEventArgs launchArgs)
+                {
+                    var launchTargets = CommandLineTokenizer.ExtractPositionalTargets(launchArgs.Arguments);
+                    LogActivation(args.Kind, launchArgs.Arguments, launchTargets);
+                    if (launchTargets.Count > 0)
+                    {
+                        return new ActivationTargets(launchTargets, Environment.CurrentDirectory);
+                    }
+                }
+
+                if (!isStartup)
+                {
+                    // redirect 受信時は自プロセスのコマンドラインへフォールバックしない。
+                    return ActivationTargets.Empty;
+                }
+
+                // 起動時のみ: Environment.GetCommandLineArgs() の args[1..] を使う。
                 var cmd = Environment.GetCommandLineArgs();
-                if (cmd.Length <= 1) return Array.Empty<string>();
+                if (cmd.Length <= 1) return ActivationTargets.Empty;
                 var list = new List<string>(cmd.Length - 1);
                 for (int i = 1; i < cmd.Length; i++)
                 {
@@ -304,8 +362,22 @@ public partial class App : WinUIApplication
                         list.Add(cmd[i]);
                     }
                 }
-                return list;
+                LogActivation(args.Kind, "(Environment.GetCommandLineArgs)", list);
+                return new ActivationTargets(list, Environment.CurrentDirectory);
         }
+    }
+
+    /// <summary>
+    /// アクティベーション解決の結果をログに残す (redirect の現地調査用)。
+    /// </summary>
+    private static void LogActivation(ExtendedActivationKind kind, string? rawArguments, IReadOnlyList<string> targets)
+    {
+        try
+        {
+            Services?.GetService<IAppLogger>()?.LogInformation(
+                $"Activation kind={kind} raw='{rawArguments}' targets=[{string.Join("; ", targets)}]");
+        }
+        catch { /* best-effort */ }
     }
 
     /// <summary>
