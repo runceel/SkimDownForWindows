@@ -18,13 +18,14 @@ sequenceDiagram
     participant W as MainWindow (既存 / 新規)
 
     U->>P2: skimdown README.md / skim README.md / .md ダブルクリック
+    P2->>P2: 引数中の相対パスを絶対パス化 (CommandLineArgumentNormalizer)
     P2->>P2: WinRT.ComWrappersSupport.InitializeComWrappers
     P2->>P2: AppInstance.FindOrRegisterForKey("SkimDownForWindowsMain")
     Note over P2: mainInstance.IsCurrent == false
     P2->>P1: RedirectActivationToAsync(activatedArgs)
     P2-->>U: 終了 (UI を作らない)
     P1->>App: thisInstance.Activated
-    App->>App: ExtractActivationTargets(args)<br/>(Launch=CLI / File=FileActivatedEventArgs.Files)
+    App->>App: ExtractActivationTargets(args, isStartup: false)<br/>(Launch=args.Data の Arguments / File=FileActivatedEventArgs.Files)
     App->>CLI: scope を作って Classify(target, cwd)
     CLI-->>App: OpenFolderActivation / OpenSingleFileActivation / null
     alt single-file
@@ -43,7 +44,7 @@ WinUI 3 のデフォルトは XAML ジェネレーターが `Main` を自動生�
 
 `Main` の処理:
 
-1. 親プロセスがコンソールホスト (`pwsh` / `cmd` / `WindowsTerminal` 等) なら、自分自身を子プロセスとして spawn して `return 0` (CLI 起動時に親ターミナルを即時解放するため。詳細は下の「親ターミナルの解放」)
+1. 引数中の相対パスを `CommandLineArgumentNormalizer.ToAbsolutePaths` で絶対パス化する。親プロセスがコンソールホスト (`pwsh` / `cmd` / `WindowsTerminal` 等) か、絶対パス化で引数が変化した場合は、正規化後の引数で自分自身を子プロセスとして spawn して `return 0` (CLI 起動時に親ターミナルを即時解放し、かつ redirect に絶対パスを載せるため。詳細は下の「親ターミナルの解放」)
 2. `WinRT.ComWrappersSupport.InitializeComWrappers()` — WinRT 型 marshal の初期化 (generated Main と同じ)
 3. `AppInstance.GetCurrent()` / `AppInstance.FindOrRegisterForKey("SkimDownForWindowsMain")`
    - キーが未登録ならカレントプロセスが **主インスタンス** として登録される
@@ -53,16 +54,22 @@ WinUI 3 のデフォルトは XAML ジェネレーターが `Main` を自動生�
 
 `Application.Start` のラムダ内で `DispatcherQueueSynchronizationContext` をセットし、`new App()` を呼ぶ (generated Main と同等)。
 
-### 親ターミナルの解放 (CLI 起動時の self-relaunch)
+### 親ターミナルの解放 (CLI 起動時の self-relaunch) と引数の絶対パス化
 
 `windows.appExecutionAlias` 経由で `skimdown <path>` または `skim <path>` が PowerShell / cmd から起動されると、起動元のシェルは spawn した SkimDown プロセスを `WaitForSingleObject` で待ち続ける。これは GUI subsystem (PE subsystem = 2) の SkimDown 自体がコンソール出力を持たなくても、`FreeConsole` で子プロセスのコンソールを detach しても止まらない (シェルはプロセスハンドルで wait しているため)。
 
+もう 1 つ、この self-relaunch が担う役割がある。`AppInstance.RedirectActivationToAsync` は **コマンドライン文字列は運ぶがカレントディレクトリは運ばない**。相対パス (`.` / `README.md`) を主プロセス側で解決すると主プロセスの `Environment.CurrentDirectory` 基準になり、意図しないフォルダー / ファイルが開かれる。正しい cwd を持つのは二次プロセスなので、そこで先に絶対パス化してから redirect する必要がある。
+
 このため `Program.Main` の **先頭** で次の手順を踏む:
 
-1. 親プロセスがコンソールホスト (`pwsh` / `powershell` / `cmd` / `conhost` / `WindowsTerminal` / `wt` / `OpenConsole`) なら、`Environment.ProcessPath` で自分自身を `ProcessStartInfo` (`UseShellExecute = false`, `CreateNoWindow = true`, `RedirectStandardInput/Output/Error = true`) として再起動する。同じ引数を `ArgumentList` で渡す
-2. 子プロセスの環境には marker env var `SKIMDOWNFORWINDOWS_DETACHED_RELAUNCH=1` をセットして無限再帰を防ぐ
-3. 親プロセスは `return 0` で即終了する。これにより起動元シェルの `WaitForSingleObject` が完了し、PowerShell のプロンプトが直ちに戻る
-4. 子プロセス側は `Main` の冒頭で marker を検出し、`Environment.SetEnvironmentVariable(...)` で消した上で通常フロー (WinRT 初期化 → single-instance redirect → `Application.Start`) に入る
+1. [`CommandLineArgumentNormalizer.ToAbsolutePaths`](../src/SkimDownForWindows.Application/CommandLine/CommandLineArgumentNormalizer.cs) で引数を正規化する。`-` 始まりのスイッチ / 空白のみのトークン / 実在しないパスは変更せず、実在するパスを指すトークンだけを `Environment.CurrentDirectory` 基準の絶対パスに置換する
+2. 次のいずれかを満たす場合に再起動する
+   - 親プロセスがコンソールホスト (`pwsh` / `powershell` / `cmd` / `conhost` / `WindowsTerminal` / `wt` / `OpenConsole`) である
+   - 正規化によって引数が変化した (= 相対パスが含まれていた)
+3. 再起動は `Environment.ProcessPath` で自分自身を `ProcessStartInfo` (`UseShellExecute = false`, `CreateNoWindow = true`, `RedirectStandardInput/Output/Error = true`) として spawn する。**正規化後の**引数を `ArgumentList` で渡す
+4. 子プロセスの環境には marker env var `SKIMDOWNFORWINDOWS_DETACHED_RELAUNCH=1` をセットして無限再帰を防ぐ
+5. 親プロセスは `return 0` で即終了する。これにより起動元シェルの `WaitForSingleObject` が完了し、PowerShell のプロンプトが直ちに戻る
+6. 子プロセス側は `Main` の冒頭で marker を検出し、`Environment.SetEnvironmentVariable(...)` で消した上で通常フロー (WinRT 初期化 → single-instance redirect → `Application.Start`) に入る。marker がある場合は正規化も再起動も行わないため、再帰は 1 段で止まる
 
 子プロセスの std handles は anonymous pipe に差し替えられるため、PowerShell の標準入出力を直接掴まない (親終了で pipe は自然に閉じる)。
 
@@ -103,20 +110,31 @@ public static void OnRedirectedActivation(object? sender, AppActivationArguments
 2. `ServiceProviderFactory.Build(...)` で `App.Services` を構築 ([dependency-injection.md](dependency-injection.md) 参照)
 3. `Services.GetRequiredService<ISettingsRepository>().Load()` で `settings.json` をディスクから読込
 4. `AppInstance.GetCurrent().GetActivatedEventArgs()` で起動時の activation を取得
-5. `ExtractActivationTargets(activation)` で開く対象パス一覧に変換
+5. `ExtractActivationTargets(activation, isStartup: true)` で開く対象パス一覧とカレントディレクトリに変換
 6. `OpenFirstWindowFromActivation(targets)` で 1 個目のウィンドウを開く (残りも処理)
 7. `s_isReady = true` にし、`s_pendingActivations` を drain
 
 ## `ExtractActivationTargets` の分岐
 
-`AppActivationArguments.Kind` で分岐する。
+`AppActivationArguments.Kind` と `args.Data` の実体で分岐する。戻り値は「開く対象パス一覧」と「相対パス解決に使うカレントディレクトリ」の組。
 
 | `ExtendedActivationKind` | 取り方 | 備考 |
 |---|---|---|
-| `File` | `((FileActivatedEventArgs)args.Data).Files` を `StorageFile.Path` / `StorageFolder.Path` に変換 | Explorer ダブルクリック / Open With。複数選択あり |
-| `Launch` (および既定) | `Environment.GetCommandLineArgs()[1..]` のうち、空白でないかつ `-` で始まらないものを採用 | CLI 起動 (`skimdown README.md` / `skim README.md`) や、引数なしの通常起動 |
+| `File` | `((FileActivatedEventArgs)args.Data).Files` を `StorageFile.Path` / `StorageFolder.Path` に変換 | Explorer ダブルクリック / Open With。複数選択あり。cwd は `Environment.CurrentDirectory` |
+| 既定 — `args.Data` が `ICommandLineActivatedEventArgs` | `Operation.Arguments` を [`CommandLineTokenizer.ExtractPositionalTargets`](../src/SkimDownForWindows.Application/CommandLine/CommandLineTokenizer.cs) で解析。cwd は `Operation.CurrentDirectoryPath` | `CommandLineLaunch` が届く環境では cwd も一緒に運ばれるため最優先で使う |
+| 既定 — `args.Data` が `ILaunchActivatedEventArgs` | `Arguments` を `ExtractPositionalTargets` で解析 | CLI 起動 (`skimdown README.md` / `skim README.md`)。Windows App SDK は `GetCommandLine()` の**全文 (argv[0] を含む)** を `Arguments` に入れる |
+| 既定 — 上記で 0 件、かつ `isStartup == true` | `Environment.GetCommandLineArgs()[1..]` のうち、空白でないかつ `-` で始まらないもの | 自プロセスの起動引数。**起動時 (`OnLaunched`) 経路でのみ**使う |
+| 既定 — 上記で 0 件、かつ `isStartup == false` | 空リスト | redirect 受信時は自プロセスのコマンドラインへフォールバックしない |
 
-引数なしの `Launch` の場合は targets が空。`OpenFirstWindowFromActivation` は空 → `CreateWindow(initialFolderPath: null, restoreLastFolder: true)` で **last folder を復元** する起動になる。
+`Environment.GetCommandLineArgs()` は **主プロセス自身の起動時引数**であり、redirect 受信時に読むと 2 回目以降の `skim <path>` が 1 回目と同じ対象を開いてしまう。このため `isStartup` フラグでフォールバックを起動時経路に限定している。
+
+`ExtractPositionalTargets` はコマンドライン文字列を `CommandLineToArgvW` 互換規則でトークナイズし、先頭の argv[0] トークンと、空白のみ / `-` 始まりのトークンを落とす。
+
+argv[0] の判定は「`.exe` で終わる」だけでは足りない。`cmd.exe` は `skim README.md` と入力された場合に argv[0] を入力どおり `skim` (拡張子なし) で渡すため、`.exe` 判定に加えて、拡張子を除いた名前が `Package.appxmanifest` の `windows.appExecutionAlias` (`skim` / `skimdown`) または実行ファイル自身の名前と一致する場合も argv[0] とみなす。落とすのは先頭 1 トークンだけなので、`skim` という名前のフォルダーを引数に渡した場合も対象として残る。
+
+引数なしの `Launch` の場合は targets が空。`OpenFirstWindowFromActivation` / `DispatchActivationTargets` はどちらも空 → `CreateWindow(initialFolderPath: null, restoreLastFolder: true)` で **last folder を復元** する起動になる。
+
+解決結果は `IAppLogger.LogInformation` に `Activation kind=... raw='...' targets=[...]` の形で記録される (redirect 経路の現地調査用)。
 
 ## パス → activation の分類 ([`CommandLineLauncher.Classify`](../src/SkimDownForWindows.Application/CommandLine/CommandLineLauncher.cs))
 
@@ -128,7 +146,7 @@ public static void OnRedirectedActivation(object? sender, AppActivationArguments
 | ファイルが存在し、拡張子が `.md` / `.markdown` | `OpenSingleFileActivation(canonicalPath)` |
 | 上記以外 (存在しない / 非 Markdown ファイル / 不正パス) | `null` |
 
-相対パスは `Environment.CurrentDirectory` 起点で解決される (呼び出し側が `cwd` を渡す)。
+相対パスは `ExtractActivationTargets` が返したカレントディレクトリ起点で解決される (呼び出し側が `cwd` を渡す)。redirect 経路では二次プロセス側 (`Program.Main`) が既に絶対パス化しているため、ここでの相対パス解決は実質的に起動時経路と `CommandLineLaunch` 経路のためのもの。
 
 ## `InitialActivation` 表現
 
@@ -164,6 +182,7 @@ public sealed record OpenSingleFileActivation(string FilePath) : InitialActivati
 | プロセス起動時 (targets 空) | `CreateWindow(null, restoreLastFolder: true)` で last folder を復元 | — |
 | プロセス起動時 (1 件以上、最初が single-file) | `OpenSingleFileInNewWindow` (起動直後にウィンドウを必ず新規で作る) | 各 target ごとに `OpenSingleFileInNewWindow` / `OpenFolderInNewWindow` |
 | プロセス起動時 (最初が folder) | `CreateWindow(initialFolderPath: ofa.FolderPath, restoreLastFolder: false)` | 同上 |
+| Redirect 受信時 (targets 空 / 全件 classify 失敗) | `CreateWindow(null, restoreLastFolder: true)` で last folder を復元した新規ウィンドウ (コールドスタートと同じ挙動) | — |
 | Redirect 受信時 (single-file) | `OpenSingleFileInNewWindow` (常に新規) | 必ず新規 |
 | Redirect 受信時 (folder) | `OpenFolderInNewWindow` (常に新規) | 必ず新規 |
 
@@ -189,4 +208,4 @@ public sealed record OpenSingleFileActivation(string FilePath) : InitialActivati
 - ADR: [0005 Single-file mode と File Activation の導入](../.github/adr/0005-single-file-mode-and-file-activation.md)
 - SPEC: [`design/SPEC.md`](../design/SPEC.md) の「フォルダを開く」「単一ファイルを開く」「Single-instance behavior」
 - 隣接ドキュメント: [`dependency-injection.md`](dependency-injection.md), [`markdown-content-pipeline.md`](markdown-content-pipeline.md), [`settings-and-state.md`](settings-and-state.md)
-- コード: [`Program.cs`](../src/SkimDownForWindows/Program.cs), [`App.xaml.cs`](../src/SkimDownForWindows/App.xaml.cs), [`WindowService.cs`](../src/SkimDownForWindows/Composition/WindowService.cs), [`CommandLineLauncher.cs`](../src/SkimDownForWindows.Application/CommandLine/CommandLineLauncher.cs), [`InitialActivation.cs`](../src/SkimDownForWindows.Application/Models/InitialActivation.cs), [`Package.appxmanifest`](../src/SkimDownForWindows/Package.appxmanifest)
+- コード: [`Program.cs`](../src/SkimDownForWindows/Program.cs), [`App.xaml.cs`](../src/SkimDownForWindows/App.xaml.cs), [`WindowService.cs`](../src/SkimDownForWindows/Composition/WindowService.cs), [`CommandLineLauncher.cs`](../src/SkimDownForWindows.Application/CommandLine/CommandLineLauncher.cs), [`CommandLineTokenizer.cs`](../src/SkimDownForWindows.Application/CommandLine/CommandLineTokenizer.cs), [`CommandLineArgumentNormalizer.cs`](../src/SkimDownForWindows.Application/CommandLine/CommandLineArgumentNormalizer.cs), [`InitialActivation.cs`](../src/SkimDownForWindows.Application/Models/InitialActivation.cs), [`Package.appxmanifest`](../src/SkimDownForWindows/Package.appxmanifest)

@@ -1,10 +1,12 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.Windows.AppLifecycle;
+using SkimDownForWindows.Application.CommandLine;
 using WinUIApplication = Microsoft.UI.Xaml.Application;
 
 namespace SkimDownForWindows;
@@ -49,6 +51,11 @@ public static class Program
         //
         // 検出は親プロセス名 (pwsh / cmd / WindowsTerminal / conhost / OpenConsole / powershell / wt)
         // で行う。GetConsoleWindow() は packaged app の broker spawn では常に 0 を返すため使えない。
+        //
+        // あわせて、引数中の相対パスをここで絶対パスへ正規化する。single-instance redirect
+        // (AppInstance.RedirectActivationToAsync) はコマンドライン文字列は運ぶが **カレントディレクトリは
+        // 運ばない** ため、主プロセス側で相対パスを解決すると主プロセスの cwd が使われてしまう。
+        // 正しい cwd を持つこのプロセスで先に絶対パス化してから子プロセス / redirect に渡す。
         var isDetachedRelaunch = string.Equals(
             Environment.GetEnvironmentVariable(DetachedRelaunchMarker), "1", StringComparison.Ordinal);
         if (isDetachedRelaunch)
@@ -57,13 +64,21 @@ public static class Program
             // 意図せず detach 判定がスキップされないようにする。
             Environment.SetEnvironmentVariable(DetachedRelaunchMarker, null);
         }
-        else if (IsLaunchedFromConsoleHost())
+        else
         {
-            if (TryRelaunchDetached(args))
+            var normalizedArgs = NormalizeArgumentPaths(args);
+            var pathsWereRelative = CommandLineArgumentNormalizer.DiffersFrom(args, normalizedArgs);
+
+            // console host 起動 (親ターミナルの解放が必要) か、相対パスが含まれていて
+            // 絶対パス化した引数で起動し直す必要がある場合に再起動する。
+            if (IsLaunchedFromConsoleHost() || pathsWereRelative)
             {
-                return 0;
+                if (TryRelaunchDetached(normalizedArgs))
+                {
+                    return 0;
+                }
+                // 再起動に失敗した場合は通常フローへフォールバック (機能は維持される)
             }
-            // 再起動に失敗した場合は通常フローへフォールバック (機能は維持される)
         }
 
         // WinUI / WinRT の COM ラッパーをグローバルに初期化する。これは generated Main
@@ -104,6 +119,30 @@ public static class Program
             _ = new App();
         });
         return 0;
+    }
+
+    /// <summary>
+    /// 引数中の「実在するパスを指す位置引数」を、このプロセスのカレントディレクトリ基準で絶対パス化する。
+    /// スイッチ (<c>-</c> 始まり) や存在しないパスは変更しない。
+    /// </summary>
+    private static string[] NormalizeArgumentPaths(string[] args)
+    {
+        try
+        {
+            return CommandLineArgumentNormalizer.ToAbsolutePaths(
+                args,
+                Environment.CurrentDirectory,
+                static path =>
+                {
+                    try { return File.Exists(path) || Directory.Exists(path); }
+                    catch { return false; }
+                });
+        }
+        catch
+        {
+            // 正規化に失敗しても機能は維持する (相対パスのまま従来動作)
+            return args;
+        }
     }
 
     /// <summary>
