@@ -1814,6 +1814,95 @@
         });
     }
 
+    function extractFrontMatter(markdown) {
+        var source = String(markdown || "");
+        var opening = source.match(/^\uFEFF?---[ \t]*(?:\r?\n|$)/);
+        if (!opening) {
+            return { frontMatter: null, markdown: source };
+        }
+
+        var rest = source.slice(opening[0].length);
+        var closing = rest.match(/^---[ \t]*(?:\r?\n|$)/m);
+        if (!closing) {
+            return { frontMatter: null, markdown: source };
+        }
+
+        var frontMatterEnd = closing.index;
+        if (frontMatterEnd > 0 && rest.charAt(frontMatterEnd - 1) === "\n") {
+            frontMatterEnd -= 1;
+            if (frontMatterEnd > 0 && rest.charAt(frontMatterEnd - 1) === "\r") {
+                frontMatterEnd -= 1;
+            }
+        }
+        var frontMatter = rest.slice(0, frontMatterEnd);
+        var markdownStart = closing.index + closing[0].length;
+        return { frontMatter: frontMatter, markdown: rest.slice(markdownStart) };
+    }
+
+    function frontMatterEntries(frontMatter) {
+        var entries = [];
+        var current = null;
+
+        String(frontMatter || "").replace(/\r\n?/g, "\n").split("\n").forEach(function (line) {
+            if (!line.trim() || line.trim().startsWith("#")) return;
+
+            var keyMatch = line.match(/^([A-Za-z0-9_.-][^:]*):(?:[ \t]*(.*))?$/);
+            if (keyMatch) {
+                current = { key: keyMatch[1].trim(), values: keyMatch[2] ? [keyMatch[2].trim()] : [] };
+                entries.push(current);
+                return;
+            }
+            if (!current) return;
+
+            var itemMatch = line.match(/^[ \t]*-(?:[ \t]+(.*))?$/);
+            if (itemMatch) {
+                current.values.push((itemMatch[1] || "").trim());
+                return;
+            }
+
+            var continuationMatch = line.match(/^[ \t]+(.*)$/);
+            if (continuationMatch) {
+                var continuation = continuationMatch[1].trim();
+                if (current.values.length === 0) current.values.push(continuation);
+                else current.values[current.values.length - 1] += "\n" + continuation;
+            }
+        });
+
+        return entries.filter(function (entry) {
+            return entry.key;
+        }).map(function (entry) {
+            return {
+                key: entry.key,
+                value: entry.values.filter(Boolean).join("\n"),
+            };
+        });
+    }
+
+    function prependFrontMatter(content, frontMatter) {
+        var entries = frontMatterEntries(frontMatter);
+        if (entries.length === 0) return false;
+
+        var container = document.createElement("div");
+        container.className = "skimdown-frontmatter";
+        var table = document.createElement("table");
+        var body = document.createElement("tbody");
+        entries.forEach(function (entry) {
+            var row = document.createElement("tr");
+            var key = document.createElement("th");
+            var value = document.createElement("td");
+            key.scope = "row";
+            key.textContent = entry.key;
+            value.textContent = entry.value;
+            row.appendChild(key);
+            row.appendChild(value);
+            body.appendChild(row);
+        });
+        table.appendChild(body);
+        container.appendChild(table);
+        content.insertBefore(container, content.firstChild);
+        return true;
+    }
+
     function render(markdown, sourcePath, contentBaseUri, theme, themeType, themeIsDark, themeVars) {
         if (typeof markdown !== "string") markdown = "";
         // If the user switches to another file while the zoom modal is open,
@@ -1833,9 +1922,10 @@
         }
 
         var rendererInstance = ensureMarkdown();
+        var parsedMarkdown = extractFrontMatter(markdown);
         var raw;
         try {
-            raw = rendererInstance.render(markdown);
+            raw = rendererInstance.render(parsedMarkdown.markdown);
         } catch (e) {
             raw = '<div class="skim-error">Markdown render failed: ' + escapeHtml(String(e)) + '</div>';
         }
@@ -1857,6 +1947,9 @@
         lastRenderedHtml = clean;
         contentEl.innerHTML = clean;
         hasRenderedDocument = true;
+        if (parsedMarkdown.frontMatter !== null) {
+            prependFrontMatter(contentEl, parsedMarkdown.frontMatter);
+        }
 
         // DOMPurify strips `data-source` on <pre class="mermaid"> when the
         // value contains characters it flags as risky (e.g. raw `>`), so

@@ -184,6 +184,27 @@ async function main() {
     check("TOC empty state appears for documents without headings",
         tocEmpty && tocEmpty.hidden === false && tocList.hidden === true);
 
+    // --- 2c. YAML front matter ---
+    console.log("[2c] YAML front matter");
+    h = await renderMd("\uFEFF---\r\ntitle: SkimDown\r\ntags:\r\n  - markdown\r\n  - preview\r\ndraft: false\r\n---\r\n# Body\r\n");
+    var frontMatter = window.document.querySelector(".skimdown-frontmatter");
+    var frontMatterRows = frontMatter
+        ? Array.prototype.map.call(frontMatter.querySelectorAll("tr"), function (row) {
+            return Array.prototype.map.call(row.children, function (cell) { return cell.textContent; });
+        })
+        : [];
+    check("front matter is prepended as the first rendered element",
+        frontMatter && frontMatter === window.document.getElementById("content").firstElementChild);
+    check("front matter rows contain scalar and list values",
+        JSON.stringify(frontMatterRows) === JSON.stringify([
+            ["title", "SkimDown"],
+            ["tags", "markdown\npreview"],
+            ["draft", "false"],
+        ]),
+        "got: " + JSON.stringify(frontMatterRows));
+    check("front matter delimiters are not rendered", !h.includes("---"), "got: " + h);
+    check("Markdown body renders after front matter", /<h1\s+id="body">Body<\/h1>/.test(h), "got: " + h);
+
     // --- 3. Single-tilde strikethrough ---
     console.log("[3] Single-tilde strikethrough");
     h = await renderMd("hello ~world~ done\n");
