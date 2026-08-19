@@ -17,7 +17,7 @@ Open a folder, and SkimDown shows only the Markdown files in a sidebar tree and 
 - Folder-first, case-insensitive Markdown tree (recursive `.md` / `.markdown` discovery)
 - Switch the sidebar between the folder tree and a **flat list sorted by date modified** (newest first) — an app-wide toggle in the sidebar header; each row shows the file name, its last-modified time, and its subfolder
 - Hidden-file and ignored-directory filtering (`.git`, `node_modules`, `.build`, `DerivedData`, …)
-- Read-only WebView2 preview with bundled rendering assets (no CDN required, works fully offline)
+- Read-only WebView2 preview with bundled rendering assets (no CDN required, works fully offline), including rendered YAML front matter
 - Markdown rendering bundled: markdown-it + highlight.js + DOMPurify + KaTeX + Mermaid + emoji; GitHub-style alerts and inline color swatches included
 - Table of Contents pane on the right side of the Markdown preview, generated from rendered headings and toggleable from **View → Table of Contents** or Settings
 - In-document search for the current file (**Ctrl+F**), plus **Edit → Use Selection for Find** (Ctrl+E)
