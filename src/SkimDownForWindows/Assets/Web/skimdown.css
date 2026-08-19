@@ -678,6 +678,27 @@ main.markdown-body table tr:nth-child(2n) {
     background: var(--skim-table-stripe);
 }
 
+main.markdown-body .skimdown-frontmatter {
+    margin-bottom: 1.15em;
+}
+
+main.markdown-body .skimdown-frontmatter table {
+    display: table;
+    width: auto;
+    max-width: 100%;
+    margin: 0;
+    overflow: visible;
+}
+
+main.markdown-body .skimdown-frontmatter th {
+    text-align: left;
+    white-space: nowrap;
+}
+
+main.markdown-body .skimdown-frontmatter td {
+    white-space: pre-wrap;
+}
+
 main.markdown-body ul.contains-task-list { padding-left: 1.5em; list-style: none; }
 main.markdown-body li.task-list-item { list-style: none; }
 /* Custom-render the task-list checkbox instead of relying on the browser's

@@ -24,7 +24,7 @@ Markdown はすべて WebView2 上のレンダラー (`Assets/Web/renderer.html`
 | ファイル | 中身 |
 |---|---|
 | `renderer.html` | エントリーポイント。`renderer.js` と `skimdown.css`、各 vendor を読み込む |
-| `renderer.js` | host メッセージ受信ループ、markdown-it 構成、Table of Contents、リンク・ショートカット・検索・ズームのハンドラー |
+| `renderer.js` | host メッセージ受信ループ、YAML front matter の metadata table 化、markdown-it 構成、Table of Contents、リンク・ショートカット・検索・ズームのハンドラー |
 | `skimdown.css` | アプリ既定のスタイル / フォールバック `--skim-*` 変数 / preview 内 Table of Contents レイアウト |
 | `vendor/markdown-it.min.js` ほか | markdown-it 本体 + footnote / emoji / imsize プラグイン |
 | `vendor/highlight.min.js` + `vendor/github*.min.css` | シンタックスハイライト (light/dark の 2 CSS をテーマで切替) |
@@ -69,7 +69,7 @@ sequenceDiagram
     MP->>MV: LoadAsync(markdown, relPath, theme, isDark, themeVars)
     MV->>Web: PostWebMessageAsJson({type:"render", markdown, sourcePath, contentBaseUri, theme, themeVars})
     Web->>R: onmessage
-    R->>R: markdown-it.render → DOMPurify → hljs → KaTeX → Mermaid
+    R->>R: YAML front matter 分離 → markdown-it.render → DOMPurify → metadata table 追加 → hljs → KaTeX → Mermaid
     R-->>MV: PostMessage {type:"log"|"link"|"copy"|... } (必要に応じて)
 ```
 
@@ -123,6 +123,8 @@ sequenceDiagram
 renderer は markdown-it のレンダリング結果に DOMPurify を必ず通す。`script`, `iframe`, `object`, `embed`, `style`, `onclick` 等のイベント属性、`javascript:` URL は DOMPurify が除去する。SkimDown 側で追加のホワイトリストを書いていない (DOMPurify のデフォルトポリシーに従う)。
 
 許可される基本的なタグ: `details`, `summary`, `kbd`, `mark`, `sup`, `sub`, `br`, `span`, `div` 等。
+
+ファイル先頭の `---` で囲まれた YAML front matter は markdown-it に渡す本文から分離され、key/value、list、indent continuation の値が本文先頭の metadata table として表示される。key と value は DOM API の `textContent` で設定され、HTML として解釈されない。閉じる `---` がない場合は front matter とみなされず、入力全体が通常の Markdown として描画される。
 
 ## テーマの伝達
 
