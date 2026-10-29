@@ -118,6 +118,7 @@ public sealed partial class MainPage : Page
             UpdateThemeMenuChecks();
             UpdateContentWidthMenuChecks();
             UpdateTableOfContentsMenuCheck();
+            GitChangesMenuItem.IsChecked = ViewModel.IsGitChangesVisible;
             UpdateMoveSidebarLabel();
         }
     }
@@ -250,6 +251,9 @@ public sealed partial class MainPage : Page
                 break;
             case nameof(MainPageViewModel.SidebarViewMode):
                 SyncViewModeToggles();
+                break;
+            case nameof(MainPageViewModel.IsGitChangesVisible):
+                GitChangesMenuItem.IsChecked = ViewModel.IsGitChangesVisible;
                 break;
         }
     }
@@ -677,7 +681,8 @@ public sealed partial class MainPage : Page
                 Preview.SetContentFolder(ViewModel.OpenedFolderPath);
             }
             var (themeKey, isDark, vars) = ResolveActiveThemePayload();
-            _ = Preview.LoadAsync(req.Markdown, req.RelativePath, themeKey, isDark, vars);
+            _ = Preview.LoadAsync(req.Markdown, req.RelativePath, themeKey, isDark, vars,
+                req.GitDiffHunks, req.PreserveScrollPosition);
         });
     }
 
@@ -746,6 +751,9 @@ public sealed partial class MainPage : Page
             case "new-window":              OnNewWindowClick(this, args);             break;
             case "minimize":                OnMinimizeClick(this, args);              break;
             case "toggle-sidebar":          OnToggleSidebarClick(this, args);         break;
+            case "toggle-git-changes":
+                _ = ViewModel.SetGitChangesVisibleAsync(!ViewModel.IsGitChangesVisible);
+                break;
             case "find":                    OnFindClick(this, args);                  break;
             case "find-next":               OnFindNextClick(this, args);              break;
             case "find-prev":               OnFindPrevClick(this, args);              break;
@@ -955,6 +963,9 @@ public sealed partial class MainPage : Page
         await ViewModel.Settings.SaveAsync();
     }
 
+    private async void OnToggleGitChangesClick(object? sender, RoutedEventArgs e)
+        => await ViewModel.SetGitChangesVisibleAsync(GitChangesMenuItem.IsChecked);
+
     private void UpdateTableOfContentsMenuCheck()
     {
         TableOfContentsMenuItem.IsChecked = ViewModel.Settings.Current.IsTableOfContentsVisible;
@@ -1029,6 +1040,9 @@ public sealed partial class MainPage : Page
         AddIfPresent(dict, loader, "mermaidZoom.hint", "MermaidZoom/Hint");
         AddIfPresent(dict, loader, "tableOfContents.title", "TableOfContents/Title");
         AddIfPresent(dict, loader, "tableOfContents.empty", "TableOfContents/Empty");
+        AddIfPresent(dict, loader, "gitChanges.previous", "GitChanges/Previous");
+        AddIfPresent(dict, loader, "gitChanges.deletedOne", "GitChanges/DeletedOne");
+        AddIfPresent(dict, loader, "gitChanges.deletedMany", "GitChanges/DeletedMany");
         return dict;
     }
 

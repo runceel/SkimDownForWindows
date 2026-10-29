@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -37,6 +38,15 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
     private readonly MarkdownTreeBuilder _treeBuilder;
     private readonly RecentMarkdownListBuilder _recentListBuilder;
     private readonly InitialSelectionPicker _picker;
+    private readonly IGitChangeSource _git;
+    private readonly GitChangesPreference _gitPreference;
+    private CancellationTokenSource? _gitRead;
+    private int _renderGeneration;
+    private int _gitGeneration;
+
+    public bool IsGitChangesVisible => _gitPreference.IsVisible;
+
+    public Task SetGitChangesVisibleAsync(bool visible) => _gitPreference.SetVisibleAsync(visible);
 
     private bool _disposed;
 
@@ -133,7 +143,9 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         MarkdownTreeBuilder treeBuilder,
         RecentMarkdownListBuilder recentListBuilder,
         InitialSelectionPicker picker,
-        LinkResolver linkResolver)
+        LinkResolver linkResolver,
+        IGitChangeSource git,
+        GitChangesPreference gitPreference)
     {
         _settings = settings;
         _watcher = watcher;
@@ -148,6 +160,10 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         _recentListBuilder = recentListBuilder;
         _picker = picker;
         LinkResolver = linkResolver;
+        _git = git;
+        _gitPreference = gitPreference;
+        _git.RepositoryChanged += OnGitRepositoryChanged;
+        _gitPreference.Changed += OnGitPreferenceChanged;
 
         SidebarViewMode = settings.Current.SidebarViewMode;
 
@@ -207,6 +223,8 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         }
 
         var canonical = PathHelpers.Canonicalize(folderPath);
+        InvalidateGit();
+        _git.Stop();
 
         // Single-file mode から folder mode への切り替え。code-behind 側で
         // IsSingleFileMode の変化を見てサイドバー visual state を復元する。
@@ -240,8 +258,10 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         {
             SelectedItem = null;
             PreviewClearRequested?.Invoke();
+            await RefreshGitAsync();
         }
 
+        if (_disposed || OpenedFolderPath != canonical) return;
         _settings.Current.UpdateRecentFolders(canonical);
         await _settings.SaveAsync();
         RebuildRecentFolders();
@@ -295,6 +315,8 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         var canonicalParent = PathHelpers.Canonicalize(parent);
 
         IsSingleFileMode = true;
+        InvalidateGit();
+        _git.Stop();
         IsSidebarTemporarilyCollapsed = false;
         _singleFilePath = canonicalFile;
 
@@ -321,7 +343,8 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         // dedicated reload を走らせる。SelectAndLoadAsync は folder mode 用なので使わない。
         await ReloadSingleFileAsync();
 
-        _watcher.Watch(canonicalParent);
+        if (!_disposed && IsSingleFileMode && _singleFilePath == canonicalFile)
+            _watcher.Watch(canonicalParent);
     }
 
     private async Task<bool> TryOpenSingleFileAsContainingFolderAsync(string filePath)
@@ -357,9 +380,8 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         if (_singleFilePath is null || OpenedFolderPath is null) return;
         if (!_fileSystem.FileExists(_singleFilePath)) return;
 
-        var text = await _markdownReader.ReadAsync(_singleFilePath);
         var rel = PathHelpers.RelativeFromRoot(OpenedFolderPath, _singleFilePath);
-        PreviewLoadRequested?.Invoke(new LoadRequest(text, rel, EffectiveTheme()));
+        await LoadPreviewAsync(_singleFilePath, rel);
     }
 
     private void ReplaceRoot(MarkdownTreeItem root)
@@ -440,7 +462,7 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         return list;
     }
 
-    public async Task SelectAndLoadAsync(string absoluteFilePath)
+    public async Task SelectAndLoadAsync(string absoluteFilePath, bool preserveScrollPosition = false)
     {
         if (string.IsNullOrEmpty(OpenedFolderPath)) return;
         if (!PathHelpers.IsInsideFolder(OpenedFolderPath, absoluteFilePath)) return;
@@ -453,10 +475,9 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         ExpandAncestors(item);
         SelectedItem = item;
 
-        var text = await _markdownReader.ReadAsync(absoluteFilePath);
+        await LoadPreviewAsync(absoluteFilePath, rel, preserveScrollPosition);
 
-        PreviewLoadRequested?.Invoke(new LoadRequest(text, rel, EffectiveTheme()));
-
+        if (_disposed || OpenedFolderPath is null || SelectedItem != item) return;
         var state = _settings.Current.GetOrCreateFolderState(OpenedFolderPath);
         state.LastSelectedRelativePath = rel;
         await _settings.SaveAsync();
@@ -531,11 +552,12 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (SelectedItem is null) return;
-        if (string.Equals(SelectedItem.FullPath, absolutePath, StringComparison.OrdinalIgnoreCase))
+        if (SelectedItem is not null &&
+            string.Equals(SelectedItem.FullPath, absolutePath, StringComparison.OrdinalIgnoreCase))
         {
-            _ = SelectAndLoadAsync(absolutePath);
+            _ = SelectAndLoadAsync(absolutePath, preserveScrollPosition: true);
         }
+        else if (IsGitChangesVisible) _ = RefreshGitAsync();
     }
 
     private async void OnTreeMayHaveChanged()
@@ -550,6 +572,7 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         var root = BuildRoot(OpenedFolderPath);
         if (RootMatches(root))
         {
+            if (IsGitChangesVisible) await RefreshGitAsync();
             return;
         }
 
@@ -573,6 +596,7 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
             else
             {
                 SelectedItem = null;
+                InvalidateGit();
                 PreviewClearRequested?.Invoke();
             }
         }
@@ -585,6 +609,7 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
             state.ExpandedFolders = CollectExpandedFolders();
         }
         await _settings.SaveAsync();
+        if (IsGitChangesVisible) await RefreshGitAsync();
     }
 
     public async Task PersistExpansionAsync()
@@ -595,6 +620,105 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         var state = _settings.Current.GetOrCreateFolderState(OpenedFolderPath);
         state.ExpandedFolders = CollectExpandedFolders();
         await _settings.SaveAsync();
+    }
+
+    private void OnGitPreferenceChanged()
+    {
+        OnPropertyChanged(nameof(IsGitChangesVisible));
+        InvalidateGit();
+        if (!IsGitChangesVisible) _git.Stop();
+        _ = RefreshGitAsync();
+    }
+
+    private void OnGitRepositoryChanged() => _ = RefreshGitAsync();
+
+    private void InvalidateGit()
+    {
+        _renderGeneration++;
+        _gitGeneration++;
+        _gitRead?.Cancel();
+        _gitRead?.Dispose();
+        _gitRead = null;
+    }
+
+    private async Task LoadPreviewAsync(string path, string relative, bool preserveScrollPosition = false)
+    {
+        var generation = ++_renderGeneration;
+        var root = OpenedFolderPath;
+        var text = await _markdownReader.ReadAsync(path);
+        if (_disposed || generation != _renderGeneration || root != OpenedFolderPath) return;
+        var changes = await ReadGitAsync(relative);
+        if (_disposed || generation != _renderGeneration || root != OpenedFolderPath) return;
+        var hunks = changes?.BaseText is { } baseline
+            ? await Task.Run(() => LineDiff.Hunks(baseline, text)) : null;
+        if (_disposed || generation != _renderGeneration || root != OpenedFolderPath) return;
+        PreviewLoadRequested?.Invoke(new LoadRequest(text, relative, EffectiveTheme(), hunks, preserveScrollPosition));
+    }
+
+    private async Task RefreshGitAsync()
+    {
+        if (_disposed) return;
+        if (SelectedItem is { } selected)
+        {
+            await LoadPreviewAsync(selected.FullPath, selected.RelativePath, preserveScrollPosition: true);
+        }
+        else
+        {
+            await ReadGitAsync(null);
+        }
+    }
+
+    private async Task<GitChanges?> ReadGitAsync(string? selectedPath)
+    {
+        _gitRead?.Cancel();
+        _gitRead?.Dispose();
+        var generation = ++_gitGeneration;
+        if (!IsGitChangesVisible || OpenedFolderPath is null)
+        {
+            ApplyGitBadges(null);
+            return null;
+        }
+        using var request = new CancellationTokenSource();
+        _gitRead = request;
+        try
+        {
+            var files = new List<string>();
+            void Collect(IEnumerable<MarkdownTreeItem> items)
+            {
+                foreach (var item in items)
+                {
+                    if (item.IsFolder) Collect(item.Children);
+                    else files.Add(item.RelativePath);
+                }
+            }
+            Collect(RootItems);
+            var changes = await _git.ReadAsync(OpenedFolderPath, files, selectedPath, request.Token);
+            if (_disposed || generation != _gitGeneration) return null;
+            ApplyGitBadges(changes?.Statuses);
+            return changes;
+        }
+        catch (OperationCanceledException) when (request.IsCancellationRequested) { return null; }
+        finally
+        {
+            if (ReferenceEquals(_gitRead, request)) _gitRead = null;
+        }
+    }
+
+    private void ApplyGitBadges(IReadOnlyDictionary<string, string>? statuses)
+    {
+        static int Priority(string status) => status switch { "M" => 3, "A" => 2, "U" => 1, _ => 0 };
+        string Walk(IEnumerable<MarkdownTreeItem> items)
+        {
+            var aggregate = "";
+            foreach (var item in items)
+            {
+                item.GitStatus = item.IsFolder ? Walk(item.Children)
+                    : statuses?.GetValueOrDefault(item.RelativePath) ?? "";
+                if (Priority(item.GitStatus) > Priority(aggregate)) aggregate = item.GitStatus;
+            }
+            return aggregate;
+        }
+        Walk(RootItems);
     }
 
     /// <summary>
@@ -688,6 +812,7 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
         }
 
         await _settings.SaveAsync();
+        if (IsGitChangesVisible) await RefreshGitAsync();
     }
 
     private void RebuildRecentFolders()
@@ -719,6 +844,10 @@ public partial class MainPageViewModel : ObservableObject, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        InvalidateGit();
+        _git.RepositoryChanged -= OnGitRepositoryChanged;
+        _gitPreference.Changed -= OnGitPreferenceChanged;
+        _git.Dispose();
 
         _watcher.TreeMayHaveChanged -= OnTreeMayHaveChanged;
         _watcher.FileContentChanged -= OnFileContentChanged;

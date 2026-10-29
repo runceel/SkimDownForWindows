@@ -42,6 +42,12 @@ public partial class MarkdownTreeItem : ObservableObject
     [ObservableProperty]
     public partial bool IsExpanded { get; set; }
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(GitBadge))]
+    public partial string GitStatus { get; set; } = string.Empty;
+
+    public string GitBadge => GitStatus.Length == 0 ? "" : IsFolder ? "\u25CF" : GitStatus;
+
     public MarkdownTreeItem(string name, string fullPath, string relativePath, bool isFolder)
     {
         Name = name;

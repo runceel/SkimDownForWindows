@@ -26,6 +26,7 @@ A complete reference of SkimDown's keyboard shortcuts.
 | Shortcut | Action |
 | --- | --- |
 | **Ctrl+B** | Toggle Sidebar |
+| **Ctrl+Shift+D** | Show / hide Git changes |
 | **Ctrl + `+`** | Zoom In |
 | **Ctrl + `-`** | Zoom Out |
 | **Ctrl + `0`** | Actual Size (reset zoom) |

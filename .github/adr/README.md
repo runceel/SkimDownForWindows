@@ -81,3 +81,4 @@ PR で他のレビュワーから合意を得たら `ステータス` を `Accep
 | [0004](0004-custom-color-schemes.md) | VS Code 互換のカスタムカラースキーマ対応 | Accepted |
 | [0005](0005-single-file-mode-and-file-activation.md) | Single-file mode と File Activation の導入 | Proposed |
 | [0006](0006-localization-with-resw-and-resourceloader.md) | UI 文字列ローカライズに MRT (resw) と ResourceLoader を採用する | Proposed |
+| [0007](0007-read-only-git-changes.md) | 読み取り専用 Git 比較の Infrastructure 境界 | Proposed |

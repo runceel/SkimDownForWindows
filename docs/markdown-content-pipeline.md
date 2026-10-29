@@ -183,6 +183,35 @@ Created / Renamed のうち、Markdown でもディレクトリでもない通�
 
 判断の経緯は [ADR-0005](../.github/adr/0005-single-file-mode-and-file-activation.md) を参照。
 
+## Git changes の追加パイプライン
+
+[`GitChangesPreference`](../src/SkimDownForWindows.Application/Markdown/GitChangesPreference.cs) は
+既定 OFF の `AppSettings.IsGitChangesVisible` を全ウィンドウへ通知する。
+`MainPageViewModel` は有効なときだけ
+[`IGitChangeSource`](../src/SkimDownForWindows.Application/Abstractions/IGitChangeSource.cs) を呼び、
+現在の Markdown 一覧と選択パスを渡す。戻り値の M/U/A を `MarkdownTreeItem.GitStatus` に反映し、
+子孫に変更があるフォルダーには M > A > U の優先順位で状態を集約する。
+`GitBadge` はファイルでは M/U/A、フォルダーでは dot になる。更新日順表示も同じ leaf badge を使う。
+
+[`LocalGitChangeSource`](../src/SkimDownForWindows.Infrastructure/IO/LocalGitChangeSource.cs) は
+root 直下の `.git` を事前確認し、`rev-parse` で root / git directory / common directory / object format を取得する。
+HEAD の commit ID を固定して `ls-tree` で blob ID、`ls-files --cached` で index path、
+`check-ignore --stdin -z` で ignored path、`cat-file blob` で選択ファイルの以前の本文を取得する。
+SHA-1 / SHA-256 の Git blob hash と CRLF 正規化後の hash をアプリ内で比較する。
+file symlink / junction を辿る比較は除外される。
+
+選択ファイルの baseline は [`LineDiff`](../src/SkimDownForWindows.Application/Markdown/LineDiff.cs) が
+UTF-8 BOM / CRLF / CR を正規化して zero-based hunk に変換する。
+Myers trace が 100 万 entry を超える大規模な書き換えでは、共通 prefix / suffix を除いた中間を
+1 個の置換 hunk として扱う。結果は `LoadRequest.GitDiffHunks` に含まれる。
+非同期 read は cancellation と世代番号で無効化され、folder / selection / setting の変更や dispose 後に古い preview を適用しない。
+
+git directory / common directory の HEAD / index / packed-refs / refs を `FileSystemWatcher` で監視し、
+300 ms debounce 後に `IUiDispatcher` 経由で再比較する。`.lock` と objects / logs のイベントは対象外になる。
+Git 表示を無効にすると監視を停止し、badge と preview decoration を消去する。
+通常の Markdown watcher の更新も再比較につながる。single-file mode は親フォルダーが root の場合だけ baseline を取得する。
+Git 実行の信頼境界は [ADR-0007](../.github/adr/0007-read-only-git-changes.md) に記録される。
+
 ## 関連
 
 - ADR: [0005 Single-file mode と File Activation の導入](../.github/adr/0005-single-file-mode-and-file-activation.md), [0002 クリーンアーキテクチャー風の層分割と DI](../.github/adr/0002-clean-architecture-layered-projects.md)

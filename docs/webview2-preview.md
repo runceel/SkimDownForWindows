@@ -83,7 +83,7 @@ sequenceDiagram
 
 | `type` | フィールド | 目的 |
 |---|---|---|
-| `render` | `markdown`, `sourcePath`, `contentBaseUri`, `theme`, `themeType`, `themeIsDark`, `themeVars` | Markdown 本文を渡して描画させる |
+| `render` | `markdown`, `sourcePath`, `contentBaseUri`, `theme`, `themeType`, `themeIsDark`, `themeVars`, `gitDiff`, `preserveScrollPosition` | Markdown 本文を渡して描画させる。`gitDiff` は無効時 `null`、有効時 `{ hunks: [{ newStart, newCount, oldStart, oldCount, oldLines }] }`。offset は full source の zero-based line |
 | `theme` | `theme`, `themeType`, `themeIsDark`, `themeVars` | テーマだけを切替 (Markdown は再描画しない) |
 | `zoom` | `factor` | レンダラー zoom 倍率を設定 (host の `ZoomFactor` と sync) |
 | `contentMaxWidth` | `value` (CSS 値: `"760px"` / `"960px"` / `"1200px"` / `"none"`) | 本文 (`main.markdown-body`) の `max-width` を `--skim-content-max` CSS 変数経由で上書きする (`AppSettings.ContentMaxWidth` と sync) |
@@ -97,6 +97,14 @@ sequenceDiagram
 | `scrollToAnchor` | `hash` | slug ベースのアンカースクロール |
 
 ### Renderer → Host (`window.chrome.webview.postMessage`)
+
+Git hunk は markdown-it token の line map と front matter の offset から block に対応付けられる。
+追加 / 変更の連続 block は共通 run を持ち、独立した gutter に 1 本の bar を描く。
+`ResizeObserver` は reflow / image / Mermaid / marker 展開後の bar を更新し、CSS zoom 倍率を補正する。
+以前の本文は `<details>` 内の `<pre>.textContent` として挿入され、Markdown 評価と検索の対象外になる。
+`preserveScrollPosition` は reference 更新・外部編集・表示切替時の viewport 維持に使われる。
+`empty` と次回 `render` は observer と gutter を解除する。
+`Ctrl+Shift+D` は renderer focus 時に `shortcut` の `toggle-git-changes` として host へ転送される。
 
 [`MarkdownPreview.OnWebMessageReceived`](../src/SkimDownForWindows/Viewer/MarkdownPreview.xaml.cs) で受ける。
 

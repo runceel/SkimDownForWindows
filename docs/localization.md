@@ -102,6 +102,11 @@ MarkdownCountText.Text = string.Format(
 | `MainPage.xaml.cs` | `Search/NoResults` | 検索結果ゼロ時の SearchStatus |
 | `MainPage.xaml.cs` | `Sidebar/MoveToRight`, `Sidebar/MoveToLeft` | サイドバー位置トグルの label を状態で切り替え |
 | `MainPage.xaml.cs` (`BuildPreviewLocalizedStrings`) | `MermaidZoom/*`, `TableOfContents/Title`, `TableOfContents/Empty` | WebView2 renderer に渡すローカライズ済み文字列。JS 側では `mermaidZoom.*` / `tableOfContents.*` キーとして使われる |
+| `MainPage.xaml.cs` (`BuildPreviewLocalizedStrings`) | `GitChanges/Previous`, `GitChanges/DeletedOne`, `GitChanges/DeletedMany` | plain-text Git marker のラベル。JS 側は `gitChanges.*` を使い、`{0}` を行数に置換する |
+
+View の Git 表示トグルは `GitChangesMenuItem.Text` を `x:Uid` で取得する。
+`GitStatusConverter` は `GitChanges/Modified` / `Untracked` / `Added` を
+badge の accessibility name に使い、状態に応じた WinUI の caution / success brush を返す。
 
 ## レイヤー境界
 

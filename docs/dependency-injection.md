@@ -33,6 +33,7 @@ Services = ServiceProviderFactory.Build(
 | `CommandLineLauncher` | Scoped | `Classify` 1 発のためにスコープを作る場面でも使う (App.xaml.cs 参照) |
 | `MainPageViewModel` | Scoped | `IDisposable`。Window 閉鎖時に必ず dispose される |
 | `ColorSchemeRegistry` | Singleton | カスタムテーマレジストリは全ウィンドウで共有する 1 状態 |
+| `GitChangesPreference` | Singleton | `IsGitChangesVisible` の永続設定とウィンドウ間変更通知 |
 
 ### Infrastructure 層: [`AddSkimDownInfrastructure`](../src/SkimDownForWindows.Infrastructure/DependencyInjection/InfrastructureServiceCollectionExtensions.cs)
 
@@ -50,6 +51,7 @@ Services = ServiceProviderFactory.Build(
 | `IAppInfoService` | `PackageAppInfoService` | Singleton | About ダイアログ向けメタ情報 |
 | `IAppLogger` | `FileAppLogger` | Singleton | best-effort、例外を投げない |
 | `IFolderWatcher` | `FileSystemFolderWatcher` | **Scoped** | `IUiDispatcher` 依存・Window 寿命 |
+| `IGitChangeSource` | `LocalGitChangeSource` | **Scoped** | read-only Git plumbing と HEAD / index / refs の監視。`IUiDispatcher` / `IAppLogger` 依存 |
 
 ### Presentation 層: [`ServiceProviderFactory.Build`](../src/SkimDownForWindows/Composition/ServiceProviderFactory.cs)
 
@@ -71,6 +73,7 @@ Application 層の I/F (port) と Infrastructure / Presentation 層の実装 (ad
 | [`IExternalUriLauncher`](../src/SkimDownForWindows.Application/Abstractions/IExternalUriLauncher.cs) | [`LauncherExternalUriService`](../src/SkimDownForWindows.Infrastructure/Windows/LauncherExternalUriService.cs) | Infrastructure | Singleton |
 | [`IFileSystem`](../src/SkimDownForWindows.Application/Abstractions/IFileSystem.cs) | [`LocalFileSystem`](../src/SkimDownForWindows.Infrastructure/IO/LocalFileSystem.cs) | Infrastructure | Singleton |
 | [`IFolderWatcher`](../src/SkimDownForWindows.Application/Abstractions/IFolderWatcher.cs) | [`FileSystemFolderWatcher`](../src/SkimDownForWindows.Infrastructure/IO/FileSystemFolderWatcher.cs) | Infrastructure | **Scoped** |
+| [`IGitChangeSource`](../src/SkimDownForWindows.Application/Abstractions/IGitChangeSource.cs) | [`LocalGitChangeSource`](../src/SkimDownForWindows.Infrastructure/IO/LocalGitChangeSource.cs) | Infrastructure | **Scoped** |
 | [`IMarkdownFileReader`](../src/SkimDownForWindows.Application/Abstractions/IMarkdownFileReader.cs) | [`LocalMarkdownFileReader`](../src/SkimDownForWindows.Infrastructure/IO/LocalMarkdownFileReader.cs) | Infrastructure | Singleton |
 | [`ISettingsRepository`](../src/SkimDownForWindows.Application/Abstractions/ISettingsRepository.cs) | [`JsonSettingsRepository`](../src/SkimDownForWindows.Infrastructure/IO/JsonSettingsRepository.cs) | Infrastructure | Singleton |
 | [`IShellService`](../src/SkimDownForWindows.Application/Abstractions/IShellService.cs) | [`ExplorerShellService`](../src/SkimDownForWindows.Infrastructure/Windows/ExplorerShellService.cs) | Infrastructure | Singleton |

@@ -102,6 +102,18 @@ Markdown ファイルを直接開く `single-file mode` を提供する。フォ
 - ズーム倍率は `View > Zoom` メニューおよびキーボード / マウス / タッチパッドから変更する (詳細は [ズーム](#ズーム))
 - スクロール位置は軽さを損なわない範囲でファイル単位で保存する
 
+## Git changes view
+
+- `View > Show Git Changes` (`Ctrl + Shift + D`) は既定で OFF。`IsGitChangesVisible` としてアプリ全体に永続化し、開いているすべてのウィンドウに反映する。
+- 開いたフォルダー自身が Git working-tree root の場合だけ HEAD と現在の Markdown を比較する。親リポジトリを探索しない。linked worktree の `.git` ファイルにも対応する。
+- Single-file mode は対象ファイルの親フォルダーが working-tree root の場合だけ比較する。
+- プレビューは block 単位で追加 / 変更を淡色表示し、同じ状態が連続する block は共通 gutter の 1 本の bar にまとめる。list item / table row / code / Mermaid / math / front matter にも適用する。
+- 削除・置換前の Markdown は展開可能な marker 内に plain text で表示し、HTML / Markdown として評価せず、検索対象にも含めない。
+- サイドバーは変更 `M`、未追跡 `U`、HEAD に存在しない index 登録ファイル `A`、変更を含むフォルダーに dot を表示する。ignored / unchanged は表示しない。
+- HEAD がないリポジトリは空の baseline を使う。CRLF と LF の違いだけでは変更扱いにしない。
+- Markdown 変更と HEAD / index / refs の更新で再計算し、commit / branch switch 後の表示を更新する。古い非同期結果が別フォルダーや選択のプレビューを上書きしない。
+- Git が見つからない場合や比較失敗時も Markdown は通常表示し、診断をログに残す。
+
 ## Markdown対応
 
 GitHub Flavored Markdown 寄りの表示を基本にする。
@@ -247,6 +259,7 @@ GitHub Flavored Markdown 寄りの表示を基本にする。
 ### View
 
 - `Toggle Sidebar` (`Ctrl + B`、single-file mode では無効)
+- `Show Git Changes` (`Ctrl + Shift + D`、既定 OFF)
 - `Move Sidebar to Right` / `Move Sidebar to Left` (単一項目。現在の位置に応じてラベルが切り替わる。single-file mode では無効)
 - `Zoom > Zoom In` (`Ctrl` + `+`)
 - `Zoom > Zoom Out` (`Ctrl` + `-`)
@@ -331,6 +344,16 @@ Single-file mode 中は `RecentFolders` / `LastFolderPath` / `FolderStates` / `S
 
 ## セキュリティ
 
+Git changes は絶対 PATH エントリから安全に解決した `git.exe` を shell を介さず起動する。
+current directory / 開いたフォルダー配下の実行ファイルを探索しない。継承した `GIT_*` を除去した
+最小環境を構築し、`core.fsmonitor=false`、lazy fetch 無効、optional locks 無効、対話無効とする。
+`rev-parse` / `ls-tree` / `ls-files --cached` / `cat-file blob` / `check-ignore` の
+read-only plumbing のみを用い、`git status` / `git diff` は実行しない。
+コマンドは 10 秒 timeout、出力と比較ファイルは 32 MiB 上限とし、timeout / cancellation でプロセスを終了する。
+working file の hash はアプリで計算するため clean / process filter / external diff を起動しない。
+Git metadata と HEAD blob は linked worktree の管理先を含めて読み取り、リポジトリには書き込まない。
+設計判断は [ADR-0007](../.github/adr/0007-read-only-git-changes.md) を参照。
+
 - 通常配布の Win32 / MSIX アプリとして提供する (Microsoft Store では `runFullTrust` の Win32 アプリ扱い)
 - フォルダー / ファイルアクセスはユーザーが選択したフォルダー、ドロップしたフォルダー / ファイル、CLI 引数 / file association で渡されたパス、および永続化された RecentFolders / LastFolderPath に限る
 - 読み取り専用で、開いた Markdown ファイルへの書き込み権限は要求しない
@@ -365,6 +388,11 @@ MVP では純粋ロジックをユニットテストで固める。テストプ�
 - 設定保存のデフォルト値・正規化 (`AppSettingsTests`)
 - single-file mode で RecentFolders / LastFolderPath / FolderStates / SidebarVisible が更新されないこと (`MainPageViewModelSingleFileTests`)
 - `CommandLineLauncher.TryResolveActivation` / `Classify` による activation 分類
+- Git line hunk / view preference / stale render と decoration のテスト、`node smoke-renderer.js` による Git renderer の回帰確認
+
+`SkimDownForWindows.Infrastructure.Tests` は Windows TFM の別プロジェクトとして Infrastructure を参照し、
+一時リポジトリで root 判定、unborn HEAD、M/U/A、ignored、CRLF、linked worktree、
+reference 更新、hook / filter 非実行、実行ファイル探索と子環境を検証する。
 
 UI 自動テストは MVP 外。手動確認手順は README または `docs/` に記載する。
 
