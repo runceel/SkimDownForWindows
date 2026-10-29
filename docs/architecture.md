@@ -1,6 +1,6 @@
 # アーキテクチャー
 
-SkimDown for Windows は **WinUI 3 + Windows App SDK 2.0.1 + WebView2 + CommunityToolkit.Mvvm** の Markdown ビューアーで、5 つの csproj に分割された **クリーンアーキテクチャー風** のレイアウトを採る。本ページは「いま、どのプロジェクトがどう連結しているか」のスナップショットを記述する。判断の経緯は [ADR-0002](../.github/adr/0002-clean-architecture-layered-projects.md) を参照。
+SkimDown for Windows は **WinUI 3 + Windows App SDK 2.0.1 + WebView2 + CommunityToolkit.Mvvm** の Markdown ビューアーで、6 つの csproj に分割された **クリーンアーキテクチャー風** のレイアウトを採る。本ページは「いま、どのプロジェクトがどう連結しているか」のスナップショットを記述する。判断の経緯は [ADR-0002](../.github/adr/0002-clean-architecture-layered-projects.md) を参照。
 
 ## プロジェクト構成
 
@@ -11,6 +11,7 @@ SkimDown for Windows は **WinUI 3 + Windows App SDK 2.0.1 + WebView2 + Communit
 | `SkimDownForWindows.Infrastructure` | `net10.0-windows10.0.26100.0` | Application 抽象の WinRT / `System.IO` 実装。`Microsoft.WindowsAppSDK` は **不参照** (WinUI 依存を Presentation に閉じるため) | [src/SkimDownForWindows.Infrastructure](../src/SkimDownForWindows.Infrastructure) |
 | `SkimDownForWindows` (App / Presentation) | `net10.0-windows10.0.26100.0` | XAML ページ / `MarkdownPreview` UserControl / コンポジションルート (`App.Services`) / WindowsAppSDK 依存実装 (`DispatcherQueueUiDispatcher`, `WindowService`) | [src/SkimDownForWindows](../src/SkimDownForWindows) |
 | `SkimDownForWindows.Tests` | `net10.0` | Domain + Application の単体テスト。Infrastructure は参照しない (プラットフォーム中立) | [src/SkimDownForWindows.Tests](../src/SkimDownForWindows.Tests) |
+| `SkimDownForWindows.Infrastructure.Tests` | `net10.0-windows10.0.26100.0` | Infrastructure の Git adapter を一時リポジトリで検証する Windows テスト | [src/SkimDownForWindows.Infrastructure.Tests](../src/SkimDownForWindows.Infrastructure.Tests) |
 
 ## 依存方向
 
@@ -23,6 +24,7 @@ flowchart LR
     Application["SkimDownForWindows.Application<br/><i>net10.0</i>"]
     Domain["SkimDownForWindows.Domain<br/><i>net10.0</i>"]
     Tests["SkimDownForWindows.Tests<br/><i>net10.0</i>"]
+    WindowsTests["Infrastructure.Tests<br/><i>net10.0-windows*</i>"]
 
     Presentation --> Infrastructure
     Presentation --> Application
@@ -30,11 +32,17 @@ flowchart LR
     Application --> Domain
     Tests --> Application
     Tests --> Domain
+    WindowsTests --> Infrastructure
 ```
 
 Application は Infrastructure を直接知らず、`Application/Abstractions/` 配下の I/F 経由で操作する (具体的な I/F → 実装の対応表は [dependency-injection.md](dependency-injection.md#ports--adapters-対応表))。
 
 ## 各プロジェクトの内部構造
+
+Git changes は Application の `IGitChangeSource` と Infrastructure の `LocalGitChangeSource` を境界にする。
+Application は line diff、sidebar decoration、設定共有、古い結果の無効化を担当し、
+Infrastructure は実行ファイル解決、plumbing commands、blob hash と reference 監視を担当する。
+Git が使えない場合も通常の preview 経路は維持される。関連: [ADR-0007](../.github/adr/0007-read-only-git-changes.md)。
 
 ### Domain
 

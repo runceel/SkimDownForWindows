@@ -30,6 +30,7 @@ public static class InfrastructureServiceCollectionExtensions
 
         // FolderWatcher は IUiDispatcher に依存し、ウィンドウ単位でライフサイクルを管理するため Scoped。
         services.AddScoped<IFolderWatcher, FileSystemFolderWatcher>();
+        services.AddScoped<IGitChangeSource, LocalGitChangeSource>();
 
         return services;
     }

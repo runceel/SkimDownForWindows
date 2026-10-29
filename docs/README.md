@@ -66,6 +66,7 @@
 | DI 登録の追加 / 削除 / ライフサイクル変更 (`AddSkimDownApplication` / `AddSkimDownInfrastructure` / `ServiceProviderFactory`) | `dependency-injection.md` |
 | `Application/Abstractions/` の I/F 追加 / 削除 / シグネチャ変更 | `dependency-injection.md` (Ports / Adapters 対応表) |
 | Markdown 走査・ツリー化・選択・リンク分類・変更検知ロジックの変更 | `markdown-content-pipeline.md` |
+| Git plumbing / HEAD 比較 / reference 監視 / Git decoration の変更 | `markdown-content-pipeline.md`, `webview2-preview.md` |
 | WebView2 メッセージプロトコルの追加 / 削除 (`MarkdownPreview.xaml.cs` ↔ `web/renderer.js`) | `webview2-preview.md` |
 | `AppSettings` / `FolderState` のフィールド追加 / 削除 / 既定値変更 | `settings-and-state.md` |
 | カスタムテーマ解決 (`ColorMapping` / `ColorValueValidator` / `ResolvedTheme`) の変更 | `theming.md` |

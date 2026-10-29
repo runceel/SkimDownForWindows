@@ -12,6 +12,7 @@
     mc:Ignorable="d">
 
     <Page.Resources>
+        <converters:GitStatusConverter x:Key="GitStatusConverter" />
         <converters:ModifiedTimestampToStringConverter x:Key="ModifiedTimestampToString" />
         <converters:NullableDateToVisibilityConverter x:Key="ModifiedDateToVisibility" />
     </Page.Resources>
@@ -95,6 +96,13 @@
                 <ToggleMenuFlyoutItem x:Name="TableOfContentsMenuItem"
                                       x:Uid="TableOfContentsMenuItem"
                                       Click="OnToggleTableOfContentsClick" />
+                <ToggleMenuFlyoutItem x:Name="GitChangesMenuItem"
+                                      x:Uid="GitChangesMenuItem"
+                                      Click="OnToggleGitChangesClick">
+                    <ToggleMenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control,Shift" Key="D" />
+                    </ToggleMenuFlyoutItem.KeyboardAccelerators>
+                </ToggleMenuFlyoutItem>
                 <MenuFlyoutItem x:Uid="OpenSettingsMenuItem"
                                 Click="OnOpenSettingsClick" />
                 <MenuFlyoutSeparator />
@@ -291,6 +299,7 @@
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <FontIcon Grid.Column="0"
                                                       FontFamily="Segoe Fluent Icons"
@@ -299,8 +308,14 @@
                                                       VerticalAlignment="Center" />
                                             <TextBlock Grid.Column="1"
                                                        Text="{x:Bind Name}"
+                                                       Foreground="{x:Bind GitStatus, Mode=OneWay, Converter={StaticResource GitStatusConverter}}"
                                                        TextTrimming="CharacterEllipsis"
                                                        ToolTipService.ToolTip="{x:Bind Name}" />
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{x:Bind GitBadge, Mode=OneWay}"
+                                                       AutomationProperties.Name="{x:Bind GitStatus, Mode=OneWay, Converter={StaticResource GitStatusConverter}, ConverterParameter=Name}"
+                                                       Foreground="{x:Bind GitStatus, Mode=OneWay, Converter={StaticResource GitStatusConverter}}"
+                                                       FontWeight="SemiBold" />
                                         </Grid>
                                         <Grid ColumnSpacing="6"
                                               Margin="20,0,0,0"

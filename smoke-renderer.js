@@ -95,6 +95,8 @@ async function renderMd(md, opts = {}) {
         sourcePath: opts.sourcePath || "test.md",
         contentBaseUri: "https://skimdown-content.example/",
         theme: opts.theme || "light",
+        gitDiff: opts.gitDiff,
+        preserveScrollPosition: opts.preserveScrollPosition,
     });
     // Allow microtasks / KaTeX to settle.
     await new Promise(r => setTimeout(r, 200));
@@ -737,6 +739,77 @@ async function main() {
             /body\[data-toc-drawer-open="true"\]\s+\.skim-toc\s*\{[\s\S]*transform\s*:\s*translateX\(0\)/i.test(tocMediaRule[0]),
             "rule: " + tocMediaRule[0]);
     }
+
+    console.log("[24] Git changes: source maps, block states, markers, and teardown");
+    function hunk(start, count, oldLines = []) {
+        return { newStart: start, newCount: count, oldStart: start, oldCount: oldLines.length, oldLines };
+    }
+    function gitOptions(hunks) { return { gitDiff: { hunks } }; }
+    await renderMd("# Same\n\nNew paragraph.\n\nChanged paragraph.\n",
+        gitOptions([hunk(2, 1), hunk(4, 1, ["Old paragraph."])]));
+    check("added paragraph receives added class", !!window.document.querySelector("p.skimdown-git-added"));
+    check("modified paragraph receives modified class", !!window.document.querySelector("p.skimdown-git-modified"));
+    check("unchanged heading is not decorated", !window.document.querySelector("h1").className.includes("skimdown-git-"));
+    check("previous text is expandable plain text", window.document.querySelector("details.skimdown-git-marker pre").textContent === "Old paragraph.");
+    check("all temporary anchors are removed", !window.document.querySelector("[class*='skimdown-git-anchor-'], .skimdown-git-sentinel"));
+
+    await renderMd("- parent\n  - old child\n  - new child\n",
+        gitOptions([hunk(2, 1)]));
+    var items = window.document.querySelectorAll("li");
+    check("nested list changes do not decorate parent", !items[0].className.includes("skimdown-git-added") &&
+        items[2].classList.contains("skimdown-git-added"));
+
+    await renderMd("| A | B |\n| - | - |\n| 1 | 2 |\n| 3 | 4 |\n",
+        gitOptions([hunk(3, 1, ["| 3 | 5 |"])]));
+    check("table row decoration preserves valid table marker markup",
+        !!window.document.querySelector("tr.skimdown-git-modified") &&
+        window.document.querySelector(".skimdown-git-marker-row td").colSpan === 2);
+
+    await renderMd("---\ntitle: New\n---\n\n```mermaid\ngraph TD\n```\n\n```math\nx^2\n```\n\n<div>Raw HTML</div>\n",
+        gitOptions([hunk(1, 1, ["title: Old"]), hunk(4, 3), hunk(9, 1, ["x^1"]), hunk(12, 1)]));
+    check("front matter keeps full-document line offset",
+        !!window.document.querySelector(".skimdown-frontmatter.skimdown-git-modified"));
+    check("Mermaid keeps added classes on outer scroll card",
+        !!window.document.querySelector(".skim-mermaid-wrap.skimdown-git-added"));
+    check("math fence retains modified classes",
+        !!window.document.querySelector(".skim-math-block.skimdown-git-modified"));
+    check("raw HTML receives sentinel decoration after sanitization",
+        Array.from(window.document.querySelectorAll("div.skimdown-git-added")).some(el => el.textContent === "Raw HTML"));
+
+    await renderMd("```js\nconst x = 1;\n```\n",
+        gitOptions([hunk(1, 1, ["const x = 0;"])]));
+    check("code decoration moves off code onto pre",
+        !!window.document.querySelector("pre.skimdown-git-modified") &&
+        !window.document.querySelector("pre > code").className.includes("skimdown-git-"));
+
+    var unsafePrevious = '<img src=x onerror="window.pwned=1"><script>window.pwned=1</script>';
+    await renderMd("Keep alpha.\n", gitOptions([hunk(1, 0, [unsafePrevious, "alpha removed"])]));
+    check("deleted Markdown is never rendered as HTML", !window.document.querySelector(".skimdown-git-marker img, .skimdown-git-marker script") &&
+        window.document.querySelector(".skimdown-git-previous").textContent.includes(unsafePrevious) && !window.pwned);
+    postToRenderer({ type: "search", query: "alpha" });
+    check("search excludes old text in markers",
+        window.document.querySelectorAll("mark.skim-search-hit").length === 1 &&
+        !window.document.querySelector(".skimdown-git-marker mark"));
+    postToRenderer({ type: "search/clear" });
+
+    await renderMd("# Added\n\nBody\n\n- item\n", gitOptions([hunk(0, 5)]));
+    var runs = Array.from(window.document.querySelectorAll("h1, p, li")).map(el =>
+        Array.from(el.classList).find(name => name.startsWith("skimdown-git-run-")));
+    check("consecutive added blocks share one gutter run", runs.every(run => run === runs[0]) && !!runs[0]);
+    check("pure additions do not create previous-version markers", !window.document.querySelector(".skimdown-git-marker"));
+    await renderMd("# Normal\n");
+    check("turning off Git removes gutter and decoration", !window.document.querySelector(".skimdown-git-gutter") &&
+        !window.document.getElementById("content").classList.contains("skimdown-git-diff"));
+    await renderMd("# Added", gitOptions([hunk(0, 1)]));
+    postToRenderer({ type: "empty" });
+    check("empty preview tears down Git gutter", !window.document.querySelector(".skimdown-git-gutter") &&
+        !window.document.getElementById("content").classList.contains("skimdown-git-diff"));
+    incoming.length = 0;
+    window.document.dispatchEvent(new window.KeyboardEvent("keydown", {
+        key: "D", ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true,
+    }));
+    check("Ctrl+Shift+D is forwarded from WebView2",
+        incoming.some(msg => msg.type === "shortcut" && msg.id === "toggle-git-changes"));
 
     console.log("");
     if (failures === 0) {

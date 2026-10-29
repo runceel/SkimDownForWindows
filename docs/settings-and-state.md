@@ -15,6 +15,7 @@ SkimDown for Windows は、グローバル設定 (テーマ・サイドバー幅
 | `SidebarWidth` | `double` | `280` | グローバル |
 | `SidebarVisible` | `bool` | `true` | グローバル (folder mode 用) |
 | `IsTableOfContentsVisible` | `bool` | `true` | グローバル。Markdown プレビュー右側の Table of Contents pane の表示状態 |
+| `IsGitChangesVisible` | `bool` | `false` | グローバル。HEAD 比較の表示状態。`GitChangesPreference` の変更通知で全ウィンドウを同期する |
 | `SidebarPosition` | `SidebarPosition` | `Left` | グローバル |
 | `SidebarViewMode` | `SidebarViewMode` | `Tree` | グローバル。サイドバーのファイル一覧の表示モード。`Tree`=フォルダー階層ツリー / `RecentlyModified`=全 Markdown を更新日時の新しい順に並べたフラット一覧 ([markdown-content-pipeline.md](markdown-content-pipeline.md) 参照) |
 | `ContentMaxWidth` | `ContentMaxWidth` | `Full` | グローバル。Markdown プレビュー本文の最大幅段階 (Standard=760px / Wide=960px / ExtraWide=1200px / Full=無制限)。CSS の `max-width` として効くため、ウィンドウが指定段階より狭ければ本文はウィンドウ幅にフィットし、広ければ指定段階で頭打ちになる |

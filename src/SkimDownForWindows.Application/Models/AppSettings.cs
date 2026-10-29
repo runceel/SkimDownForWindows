@@ -36,6 +36,9 @@ public sealed class AppSettings
     /// <summary>Markdown プレビュー右側の Table of Contents pane を表示するか。既定は表示。</summary>
     public bool IsTableOfContentsVisible { get; set; } = true;
 
+    /// <summary>Show read-only HEAD comparisons in the preview and sidebar. Off by default.</summary>
+    public bool IsGitChangesVisible { get; set; }
+
     /// <summary>サイドバーがウィンドウの左右どちらに表示されるか。既定は <see cref="SidebarPosition.Left"/>。</summary>
     public SidebarPosition SidebarPosition { get; set; } = SidebarPosition.Left;
 

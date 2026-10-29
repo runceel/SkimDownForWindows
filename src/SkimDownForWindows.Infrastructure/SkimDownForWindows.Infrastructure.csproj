@@ -20,6 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="SkimDownForWindows.Infrastructure.Tests" />
     <ProjectReference Include="..\SkimDownForWindows.Application\SkimDownForWindows.Application.csproj" />
   </ItemGroup>
 

@@ -20,6 +20,7 @@ Open a folder, and SkimDown shows only the Markdown files in a sidebar tree and 
 - Read-only WebView2 preview with bundled rendering assets (no CDN required, works fully offline), including rendered YAML front matter
 - Markdown rendering bundled: markdown-it + highlight.js + DOMPurify + KaTeX + Mermaid + emoji; GitHub-style alerts and inline color swatches included
 - Table of Contents pane on the right side of the Markdown preview, generated from rendered headings and toggleable from **View → Table of Contents** or Settings
+- Optional **View → Show Git Changes** (**Ctrl+Shift+D**, off by default): compare Markdown with HEAD at a Git working-tree root, with added/modified gutter bars, expandable plain-text previous/deleted content, and sidebar M/U/A badges and folder dots. Requires Git for Windows on PATH; see [Git changes](manual/07-view-and-appearance.md#git-changes).
 - In-document search for the current file (**Ctrl+F**), plus **Edit → Use Selection for Find** (Ctrl+E)
 - Zoom the preview with **Ctrl+`+`** / **Ctrl+`-`** / **Ctrl+`0`** (View → Zoom), or smoothly with **Ctrl+mouse wheel** and **precision-touchpad pinch** — the zoom level is persisted (clamped to 50–300 %)
 - Live reload — Markdown add / delete / rename / update events refresh the tree and preview (also works in single-file mode for the open file)
@@ -54,7 +55,7 @@ SkimDown runs as a **single process** per user. The second time you double-click
 
 **WinUI 3 + Windows App SDK 2.0.1** + WebView2 + CommunityToolkit.Mvvm on **.NET 10**, with **Microsoft.Extensions.DependencyInjection** for composition. WebView2 serves bundled renderer assets from one virtual host (`https://skimdown-app.example/`) while the opened folder is mapped to a separate origin (`https://skimdown-content.example/`), so a renderer bug cannot reach the user's content from the asset origin. Markdown is delivered to the renderer through `CoreWebView2.PostWebMessageAsJson` — never `NavigateToString`.
 
-The solution is split into 4 + 1 projects following clean-architecture-style layering. Dependencies flow inward only.
+The solution is split into 4 production projects and 2 test projects following clean-architecture-style layering. Dependencies flow inward only.
 
 | Project | TFM | Role |
 |---|---|---|
@@ -63,6 +64,7 @@ The solution is split into 4 + 1 projects following clean-architecture-style lay
 | **`SkimDownForWindows.Infrastructure`** | `net10.0-windows10.0.26100.0` | Platform implementations of the abstractions — `LocalFileSystem`, `FileSystemFolderWatcher`, `JsonSettingsRepository`, `WindowsClipboardService`, `ExplorerShellService`, `UiSettingsThemeProvider`, `LauncherExternalUriService`, `FileAppLogger`. References WinRT only — **does not depend on `Microsoft.WindowsAppSDK`**. |
 | **`SkimDownForWindows`** (App / Presentation) | `net10.0-windows10.0.26100.0` | XAML pages / windows / `MarkdownPreview` UserControl, the DI composition root (`App.Services`), and WindowsAppSDK-specific service implementations (`DispatcherQueueUiDispatcher`, `WindowService`). |
 | **`SkimDownForWindows.Tests`** | `net10.0` | Unit + opt-in integration tests against Domain + Application. Stays cross-platform-neutral (no Infrastructure reference). |
+| **`SkimDownForWindows.Infrastructure.Tests`** | `net10.0-windows10.0.26100.0` | Windows integration tests for read-only Git plumbing, worktrees, reference monitoring, and executable/environment isolation. |
 
 Each `MainWindow` owns its own `IServiceScope`, so window-scoped services (`IFolderWatcher`, `MainPageViewModel`, Markdown pure services, `CommandLineLauncher`) are deterministically disposed when the window is closed.
 
@@ -89,6 +91,8 @@ Detailed design documents for the upstream macOS SkimDown are in [`07JP27/SkimDo
 ```powershell
 dotnet build SkimDownForWindows.slnx          # Debug build
 dotnet test src\SkimDownForWindows.Tests      # Run unit tests
+dotnet test src\SkimDownForWindows.Infrastructure.Tests # Windows Git integration tests (Git on PATH)
+node smoke-renderer.js                      # Renderer checks (npm install first)
 ```
 
 Building and launching the WinUI 3 app requires the `winapp` CLI:

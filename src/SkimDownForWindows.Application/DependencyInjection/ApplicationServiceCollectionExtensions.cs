@@ -28,6 +28,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<MainPageViewModel>();
 
         services.AddSingleton<ColorSchemeRegistry>();
+        services.AddSingleton<GitChangesPreference>();
 
         return services;
     }

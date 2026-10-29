@@ -26,6 +26,7 @@ SkimDown のキーボードショートカットの完全なリファレンス�
 | ショートカット | 操作 |
 | --- | --- |
 | **Ctrl+B** | Toggle Sidebar（サイドバーの切り替え） |
+| **Ctrl+Shift+D** | Git の変更表示の切り替え |
 | **Ctrl + `+`** | Zoom In（拡大） |
 | **Ctrl + `-`** | Zoom Out（縮小） |
 | **Ctrl + `0`** | Actual Size（実際のサイズ。ズームをリセット） |

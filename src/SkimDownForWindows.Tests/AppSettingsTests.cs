@@ -152,6 +152,7 @@ public sealed class AppSettingsTests
             SidebarWidth = 320,
             SidebarVisible = false,
             IsTableOfContentsVisible = false,
+            IsGitChangesVisible = true,
             SidebarPosition = SidebarPosition.Right,
             ContentMaxWidth = ContentMaxWidth.ExtraWide,
             OpenContainingFolderOnSingleFileActivation = true,
@@ -183,6 +184,7 @@ public sealed class AppSettingsTests
         Assert.AreEqual(320, round.SidebarWidth);
         Assert.IsFalse(round.SidebarVisible);
         Assert.IsFalse(round.IsTableOfContentsVisible);
+        Assert.IsTrue(round.IsGitChangesVisible);
         Assert.AreEqual(SidebarPosition.Right, round.SidebarPosition);
         Assert.AreEqual(ContentMaxWidth.ExtraWide, round.ContentMaxWidth);
         Assert.IsTrue(round.OpenContainingFolderOnSingleFileActivation);
@@ -213,6 +215,7 @@ public sealed class AppSettingsTests
         Assert.AreEqual(280d, s.SidebarWidth);
         Assert.IsTrue(s.SidebarVisible);
         Assert.IsTrue(s.IsTableOfContentsVisible);
+        Assert.IsFalse(s.IsGitChangesVisible);
         Assert.AreEqual(SidebarPosition.Left, s.SidebarPosition);
         Assert.AreEqual(ContentMaxWidth.Full, s.ContentMaxWidth);
         Assert.IsFalse(s.OpenContainingFolderOnSingleFileActivation);

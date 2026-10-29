@@ -330,4 +330,25 @@
   <data name="TableOfContents.Empty" xml:space="preserve">
     <value>No headings</value>
   </data>
+  <data name="GitChangesMenuItem.Text" xml:space="preserve">
+    <value>Show Git Changes</value>
+  </data>
+  <data name="GitChanges.Previous" xml:space="preserve">
+    <value>Show previous version</value>
+  </data>
+  <data name="GitChanges.Modified" xml:space="preserve">
+    <value>Modified</value>
+  </data>
+  <data name="GitChanges.Untracked" xml:space="preserve">
+    <value>Untracked</value>
+  </data>
+  <data name="GitChanges.Added" xml:space="preserve">
+    <value>Added</value>
+  </data>
+  <data name="GitChanges.DeletedOne" xml:space="preserve">
+    <value>{0} line deleted</value>
+  </data>
+  <data name="GitChanges.DeletedMany" xml:space="preserve">
+    <value>{0} lines deleted</value>
+  </data>
 </root>

@@ -37,6 +37,8 @@ public sealed class MainPageViewModelTests
     private RealFileSystem _fs = null!;
     private InMemoryColorSchemeSource _colorSchemeSource = null!;
     private ColorSchemeRegistry _colorSchemes = null!;
+    private FakeGitChangeSource _git = null!;
+    private GitChangesPreference _gitPreference = null!;
 
     [TestInitialize]
     public void Setup()
@@ -53,6 +55,8 @@ public sealed class MainPageViewModelTests
         _fs = new RealFileSystem();
         _colorSchemeSource = new InMemoryColorSchemeSource();
         _colorSchemes = new ColorSchemeRegistry(_colorSchemeSource);
+        _git = new FakeGitChangeSource();
+        _gitPreference = new GitChangesPreference(_settings);
     }
 
     [TestCleanup]
@@ -81,7 +85,9 @@ public sealed class MainPageViewModelTests
             treeBuilder,
             recentListBuilder,
             picker,
-            linkResolver);
+            linkResolver,
+            _git,
+            _gitPreference);
     }
 
     private void Touch(string relativePath, string content = "x")
@@ -89,6 +95,116 @@ public sealed class MainPageViewModelTests
         var full = Path.Combine(_root, relativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(full)!);
         File.WriteAllText(full, content);
+    }
+
+    [TestMethod]
+    public async Task GitChanges_OffByDefault_DoesNotQueryGit()
+    {
+        Touch("README.md");
+        using var vm = CreateViewModel();
+        LoadRequest? request = null;
+        vm.PreviewLoadRequested += value => request = value;
+        await vm.OpenFolderAsync(_root);
+        Assert.AreEqual(0, _git.ReadCalls);
+        Assert.IsNull(request!.GitDiffHunks);
+    }
+
+    [TestMethod]
+    public async Task GitChanges_Enabled_DecoratesFilesAndFoldersAndClearsOnDisable()
+    {
+        Touch("docs/note.md");
+        _settings.Current.IsGitChangesVisible = true;
+        _reader.SetContent(Path.Combine(_root, "docs", "note.md"), "new\n");
+        _git.Result = new GitChanges(new Dictionary<string, string> { ["docs/note.md"] = "M" }, "old\n");
+        using var vm = CreateViewModel();
+        LoadRequest? request = null;
+        vm.PreviewLoadRequested += value => request = value;
+        await vm.OpenFolderAsync(_root);
+        Assert.AreEqual("\u25CF", vm.RootItems[0].GitBadge);
+        Assert.AreEqual("M", vm.RootItems[0].Children[0].GitBadge);
+        Assert.AreEqual("old", request!.GitDiffHunks![0].OldLines[0]);
+        await vm.SetGitChangesVisibleAsync(false);
+        Assert.AreEqual("", vm.RootItems[0].GitBadge);
+        Assert.AreEqual("", vm.RootItems[0].Children[0].GitBadge);
+        Assert.IsNull(request!.GitDiffHunks);
+        Assert.IsTrue(request.PreserveScrollPosition);
+        Assert.IsFalse(_settings.Current.IsGitChangesVisible);
+    }
+
+    [TestMethod]
+    public async Task GitChanges_ReferenceEvent_ReloadsSelectedPreview()
+    {
+        Touch("README.md");
+        _settings.Current.IsGitChangesVisible = true;
+        _git.Result = new GitChanges(new Dictionary<string, string> { ["README.md"] = "U" }, "");
+        using var vm = CreateViewModel();
+        await vm.OpenFolderAsync(_root);
+        var rendered = new TaskCompletionSource<LoadRequest>(TaskCreationOptions.RunContinuationsAsynchronously);
+        vm.PreviewLoadRequested += value => rendered.TrySetResult(value);
+        _git.RaiseRepositoryChanged();
+        var request = await rendered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.IsTrue(request.PreserveScrollPosition);
+        Assert.AreEqual(2, _git.ReadCalls);
+    }
+
+    [TestMethod]
+    public async Task GitChanges_StaleLookup_DoesNotReplaceNewFolder()
+    {
+        Touch("README.md");
+        var second = Path.Combine(_root, "second");
+        Directory.CreateDirectory(second);
+        File.WriteAllText(Path.Combine(second, "README.md"), "second");
+        _settings.Current.IsGitChangesVisible = true;
+        var pending = new TaskCompletionSource<GitChanges?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _git.Read = (root, _) => root == _root
+            ? pending.Task : Task.FromResult<GitChanges?>(null);
+        using var vm = CreateViewModel();
+        var requests = new List<LoadRequest>();
+        vm.PreviewLoadRequested += requests.Add;
+        var firstOpen = vm.OpenFolderAsync(_root);
+        await vm.OpenFolderAsync(second);
+        pending.SetResult(new GitChanges(new Dictionary<string, string> { ["README.md"] = "M" }, "stale"));
+        await firstOpen;
+        Assert.HasCount(1, requests);
+        Assert.IsNull(requests[0].GitDiffHunks);
+        Assert.AreEqual(second, _watcher.LastWatchedPath);
+        Assert.AreEqual(second, _settings.Current.LastFolderPath);
+    }
+
+    [TestMethod]
+    public async Task GitChanges_FolderStatus_PrioritizesModifiedThenAddedThenUntracked()
+    {
+        Touch("mixed/modified.md");
+        Touch("mixed/added.md");
+        Touch("mixed/untracked.md");
+        Touch("added/added.md");
+        Touch("added/untracked.md");
+        _settings.Current.IsGitChangesVisible = true;
+        _git.Result = new GitChanges(new Dictionary<string, string>
+        {
+            ["mixed/modified.md"] = "M", ["mixed/added.md"] = "A", ["mixed/untracked.md"] = "U",
+            ["added/added.md"] = "A", ["added/untracked.md"] = "U",
+        }, "");
+        using var vm = CreateViewModel();
+        await vm.OpenFolderAsync(_root);
+        Assert.AreEqual("M", vm.RootItems.Single(item => item.Name == "mixed").GitStatus);
+        Assert.AreEqual("A", vm.RootItems.Single(item => item.Name == "added").GitStatus);
+    }
+
+    [TestMethod]
+    public async Task GitChanges_SharedPreference_NotifiesAllWindowsAndUnsubscribesOnDispose()
+    {
+        using var first = CreateViewModel();
+        using var second = CreateViewModel();
+        var changes = 0;
+        second.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(second.IsGitChangesVisible)) changes++; };
+        await first.SetGitChangesVisibleAsync(true);
+        Assert.IsTrue(second.IsGitChangesVisible);
+        Assert.AreEqual(1, changes);
+        second.Dispose();
+        await first.SetGitChangesVisibleAsync(false);
+        Assert.AreEqual(1, changes);
+        Assert.IsTrue(_git.IsDisposed);
     }
 
     private void TouchWithTime(string relativePath, DateTime lastWriteUtc, string content = "x")

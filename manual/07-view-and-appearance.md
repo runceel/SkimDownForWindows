@@ -4,6 +4,24 @@ The **View** menu controls how content looks: the sidebar, theme, zoom, and text
 
 ![The View menu: Toggle Sidebar, Move Sidebar to Right, Settings, Zoom, Content Width, Theme](images/menu-view.png)
 
+## Git changes
+
+Choose **View → Show Git Changes** (**Ctrl+Shift+D**) to compare Markdown with **HEAD**.
+The option is **off by default**, remembered between sessions, and shared across windows.
+Open the **working-tree root** (the folder containing `.git`), not a subfolder.
+Git for Windows must be installed with `git.exe` on an absolute PATH entry outside the opened folder.
+
+Added blocks have green gutter bars; modified blocks have amber bars. Consecutive changes join into
+one bar. Expand **Show previous version** or a deleted-lines marker to read the old Markdown as
+plain text. The sidebar shows **M** (modified), **U** (untracked), **A** (added to the index), and
+folder dots. Ignored and unchanged files have no badge. Staged and unstaged changes are compared
+together against HEAD, not displayed separately.
+
+Commits, staging, branch switches, and Markdown edits refresh the comparison. Git reads only local
+metadata and blobs: no `git status` / `git diff`, hooks, clean filters, external diff, or lazy fetch.
+Git failures leave the normal preview available and are recorded in the app log.
+In single-file mode, comparison works only when the file's parent is the working-tree root.
+
 ## Theme
 
 Choose **View → Theme** to switch between:

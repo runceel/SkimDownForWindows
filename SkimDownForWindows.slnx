@@ -25,6 +25,11 @@
       <Platform Solution="*|x64" Project="AnyCPU" />
       <Platform Solution="*|ARM64" Project="AnyCPU" />
     </Project>
+    <Project Path="src/SkimDownForWindows.Infrastructure.Tests/SkimDownForWindows.Infrastructure.Tests.csproj">
+      <Platform Solution="*|x86" Project="AnyCPU" />
+      <Platform Solution="*|x64" Project="AnyCPU" />
+      <Platform Solution="*|ARM64" Project="AnyCPU" />
+    </Project>
     <Project Path="src/SkimDownForWindows/SkimDownForWindows.csproj">
       <Platform Solution="*|x86" Project="x86" />
       <Platform Solution="*|x64" Project="x64" />

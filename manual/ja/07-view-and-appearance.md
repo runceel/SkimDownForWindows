@@ -4,6 +4,23 @@
 
 ![View メニュー: Toggle Sidebar、Move Sidebar to Right、Settings、Zoom、Content Width、Theme](../images/menu-view.png)
 
+## Git の変更表示
+
+**View → Show Git Changes**（**Ctrl+Shift+D**）で Markdown を **HEAD** と比較できます。
+既定は OFF で、選択は保存され、すべてのウィンドウに反映されます。
+サブフォルダーではなく、`.git` がある **working-tree root** を開きます。
+Git for Windows の `git.exe` が、開いたフォルダー外の絶対 PATH エントリに必要です。
+
+追加は緑、変更は黄褐色の gutter bar になり、連続する変更は 1 本につながります。
+**Show previous version** または削除行の marker を展開すると、以前の Markdown を plain text で読めます。
+サイドバーには **M**（変更）、**U**（未追跡）、**A**（index に追加）とフォルダーの dot が表示されます。
+ignored / unchanged は表示されません。staged / unstaged は分離せず HEAD と比較します。
+
+commit、staging、branch switch、Markdown 編集で再比較します。
+Git の操作は local metadata / blob の読み取りだけで、hook、clean filter、external diff、lazy fetch は実行しません。
+Git が利用できない場合も通常のプレビューは使え、診断はログに残ります。
+single-file mode は、親フォルダー自身が working-tree root の場合だけ比較します。
+
 ## テーマ
 
 **View → Theme**（表示 → テーマ）で、次の中から切り替えます。

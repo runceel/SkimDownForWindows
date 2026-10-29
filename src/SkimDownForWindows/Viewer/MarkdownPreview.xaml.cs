@@ -60,6 +60,8 @@ public sealed partial class MarkdownPreview : UserControl
     private bool? _pendingTableOfContentsVisible;
     private IReadOnlyDictionary<string, string>? _pendingStrings;
     private string? _currentFolderRoot;
+    private IReadOnlyList<LineDiffHunk>? _pendingGitDiffHunks;
+    private bool _pendingPreserveScrollPosition;
 
     public MarkdownPreview()
     {
@@ -207,8 +209,12 @@ public sealed partial class MarkdownPreview : UserControl
         string relativePath,
         string theme,
         bool? themeIsDark = null,
-        IReadOnlyDictionary<string, string>? themeVars = null)
+        IReadOnlyDictionary<string, string>? themeVars = null,
+        IReadOnlyList<LineDiffHunk>? gitDiffHunks = null,
+        bool preserveScrollPosition = false)
     {
+        _pendingGitDiffHunks = gitDiffHunks;
+        _pendingPreserveScrollPosition = preserveScrollPosition;
         _pendingMarkdown = markdown;
         _pendingRelativePath = relativePath;
         _pendingTheme = theme;
@@ -486,6 +492,15 @@ public sealed partial class MarkdownPreview : UserControl
             type = "render",
             markdown = _pendingMarkdown,
             sourcePath = _pendingRelativePath ?? "",
+            gitDiff = _pendingGitDiffHunks is null ? null : new
+            {
+                hunks = System.Linq.Enumerable.Select(_pendingGitDiffHunks, h => new
+                {
+                    newStart = h.NewStart, newCount = h.NewCount,
+                    oldStart = h.OldStart, oldCount = h.OldCount, oldLines = h.OldLines,
+                }),
+            },
+            preserveScrollPosition = _pendingPreserveScrollPosition,
             contentBaseUri,
             theme = _pendingTheme ?? "light",
             themeType = _pendingThemeType ?? "light",
